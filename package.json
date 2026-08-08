@@ -1,0 +1,10 @@
+{
+  "name": "clash-sos",
+  "private": true,
+  "scripts": {
+    "web:build": "pnpm --dir frontend build",
+    "web:dev": "pnpm --dir frontend dev",
+    "web:lint": "pnpm --dir frontend lint",
+    "web:test": "pnpm --dir frontend test"
+  }
+}

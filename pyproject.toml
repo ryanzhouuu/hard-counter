@@ -1,0 +1,73 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "clash-sos"
+version = "0.1.0"
+description = "Clash Royale matchup and strength-of-schedule analysis"
+readme = "README.md"
+requires-python = ">=3.12,<3.14"
+dependencies = [
+  "duckdb>=1.3,<2",
+  "fastapi>=0.116,<1",
+  "polars>=1.31,<2",
+  "psycopg[binary]>=3.2,<4",
+  "pydantic-settings>=2.10,<3",
+  "sqlalchemy>=2.0,<3",
+  "typer>=0.16,<1",
+  "uvicorn[standard]>=0.35,<1",
+]
+
+[project.optional-dependencies]
+ml = [
+  "lightgbm>=4.6,<5",
+  "scikit-learn>=1.7,<2",
+  "torch>=2.7,<3",
+]
+
+[dependency-groups]
+dev = [
+  "httpx>=0.28,<1",
+  "hypothesis>=6.136,<7",
+  "pyright>=1.1.403,<2",
+  "pytest>=8.4,<10",
+  "pytest-cov>=6.2,<8",
+  "ruff>=0.12,<1",
+]
+
+[project.scripts]
+clash-sos = "clash_sos.interfaces.cli.main:app"
+clash-sos-api = "clash_sos.interfaces.api.main:run"
+clash-sos-worker = "clash_sos.interfaces.workers.main:app"
+
+[tool.hatch.build.targets.wheel]
+packages = ["backend/src/clash_sos"]
+
+[tool.pytest.ini_options]
+addopts = "--strict-config --strict-markers"
+pythonpath = ["backend/src"]
+testpaths = ["backend/tests"]
+
+[tool.coverage.run]
+branch = true
+source = ["clash_sos"]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true
+
+[tool.ruff]
+line-length = 100
+src = ["backend/src", "backend/tests"]
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
+
+[tool.pyright]
+include = ["backend/src", "backend/tests"]
+pythonVersion = "3.12"
+typeCheckingMode = "strict"
+venv = ".venv"
+venvPath = "."

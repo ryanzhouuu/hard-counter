@@ -1,0 +1,19 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: clash_sos
+      POSTGRES_PASSWORD: clash_sos
+      POSTGRES_USER: clash_sos
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U clash_sos -d clash_sos"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    ports:
+      - "5432:5432"
+    volumes:
+      - clash_sos_postgres:/var/lib/postgresql/data
+
+volumes:
+  clash_sos_postgres:
