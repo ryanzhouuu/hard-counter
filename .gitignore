@@ -1,0 +1,37 @@
+# Local configuration
+.env
+.env.*
+!.env.example
+
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# JavaScript
+node_modules/
+frontend/dist/
+frontend/coverage/
+frontend/playwright-report/
+frontend/test-results/
+
+# Local data and artifacts
+data/
+models/
+*.duckdb
+*.duckdb.tmp/
+
+# Design material is local-only
+docs/design/
+docs/plans/
+
+# Editors and operating systems
+.DS_Store
+.idea/
+.vscode/
+*.swp
