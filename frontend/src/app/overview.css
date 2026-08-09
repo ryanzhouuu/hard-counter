@@ -1,0 +1,211 @@
+.analysis-callout {
+  align-items: center;
+  background: linear-gradient(110deg, #1b1c16, #151713 70%);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  display: grid;
+  gap: 20px;
+  grid-template-columns: auto 1fr minmax(70px, 190px) auto;
+  overflow: hidden;
+  padding: 25px 28px;
+  position: relative;
+}
+.analysis-callout::after {
+  background: var(--accent);
+  content: "";
+  height: 1px;
+  left: 0;
+  opacity: 0.7;
+  position: absolute;
+  top: 0;
+  width: 28%;
+}
+.callout-mark {
+  color: var(--acid);
+  font-size: 30px;
+}
+.analysis-callout h2 {
+  font-family: Georgia, serif;
+  font-size: 21px;
+  font-weight: 400;
+  letter-spacing: -0.04em;
+  margin: 5px 0 6px;
+}
+.analysis-callout p:last-child {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
+  margin-bottom: 0;
+}
+.callout-line {
+  background: repeating-linear-gradient(
+    90deg,
+    var(--line),
+    var(--line) 2px,
+    transparent 2px,
+    transparent 7px
+  );
+  height: 1px;
+}
+.callout-index {
+  color: var(--accent);
+  font-family: Georgia, serif;
+  font-size: 20px;
+}
+.callout-index span {
+  color: var(--faint);
+  font-size: 11px;
+}
+
+.metric-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(4, 1fr);
+  margin: 12px 0 34px;
+}
+.metric-card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  min-height: 166px;
+  padding: 18px;
+}
+.metric-heading {
+  align-items: flex-start;
+  display: flex;
+  justify-content: space-between;
+  min-height: 38px;
+}
+.metric-heading p {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.35;
+  margin: 0;
+  max-width: 100px;
+}
+.metric-status {
+  color: var(--faint);
+  font-size: 9px;
+  letter-spacing: 0.03em;
+  text-align: right;
+}
+.metric-card strong {
+  color: var(--ink);
+  display: block;
+  font-family: Georgia, serif;
+  font-size: 46px;
+  font-weight: 400;
+  letter-spacing: -0.07em;
+  line-height: 1;
+  margin: 21px 0 12px;
+}
+.metric-detail {
+  color: var(--faint);
+  font-size: 10px;
+  margin: 0;
+}
+
+.lower-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(0, 1.25fr) minmax(280px, 0.75fr);
+}
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  padding: 25px 26px;
+}
+.panel-heading {
+  align-items: flex-start;
+  display: flex;
+  justify-content: space-between;
+}
+.panel h2 {
+  font-family: Georgia, serif;
+  font-size: 23px;
+  font-weight: 400;
+  letter-spacing: -0.045em;
+  margin: 7px 0 0;
+}
+.panel-count {
+  color: var(--faint);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.signal-list {
+  list-style: none;
+  margin: 28px 0 0;
+  padding: 0;
+}
+.signal-list li {
+  border-top: 1px solid var(--line);
+  display: grid;
+  gap: 16px;
+  grid-template-columns: 24px 1fr;
+  padding: 16px 0;
+}
+.signal-list li:last-child {
+  padding-bottom: 0;
+}
+.signal-list li > span {
+  color: var(--accent);
+  font-family: Georgia, serif;
+  font-size: 14px;
+}
+.signal-list strong {
+  font-size: 12px;
+  font-weight: 600;
+}
+.signal-list p {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.45;
+  margin: 5px 0 0;
+}
+.readiness-icon {
+  align-items: center;
+  background: rgba(201, 242, 122, 0.1);
+  border: 1px solid rgba(201, 242, 122, 0.3);
+  border-radius: 50%;
+  color: var(--acid);
+  display: flex;
+  font-size: 14px;
+  height: 28px;
+  justify-content: center;
+  width: 28px;
+}
+.readiness-copy {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.55;
+  margin: 28px 0;
+  max-width: 300px;
+}
+.readiness-bar {
+  background: #242b25;
+  height: 4px;
+  margin-bottom: 20px;
+  overflow: hidden;
+}
+.readiness-bar span {
+  background: var(--acid);
+  display: block;
+  height: 100%;
+  width: 72%;
+}
+.readiness-foot {
+  border-top: 1px solid var(--line);
+  display: flex;
+  font-size: 11px;
+  justify-content: space-between;
+  padding: 12px 0;
+}
+.readiness-foot strong {
+  color: var(--acid);
+  font-weight: 500;
+}
+.readiness-foot .muted {
+  color: var(--faint);
+}

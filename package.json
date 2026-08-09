@@ -1,10 +1,13 @@
 {
   "name": "clash-sos",
   "private": true,
+  "packageManager": "pnpm@11.20.0",
   "scripts": {
     "web:build": "pnpm --dir frontend build",
     "web:dev": "pnpm --dir frontend dev",
+    "web:format:check": "pnpm --dir frontend format:check",
     "web:lint": "pnpm --dir frontend lint",
-    "web:test": "pnpm --dir frontend test"
+    "web:test": "pnpm --dir frontend test",
+    "web:typecheck": "pnpm --dir frontend typecheck"
   }
 }

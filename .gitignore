@@ -15,6 +15,7 @@ htmlcov/
 
 # JavaScript
 node_modules/
+.pnpm-store/
 frontend/dist/
 frontend/coverage/
 frontend/playwright-report/
