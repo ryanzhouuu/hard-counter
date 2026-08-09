@@ -1,0 +1,61 @@
+name: Quality
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    name: Backend quality
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.10.9"
+      - name: Set up Python
+        run: uv python install 3.12
+      - name: Install Python dependencies
+        run: uv sync --locked --dev
+      - name: Run Ruff lint
+        run: uv run ruff check .
+      - name: Check Ruff formatting
+        run: uv run ruff format --check .
+      - name: Run Pyright
+        run: uv run pyright
+      - name: Run pytest
+        run: uv run pytest
+
+  frontend:
+    name: Frontend quality
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.20.0
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.18.1
+          cache: pnpm
+      - name: Install JavaScript dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Run ESLint
+        run: pnpm web:lint
+      - name: Check Prettier formatting
+        run: pnpm web:format:check
+      - name: Run TypeScript check
+        run: pnpm web:typecheck
+      - name: Run Vitest
+        run: pnpm web:test
+      - name: Build web application
+        run: pnpm web:build
