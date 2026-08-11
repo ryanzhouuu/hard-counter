@@ -120,6 +120,27 @@ def test_battle_requires_distinct_sides_aligned_levels_and_era() -> None:
     assert battle.side_a.card_levels == (16,) * 8
 
 
+def test_battle_fingerprint_is_independent_of_side_orientation() -> None:
+    battle = Battle(
+        side_a=side("#AAA111"),
+        side_b=side("#BBB222", deck(offset=8)),
+        outcome=BattleOutcome.SIDE_A_WIN,
+        timestamp=datetime(2026, 6, 15, tzinfo=UTC),
+        mode="Ranked1v1_NewArena",
+        source_id="kaggle:source:v6:row-1",
+        balance_era=era(),
+    )
+    swapped = battle.model_copy(
+        update={
+            "side_a": battle.side_b,
+            "side_b": battle.side_a,
+            "outcome": battle.outcome.swapped(),
+        }
+    )
+
+    assert battle.fingerprint == swapped.fingerprint
+
+
 def test_battle_rejects_naive_or_out_of_era_timestamp() -> None:
     with pytest.raises(ValidationError, match="timezone-aware"):
         Battle(

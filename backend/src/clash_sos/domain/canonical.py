@@ -114,6 +114,11 @@ class RecordIssue(StrEnum):
     INCOMPLETE_DECK = "incomplete_deck"
     DUPLICATE_BATTLE = "duplicate_battle"
     UNSUPPORTED_MODE = "unsupported_mode"
+    NON_MAX_CARD_LEVEL = "non_max_card_level"
+    DRAW_OUTCOME = "draw_outcome"
+    STALE_BALANCE_ERA = "stale_balance_era"
+    UNAVAILABLE_MODEL_COVERAGE = "unavailable_model_coverage"
+    TARGET_PLAYER_NOT_FOUND = "target_player_not_found"
     INSUFFICIENT_HISTORY = "insufficient_history"
 
 
@@ -200,3 +205,23 @@ class Battle(DomainModel):
         if not self.balance_era.contains(self.timestamp):
             raise ValueError("battle timestamp must fall within its balance era")
         return self
+
+    @computed_field
+    @property
+    def fingerprint(self) -> str:
+        """Return an orientation-independent identity for deterministic ordering."""
+
+        side_payloads = sorted(
+            "|".join(
+                (
+                    side.player_id.value,
+                    side.deck.canonical_hash,
+                    ",".join(str(level) for level in side.card_levels),
+                )
+            )
+            for side in (self.side_a, self.side_b)
+        )
+        payload = "|".join(
+            (self.source_id, self.mode, self.timestamp.isoformat(), *side_payloads)
+        )
+        return sha256(payload.encode("utf-8")).hexdigest()
