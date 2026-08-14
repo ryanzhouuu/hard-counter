@@ -10,6 +10,8 @@ from clash_sos.domain.manifests import (
 
 KAGGLE_V6_SOURCE_ID = "kaggle:jackmangione/clash-royale-matchups-june2026:v6"
 KAGGLE_V6_ARCHIVE_NAME = "clash-royale-matchups-june2026-v6.zip"
+KAGGLE_V6_ARCHIVE_SIZE = 6_148_754_593
+KAGGLE_V6_ARCHIVE_SHA256 = "280ab43d916b34dd178856ada449a69cf8130f5200737572ecd994eadaa5a89b"
 KAGGLE_V6_CARD_MAPPING_NAME = "cardToID.json"
 
 KAGGLE_V6_SOURCE = SourceManifest(
