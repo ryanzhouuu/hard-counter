@@ -1,0 +1,39 @@
+"""Pinned source registration for the Kaggle version 6 snapshot."""
+
+from pydantic import AnyHttpUrl
+
+from clash_sos.domain.manifests import (
+    LicenseManifest,
+    RetrievalManifest,
+    SourceManifest,
+)
+
+KAGGLE_V6_SOURCE_ID = "kaggle:jackmangione/clash-royale-matchups-june2026:v6"
+KAGGLE_V6_ARCHIVE_NAME = "clash-royale-matchups-june2026-v6.zip"
+KAGGLE_V6_CARD_MAPPING_NAME = "cardToID.json"
+
+KAGGLE_V6_SOURCE = SourceManifest(
+    source_id=KAGGLE_V6_SOURCE_ID,
+    provider="kaggle",
+    dataset_handle="jackmangione/clash-royale-matchups-june2026",
+    dataset_version=6,
+    dataset_url=AnyHttpUrl(
+        "https://www.kaggle.com/datasets/jackmangione/clash-royale-matchups-june2026"
+    ),
+    license=LicenseManifest(
+        identifier="CC-BY-NC-SA-4.0",
+        name="Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International",
+        url=AnyHttpUrl("https://creativecommons.org/licenses/by-nc-sa/4.0/"),
+        restrictions=("noncommercial_use", "attribution", "share_alike"),
+    ),
+    known_limitations=(
+        "Rows are winner-first and do not represent draws.",
+        "The source supplies no battle identifier.",
+        "Source timestamps use America/New_York and require UTC normalization.",
+        "Only Ranked1v1_NewArena at observed card level 16 is supported by v1.",
+    ),
+    retrieval=RetrievalManifest(
+        method="manual_download",
+        notes="Pinned Kaggle dataset version 6; raw archive remains immutable.",
+    ),
+)
