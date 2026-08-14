@@ -72,9 +72,7 @@ def battle(
         card_levels=(card_level,) * 8,
     )
     side_a, side_b = (
-        (target_side, opponent_side)
-        if target_on_side_a
-        else (opponent_side, target_side)
+        (target_side, opponent_side) if target_on_side_a else (opponent_side, target_side)
     )
     record = BattleAnalysisRecord(
         battle=Battle(
