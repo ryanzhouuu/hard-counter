@@ -14,7 +14,9 @@ from clash_sos.domain.canonical import (
     Deck,
     DomainModel,
     PlayerId,
+    RecordDisposition,
     RecordIssue,
+    RecordState,
 )
 from clash_sos.infrastructure.kaggle_v6.catalog import KAGGLE_V6_CARDS, KaggleCardCatalog
 from clash_sos.infrastructure.kaggle_v6.schema import ROW_COLUMNS
@@ -31,6 +33,12 @@ KAGGLE_V6_BALANCE_ERA = BalanceEra(
 class SourceRowLocation(DomainModel):
     archive_member: str = Field(min_length=1)
     row_number: int = Field(ge=0)
+
+
+class AdaptedKaggleRecord(DomainModel):
+    location: SourceRowLocation
+    battle: Battle | None
+    disposition: RecordDisposition
 
 
 class KaggleRowError(ValueError):
@@ -68,10 +76,45 @@ def adapt_valid_row(
         raise KaggleRowError(RecordIssue.MALFORMED_ROW, str(error)) from error
 
 
+def adapt_row(
+    row: Mapping[str, object],
+    *,
+    location: SourceRowLocation,
+    catalog: KaggleCardCatalog = KAGGLE_V6_CARDS,
+) -> AdaptedKaggleRecord:
+    try:
+        battle = adapt_valid_row(row, catalog=catalog)
+    except KaggleRowError as error:
+        invalid_issues = {RecordIssue.MALFORMED_ROW, RecordIssue.MALFORMED_TIMESTAMP}
+        state = RecordState.INVALID if error.issue in invalid_issues else RecordState.QUARANTINED
+        return AdaptedKaggleRecord(
+            location=location,
+            battle=None,
+            disposition=RecordDisposition(
+                state=state,
+                issues=(error.issue,),
+                detail=error.detail,
+            ),
+        )
+
+    issues: list[RecordIssue] = []
+    if battle.mode != "Ranked1v1_NewArena":
+        issues.append(RecordIssue.UNSUPPORTED_MODE)
+    if any(level != 16 for side in (battle.side_a, battle.side_b) for level in side.card_levels):
+        issues.append(RecordIssue.NON_MAX_CARD_LEVEL)
+    disposition = (
+        RecordDisposition(state=RecordState.UNSUPPORTED, issues=tuple(issues))
+        if issues
+        else RecordDisposition(state=RecordState.VALID)
+    )
+    return AdaptedKaggleRecord(location=location, battle=battle, disposition=disposition)
+
+
 def _side(row: Mapping[str, object], side: str, catalog: KaggleCardCatalog) -> BattleSide:
     player = PlayerId(_required_string(row[f"{side}_id"], f"{side}_id"))
     cards: list[CardRef] = []
     levels: list[int] = []
+    identities: set[str] = set()
     for index in range(8):
         card_value = row[f"{side}_card_{index}"]
         if card_value is None:
@@ -80,6 +123,9 @@ def _side(row: Mapping[str, object], side: str, catalog: KaggleCardCatalog) -> B
         entry = catalog.find(source_id)
         if entry is None:
             raise KaggleRowError(RecordIssue.UNKNOWN_CARD, f"unknown source card ID {source_id}")
+        if entry.card.identity_key in identities:
+            raise KaggleRowError(RecordIssue.REPEATED_CARD, f"{side} deck repeats a card")
+        identities.add(entry.card.identity_key)
         cards.append(entry.card)
 
         level_value = row[f"{side}_card_{index}_level"]
