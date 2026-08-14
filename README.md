@@ -2,7 +2,9 @@
 
 Clash Royale matchup analysis for rolling strength of schedule, expected wins, and performance above expectation.
 
-The project is in its initial scaffold phase. The backend, web application, CLI, workers, and notebooks will share one versioned analytics model.
+R1 is complete: the canonical analytics contracts and pinned Kaggle version 6 source are
+executable and verified against the full local archive. R2, the reproducible ranked-data
+foundation, is next.
 
 ## Toolchain
 
@@ -42,6 +44,16 @@ uv run clash-sos version
 uv run clash-sos-worker status
 ```
 
+Audit the pinned Kaggle version 6 archive and write its ignored local manifest:
+
+```bash
+uv run clash-sos dataset audit-kaggle-v6
+```
+
+The command verifies the archive identity, member checksums, card catalog, and all Parquet
+schemas before writing `data/metadata/kaggle-v6-dataset.json`. It profiles the archive with
+bounded memory and does not create the R2 processed dataset.
+
 ## Quality checks
 
 Run the same checks used by GitHub Actions:
@@ -58,9 +70,8 @@ pnpm web:test
 pnpm web:build
 ```
 
-## Planned interfaces
+## Project status
 
-- FastAPI HTTP API
-- React and TypeScript dashboard
-- Typer CLI
-- Jupyter notebooks
+- R0 repository scaffold: complete.
+- R1 analytics and source-data contract: complete.
+- R2 reproducible ranked-data foundation: next.
