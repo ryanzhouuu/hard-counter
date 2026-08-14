@@ -109,7 +109,9 @@ class RecordState(StrEnum):
 
 
 class RecordIssue(StrEnum):
+    MALFORMED_ROW = "malformed_row"
     MALFORMED_TIMESTAMP = "malformed_timestamp"
+    INCOMPATIBLE_SOURCE_SCHEMA = "incompatible_source_schema"
     UNKNOWN_CARD = "unknown_card"
     REPEATED_CARD = "repeated_card"
     INCOMPLETE_DECK = "incomplete_deck"
