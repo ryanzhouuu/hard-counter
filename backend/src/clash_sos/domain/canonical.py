@@ -116,6 +116,7 @@ class RecordIssue(StrEnum):
     REPEATED_CARD = "repeated_card"
     INCOMPLETE_DECK = "incomplete_deck"
     DUPLICATE_BATTLE = "duplicate_battle"
+    CONFLICTING_BATTLE = "conflicting_battle"
     UNSUPPORTED_MODE = "unsupported_mode"
     NON_MAX_CARD_LEVEL = "non_max_card_level"
     DRAW_OUTCOME = "draw_outcome"

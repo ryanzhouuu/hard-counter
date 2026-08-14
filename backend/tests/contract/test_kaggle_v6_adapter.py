@@ -2,6 +2,7 @@ from datetime import UTC, datetime, timedelta, timezone
 
 import pytest
 
+from clash_sos.application.dataset_audit import BattleIdentityIndex
 from clash_sos.domain.canonical import BattleOutcome, CardForm, RecordIssue, RecordState
 from clash_sos.infrastructure.kaggle_v6.adapter import (
     KaggleRowError,
@@ -175,3 +176,38 @@ def test_unsupported_mode_and_level_are_both_reported() -> None:
         RecordIssue.UNSUPPORTED_MODE,
         RecordIssue.NON_MAX_CARD_LEVEL,
     )
+
+
+def test_duplicates_across_source_locations_are_detected() -> None:
+    index = BattleIdentityIndex()
+    first = adapt_row(valid_row(), location=location())
+    second_location = SourceRowLocation(archive_member="other.parquet", row_number=2)
+    second = adapt_row(valid_row(), location=second_location)
+    assert first.battle is not None
+    assert second.battle is not None
+
+    assert index.observe(first.battle, location=first.location.identity_key) is None
+    duplicate = index.observe(second.battle, location=second.location.identity_key)
+
+    assert duplicate is not None
+    assert duplicate.issues == (RecordIssue.DUPLICATE_BATTLE,)
+
+
+def test_swapped_winner_record_is_a_conflict() -> None:
+    index = BattleIdentityIndex()
+    first = adapt_row(valid_row(), location=location())
+    swapped_row = valid_row()
+    for suffix in ("id", *(f"card_{index}" for index in range(8))):
+        swapped_row[f"winner_{suffix}"], swapped_row[f"loser_{suffix}"] = (
+            swapped_row[f"loser_{suffix}"],
+            swapped_row[f"winner_{suffix}"],
+        )
+    assert first.battle is not None
+    conflict_record = adapt_row(swapped_row, location=location())
+    assert conflict_record.battle is not None
+
+    assert index.observe(first.battle, location="first") is None
+    conflict = index.observe(conflict_record.battle, location="second")
+
+    assert conflict is not None
+    assert conflict.issues == (RecordIssue.CONFLICTING_BATTLE,)

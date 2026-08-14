@@ -34,6 +34,10 @@ class SourceRowLocation(DomainModel):
     archive_member: str = Field(min_length=1)
     row_number: int = Field(ge=0)
 
+    @property
+    def identity_key(self) -> str:
+        return f"{self.archive_member}:{self.row_number}"
+
 
 class AdaptedKaggleRecord(DomainModel):
     location: SourceRowLocation
