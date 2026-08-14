@@ -1,9 +1,10 @@
 """Canonical domain values and entities shared by preparation and application services."""
 
 import re
-from datetime import datetime
+from datetime import UTC, datetime
 from enum import StrEnum
 from hashlib import sha256
+from json import dumps
 from typing import Self
 
 from pydantic import (
@@ -208,20 +209,44 @@ class Battle(DomainModel):
 
     @computed_field
     @property
-    def fingerprint(self) -> str:
-        """Return an orientation-independent identity for deterministic ordering."""
+    def event_key(self) -> str:
+        """Identify an event independently of side orientation and outcome."""
 
-        side_payloads = sorted(
-            "|".join(
-                (
-                    side.player_id.value,
-                    side.deck.canonical_hash,
-                    ",".join(str(level) for level in side.card_levels),
-                )
-            )
-            for side in (self.side_a, self.side_b)
+        return self._identity_hash(include_outcome=False)
+
+    @computed_field
+    @property
+    def fingerprint(self) -> str:
+        """Identify an event and its normalized outcome."""
+
+        return self._identity_hash(include_outcome=True)
+
+    def _identity_hash(self, *, include_outcome: bool) -> str:
+        side_a = self._side_identity(self.side_a)
+        side_b = self._side_identity(self.side_b)
+        sides = sorted((side_a, side_b), key=lambda side: dumps(side, separators=(",", ":")))
+        payload: dict[str, object] = {
+            "source_id": self.source_id,
+            "mode": self.mode,
+            "timestamp": self.timestamp.astimezone(UTC).isoformat(),
+            "sides": sides,
+        }
+        if include_outcome:
+            payload["winner"] = self._winner_identity(side_a, side_b)
+        encoded = dumps(payload, separators=(",", ":"), sort_keys=True).encode()
+        return sha256(encoded).hexdigest()
+
+    @staticmethod
+    def _side_identity(side: BattleSide) -> dict[str, object]:
+        cards = sorted(
+            (card.identity_key, level)
+            for card, level in zip(side.deck.cards, side.card_levels, strict=True)
         )
-        payload = "|".join(
-            (self.source_id, self.mode, self.timestamp.isoformat(), *side_payloads)
-        )
-        return sha256(payload.encode("utf-8")).hexdigest()
+        return {"player_id": side.player_id.value, "cards": cards}
+
+    def _winner_identity(
+        self, side_a: dict[str, object], side_b: dict[str, object]
+    ) -> dict[str, object] | str:
+        if self.outcome is BattleOutcome.DRAW:
+            return "draw"
+        return side_a if self.outcome is BattleOutcome.SIDE_A_WIN else side_b
