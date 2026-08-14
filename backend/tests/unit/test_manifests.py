@@ -11,6 +11,7 @@ from clash_sos.domain.manifests import (
     DatasetSchemaManifest,
     DatasetValidationManifest,
     LicenseManifest,
+    ModeCountManifest,
     RetrievalManifest,
     SchemaColumnManifest,
     SourceManifest,
@@ -68,6 +69,7 @@ def dataset_manifest() -> DatasetManifest:
             timestamp_min=datetime(2026, 6, 21, tzinfo=UTC),
             timestamp_max=datetime(2026, 6, 21, tzinfo=UTC),
             modes=("Ranked1v1_NewArena",),
+            mode_counts=(ModeCountManifest(mode="Ranked1v1_NewArena", row_count=1),),
             card_id_min=0,
             card_id_max=175,
         ),
@@ -120,3 +122,80 @@ def test_manifest_rejects_unknown_fields() -> None:
         payload = source_manifest().model_dump()
         payload["extra_field"] = "unexpected"
         SourceManifest.model_validate(payload)
+
+
+def test_schema_physical_type_semantics_are_documented() -> None:
+    description = SchemaColumnManifest.model_json_schema()["properties"]["physical_type"]
+
+    assert description["description"] == (
+        "DuckDB DESCRIBE SQL type for dataset manifest version 1."
+    )
+
+
+def test_manifest_requires_sorted_unique_file_inventory() -> None:
+    manifest = dataset_manifest()
+    duplicate = manifest.files[0].model_copy(update={"row_count": 1})
+
+    with pytest.raises(ValidationError, match="unique, sorted"):
+        DatasetManifest.model_validate(
+            {
+                **manifest.model_dump(by_alias=True),
+                "files": [duplicate.model_dump(), duplicate.model_dump()],
+            }
+        )
+
+
+def test_manifest_reconciles_file_and_observation_rows() -> None:
+    manifest = dataset_manifest()
+    counted_file = manifest.files[0].model_copy(update={"row_count": 2})
+
+    with pytest.raises(ValidationError, match="reconcile"):
+        manifest.model_copy(update={"files": (counted_file,)}).model_validate(
+            {**manifest.model_dump(by_alias=True), "files": [counted_file.model_dump()]}
+        )
+
+
+def test_modes_are_sorted_unique_and_reconcile_with_rows() -> None:
+    with pytest.raises(ValidationError, match="unique, sorted"):
+        DatasetObservationsManifest(
+            row_count=2,
+            modes=("Ranked", "Ladder"),
+            mode_counts=(
+                ModeCountManifest(mode="Ranked", row_count=1),
+                ModeCountManifest(mode="Ladder", row_count=1),
+            ),
+        )
+
+    with pytest.raises(ValidationError, match="sum to row_count"):
+        DatasetObservationsManifest(
+            row_count=2,
+            modes=("Ranked",),
+            mode_counts=(ModeCountManifest(mode="Ranked", row_count=1),),
+        )
+
+
+def test_validation_counts_are_all_or_none_and_reconcile() -> None:
+    with pytest.raises(ValidationError, match="all present or all absent"):
+        DatasetValidationManifest(status="passed", accepted_rows=1)
+
+    manifest = dataset_manifest()
+    with pytest.raises(ValidationError, match="reconcile"):
+        DatasetManifest.model_validate(
+            {
+                **manifest.model_dump(by_alias=True),
+                "validation": {
+                    "status": "passed",
+                    "accepted_rows": 0,
+                    "rejected_rows": 0,
+                    "quarantined_rows": 0,
+                },
+            }
+        )
+
+
+def test_manifest_timestamps_must_be_timezone_aware() -> None:
+    with pytest.raises(ValidationError, match="timezone-aware"):
+        DatasetObservationsManifest(timestamp_min=datetime(2026, 6, 21))
+
+    with pytest.raises(ValidationError, match="timezone-aware"):
+        RetrievalManifest(method="manual_download", retrieved_at=datetime(2026, 6, 21))
