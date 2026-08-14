@@ -57,7 +57,11 @@ def _load_catalog() -> KaggleCardCatalog:
     )
     catalog = KaggleCardCatalog(version=payload["catalog_version"], entries=entries)
     source_ids = [entry.source_id for entry in entries]
-    if source_ids != list(range(176)) or len({entry.source_name for entry in entries}) != 176:
+    if (
+        source_ids != list(range(176))
+        or len({entry.source_name for entry in entries}) != 176
+        or len({entry.card.identity_key for entry in entries}) != 176
+    ):
         raise ValueError("Kaggle v6 card catalog must cover unique source IDs 0 through 175")
     base_cards = {
         entry.card.card_id.value

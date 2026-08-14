@@ -9,6 +9,7 @@ def test_catalog_has_complete_unique_source_coverage() -> None:
 
     assert [entry.source_id for entry in entries] == list(range(176))
     assert len({entry.source_name for entry in entries}) == 176
+    assert len({entry.card.identity_key for entry in entries}) == 176
 
 
 def test_catalog_maps_forms_to_explicit_base_card_ids() -> None:
