@@ -122,11 +122,14 @@ def test_battle_requires_distinct_sides_aligned_levels_and_era() -> None:
     assert battle.side_a.card_levels == (16,) * 8
 
 
-def test_battle_fingerprint_is_independent_of_side_orientation() -> None:
+@given(st.sampled_from(tuple(BattleOutcome)))
+def test_battle_fingerprint_is_independent_of_side_orientation(
+    outcome: BattleOutcome,
+) -> None:
     battle = Battle(
         side_a=side("#AAA111"),
         side_b=side("#BBB222", deck(offset=8)),
-        outcome=BattleOutcome.SIDE_A_WIN,
+        outcome=outcome,
         timestamp=datetime(2026, 6, 15, tzinfo=UTC),
         mode="Ranked1v1_NewArena",
         source_id="kaggle:source:v6:row-1",
@@ -171,7 +174,8 @@ def test_battle_identity_preserves_card_level_alignment_across_deck_order(
     assert battle.fingerprint == battle.model_copy(update={"side_a": reordered_side}).fingerprint
 
 
-def test_battle_identity_normalizes_equivalent_timestamp_offsets() -> None:
+@given(st.integers(min_value=-12, max_value=14))
+def test_battle_identity_normalizes_equivalent_timestamp_offsets(offset: int) -> None:
     battle = Battle(
         side_a=side("#AAA111"),
         side_b=side("#BBB222", deck(offset=8)),
@@ -182,24 +186,27 @@ def test_battle_identity_normalizes_equivalent_timestamp_offsets() -> None:
         balance_era=era(),
     )
     equivalent = battle.model_copy(
-        update={"timestamp": battle.timestamp.astimezone(timezone(timedelta(hours=-4)))}
+        update={"timestamp": battle.timestamp.astimezone(timezone(timedelta(hours=offset)))}
     )
 
     assert battle.fingerprint == equivalent.fingerprint
     assert battle.event_key == equivalent.event_key
 
 
-def test_battle_fingerprint_distinguishes_conflicting_outcomes() -> None:
+@given(st.sampled_from((BattleOutcome.SIDE_A_WIN, BattleOutcome.SIDE_B_WIN)))
+def test_battle_fingerprint_distinguishes_conflicting_outcomes(
+    outcome: BattleOutcome,
+) -> None:
     battle = Battle(
         side_a=side("#AAA111"),
         side_b=side("#BBB222", deck(offset=8)),
-        outcome=BattleOutcome.SIDE_A_WIN,
+        outcome=outcome,
         timestamp=datetime(2026, 6, 15, tzinfo=UTC),
         mode="Ranked1v1_NewArena",
         source_id="kaggle:source:v6",
         balance_era=era(),
     )
-    conflict = battle.model_copy(update={"outcome": BattleOutcome.SIDE_B_WIN})
+    conflict = battle.model_copy(update={"outcome": outcome.swapped()})
 
     assert battle.event_key == conflict.event_key
     assert battle.fingerprint != conflict.fingerprint
