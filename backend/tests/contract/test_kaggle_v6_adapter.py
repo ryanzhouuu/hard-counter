@@ -5,6 +5,7 @@ import pytest
 from clash_sos.application.dataset_audit import BattleIdentityIndex
 from clash_sos.domain.canonical import BattleOutcome, CardForm, RecordIssue, RecordState
 from clash_sos.infrastructure.kaggle_v6.adapter import (
+    KAGGLE_V6_BALANCE_ERA,
     KaggleRowError,
     SourceRowLocation,
     adapt_row,
@@ -16,7 +17,12 @@ from clash_sos.infrastructure.kaggle_v6.schema import (
     KaggleSchemaColumn,
     validate_kaggle_v6_schema,
 )
-from clash_sos.infrastructure.kaggle_v6.source import KAGGLE_V6_SOURCE_ID
+from clash_sos.infrastructure.kaggle_v6.source import (
+    KAGGLE_V6_OBSERVED_TIMESTAMP_EXCLUSIVE_END_UTC,
+    KAGGLE_V6_OBSERVED_TIMESTAMP_MAX_UTC,
+    KAGGLE_V6_OBSERVED_TIMESTAMP_MIN_UTC,
+    KAGGLE_V6_SOURCE_ID,
+)
 
 
 def valid_row() -> dict[str, object]:
@@ -46,6 +52,12 @@ def test_valid_winner_first_row_adapts_to_canonical_battle() -> None:
     assert battle.side_b.player_id.value == "#LOSER"
     assert battle.side_a.deck.cards[0].card_id.value == "knight"
     assert battle.timestamp == datetime(2026, 6, 21, 12, tzinfo=UTC)
+
+
+def test_balance_era_covers_the_audited_timestamp_range() -> None:
+    assert KAGGLE_V6_BALANCE_ERA.contains(KAGGLE_V6_OBSERVED_TIMESTAMP_MIN_UTC)
+    assert KAGGLE_V6_BALANCE_ERA.contains(KAGGLE_V6_OBSERVED_TIMESTAMP_MAX_UTC)
+    assert not KAGGLE_V6_BALANCE_ERA.contains(KAGGLE_V6_OBSERVED_TIMESTAMP_EXCLUSIVE_END_UTC)
 
 
 def test_adapter_preserves_deck_and_level_order() -> None:

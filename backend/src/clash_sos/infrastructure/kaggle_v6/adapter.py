@@ -20,12 +20,16 @@ from clash_sos.domain.canonical import (
 )
 from clash_sos.infrastructure.kaggle_v6.catalog import KAGGLE_V6_CARDS, KaggleCardCatalog
 from clash_sos.infrastructure.kaggle_v6.schema import ROW_COLUMNS
-from clash_sos.infrastructure.kaggle_v6.source import KAGGLE_V6_SOURCE_ID
+from clash_sos.infrastructure.kaggle_v6.source import (
+    KAGGLE_V6_OBSERVED_TIMESTAMP_EXCLUSIVE_END_UTC,
+    KAGGLE_V6_OBSERVED_TIMESTAMP_MIN_UTC,
+    KAGGLE_V6_SOURCE_ID,
+)
 
 KAGGLE_V6_BALANCE_ERA = BalanceEra(
     era_id="2026-06-kaggle-v6",
-    valid_from=datetime(2026, 6, 1, tzinfo=UTC),
-    valid_to=datetime(2026, 7, 1, tzinfo=UTC),
+    valid_from=KAGGLE_V6_OBSERVED_TIMESTAMP_MIN_UTC,
+    valid_to=KAGGLE_V6_OBSERVED_TIMESTAMP_EXCLUSIVE_END_UTC,
     card_catalog_version=KAGGLE_V6_CARDS.version,
 )
 
