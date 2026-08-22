@@ -1,7 +1,7 @@
 """Canonical domain values and entities shared by preparation and application services."""
 
 import re
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from enum import StrEnum
 from hashlib import sha256
 from itertools import pairwise
@@ -149,6 +149,18 @@ class BalanceChange(DomainModel):
     summary: str = Field(min_length=1)
 
 
+class EraBoundaryPolicy(StrEnum):
+    """Map a documented update date onto a registry interval boundary."""
+
+    AT_STATED_DATE = "at_stated_date"
+    DAY_AFTER_STATED_DATE = "day_after_stated_date"
+
+    def boundary(self, stated_date: datetime) -> datetime:
+        if self is EraBoundaryPolicy.DAY_AFTER_STATED_DATE:
+            return stated_date + timedelta(days=1)
+        return stated_date
+
+
 class EraBoundaryEvidence(DomainModel):
     """Stable citation for one balance-era interval boundary."""
 
@@ -156,7 +168,7 @@ class EraBoundaryEvidence(DomainModel):
     reference: AnyHttpUrl
     stated_date: datetime
     precision: Literal["day"]
-    boundary_policy: str = Field(min_length=1)
+    boundary_policy: EraBoundaryPolicy
 
     @field_validator("stated_date")
     @classmethod
@@ -184,10 +196,17 @@ class BalanceEra(DomainModel):
 
     @model_validator(mode="after")
     def validate_range(self) -> Self:
-        if self.valid_to is not None and self.valid_to <= self.valid_from:
-            raise ValueError("balance-era valid_to must be later than valid_from")
-        if self.valid_to is not None and self.end_evidence is None:
-            raise ValueError("finite balance-era boundaries require end-evidence provenance")
+        end_evidence = self.end_evidence
+        if self.valid_to is not None:
+            if self.valid_to <= self.valid_from:
+                raise ValueError("balance-era valid_to must be later than valid_from")
+            if end_evidence is None:
+                raise ValueError("finite balance-era boundaries require end-evidence provenance")
+            if end_evidence.boundary_policy.boundary(end_evidence.stated_date) != self.valid_to:
+                raise ValueError("valid_to must align with its evidence date and policy")
+        start = self.start_evidence
+        if start.boundary_policy.boundary(start.stated_date) != self.valid_from:
+            raise ValueError("valid_from must align with its evidence date and policy")
         return self
 
     def contains(self, timestamp: datetime) -> bool:
@@ -202,13 +221,17 @@ class BalanceEraRegistry(DomainModel):
     registry_version: str = Field(min_length=1)
     eras: tuple[BalanceEra, ...] = ()
 
+    @field_validator("eras")
+    @classmethod
+    def normalize_order(cls, value: tuple[BalanceEra, ...]) -> tuple[BalanceEra, ...]:
+        return tuple(sorted(value, key=lambda era: (era.valid_from, era.era_id)))
+
     @model_validator(mode="after")
     def validate_eras(self) -> Self:
         era_ids = [era.era_id for era in self.eras]
         if len(set(era_ids)) != len(era_ids):
             raise ValueError("balance-era IDs must be unique within a registry")
-        ordered = sorted(self.eras, key=lambda era: era.valid_from)
-        for earlier, later in pairwise(ordered):
+        for earlier, later in pairwise(self.eras):
             if earlier.valid_to is None or earlier.valid_to > later.valid_from:
                 raise ValueError("balance-era intervals must not overlap")
         return self
@@ -251,6 +274,12 @@ class Battle(DomainModel):
         if value.tzinfo is None or value.utcoffset() is None:
             raise ValueError("battle timestamp must be timezone-aware")
         return value
+
+    @model_validator(mode="after")
+    def validate_distinct_sides(self) -> Self:
+        if self.side_a.player_id == self.side_b.player_id:
+            raise ValueError("battle sides must have distinct players")
+        return self
 
     @computed_field
     @property

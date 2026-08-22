@@ -4,7 +4,12 @@ from datetime import UTC, datetime
 
 from pydantic import AnyHttpUrl
 
-from clash_sos.domain.canonical import BalanceEra, BalanceEraRegistry, EraBoundaryEvidence
+from clash_sos.domain.canonical import (
+    BalanceEra,
+    BalanceEraRegistry,
+    EraBoundaryEvidence,
+    EraBoundaryPolicy,
+)
 from clash_sos.infrastructure.kaggle_v6.catalog import KAGGLE_V6_CARDS
 
 KAGGLE_V6_ERA_REGISTRY_VERSION = "kaggle-v6-balance-eras:v1"
@@ -20,41 +25,41 @@ _JULY_2026_UPDATE_URL = AnyHttpUrl(
 )
 
 _MAY_2026_START_EVIDENCE = EraBoundaryEvidence(
-    summary="Supercell documented the May balance update for May 4, 2026.",
+    summary=(
+        "Supercell documented the May balance update for May 4, 2026; the exact rollout "
+        "instant is not published, so this era starts the day after."
+    ),
     reference=_MAY_2026_UPDATE_URL,
     stated_date=datetime(2026, 5, 4, tzinfo=UTC),
     precision="day",
-    boundary_policy=(
-        "The exact rollout instant is not published; the era starts at midnight UTC "
-        "the day after the stated update date."
-    ),
+    boundary_policy=EraBoundaryPolicy.DAY_AFTER_STATED_DATE,
 )
 _MAY_2026_END_EVIDENCE = EraBoundaryEvidence(
-    summary="Supercell documented the June balance update for June 1, 2026.",
+    summary=(
+        "Supercell documented the June balance update for June 1, 2026; the transition "
+        "day is conservatively left unsupported by ending this era at that date."
+    ),
     reference=_JUNE_2026_UPDATE_URL,
     stated_date=datetime(2026, 6, 1, tzinfo=UTC),
     precision="day",
-    boundary_policy=(
-        "The transition day is conservatively left unsupported; this era ends exclusive "
-        "at the start of the stated update date."
-    ),
+    boundary_policy=EraBoundaryPolicy.AT_STATED_DATE,
 )
 _JUNE_2026_START_EVIDENCE = EraBoundaryEvidence(
-    summary="Supercell documented the June balance update for June 1, 2026.",
+    summary=(
+        "Supercell documented the June balance update for June 1, 2026; the transition "
+        "day is conservatively left unsupported by starting this era the day after."
+    ),
     reference=_JUNE_2026_UPDATE_URL,
     stated_date=datetime(2026, 6, 1, tzinfo=UTC),
     precision="day",
-    boundary_policy=(
-        "The transition day is conservatively left unsupported; this era starts at midnight UTC "
-        "the day after the stated update date."
-    ),
+    boundary_policy=EraBoundaryPolicy.DAY_AFTER_STATED_DATE,
 )
 _JUNE_2026_END_EVIDENCE = EraBoundaryEvidence(
     summary="Supercell documents the next balance update for July 6, 2026.",
     reference=_JULY_2026_UPDATE_URL,
     stated_date=datetime(2026, 7, 6, tzinfo=UTC),
     precision="day",
-    boundary_policy="This era ends exclusive at the start of the next documented update date.",
+    boundary_policy=EraBoundaryPolicy.AT_STATED_DATE,
 )
 
 KAGGLE_V6_ERA_REGISTRY = BalanceEraRegistry(

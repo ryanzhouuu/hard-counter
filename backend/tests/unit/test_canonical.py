@@ -17,6 +17,7 @@ from clash_sos.domain.canonical import (
     CardRef,
     Deck,
     EraBoundaryEvidence,
+    EraBoundaryPolicy,
     PlayerId,
     RecordDisposition,
     RecordIssue,
@@ -34,13 +35,15 @@ def deck(offset: int = 0) -> Deck:
     )
 
 
-def evidence() -> EraBoundaryEvidence:
+def evidence(
+    stated_date: datetime, policy: EraBoundaryPolicy = EraBoundaryPolicy.AT_STATED_DATE
+) -> EraBoundaryEvidence:
     return EraBoundaryEvidence(
-        summary="A documented balance update effective June 1, 2026.",
+        summary="A documented balance update.",
         reference=AnyHttpUrl("https://example.test/balance-notes/june"),
-        stated_date=datetime(2026, 6, 1, tzinfo=UTC),
+        stated_date=stated_date,
         precision="day",
-        boundary_policy="Boundaries stay conservative at day precision.",
+        boundary_policy=policy,
     )
 
 
@@ -53,8 +56,41 @@ def era() -> BalanceEra:
         changed_cards=(
             BalanceChange(card_id=CardId("knight"), change_type="buff", summary="More hitpoints"),
         ),
-        start_evidence=evidence(),
-        end_evidence=evidence(),
+        start_evidence=evidence(
+            datetime(2026, 5, 31, tzinfo=UTC), EraBoundaryPolicy.DAY_AFTER_STATED_DATE
+        ),
+        end_evidence=evidence(datetime(2026, 7, 1, tzinfo=UTC)),
+    )
+
+
+def july_era() -> BalanceEra:
+    return BalanceEra(
+        era_id="2026-07",
+        valid_from=datetime(2026, 7, 1, tzinfo=UTC),
+        valid_to=datetime(2026, 8, 1, tzinfo=UTC),
+        card_catalog_version="2026-06-v1",
+        start_evidence=evidence(datetime(2026, 7, 1, tzinfo=UTC)),
+        end_evidence=evidence(datetime(2026, 8, 1, tzinfo=UTC)),
+    )
+
+
+def overlapping_era() -> BalanceEra:
+    return BalanceEra(
+        era_id="2026-06-overlap",
+        valid_from=datetime(2026, 6, 15, tzinfo=UTC),
+        valid_to=datetime(2026, 7, 1, tzinfo=UTC),
+        card_catalog_version="2026-06-v1",
+        start_evidence=evidence(datetime(2026, 6, 15, tzinfo=UTC)),
+        end_evidence=evidence(datetime(2026, 7, 1, tzinfo=UTC)),
+    )
+
+
+def open_ended_era() -> BalanceEra:
+    return BalanceEra(
+        era_id="2026-06-open",
+        valid_from=datetime(2026, 6, 1, tzinfo=UTC),
+        card_catalog_version="2026-06-v1",
+        start_evidence=evidence(datetime(2026, 6, 1, tzinfo=UTC)),
     )
 
 
@@ -140,7 +176,9 @@ def test_balance_era_requires_provenance_for_finite_boundaries() -> None:
                 "valid_from": datetime(2026, 6, 1, tzinfo=UTC),
                 "valid_to": datetime(2026, 7, 15, tzinfo=UTC),
                 "card_catalog_version": "2026-06-v1",
-                "start_evidence": evidence().model_dump(mode="json"),
+                "start_evidence": evidence(datetime(2026, 6, 1, tzinfo=UTC)).model_dump(
+                    mode="json"
+                ),
             }
         )
 
@@ -156,6 +194,30 @@ def test_battle_requires_aligned_card_levels() -> None:
     )
 
     assert battle.side_a.card_levels == (16,) * 8
+
+
+def test_battle_requires_distinct_players() -> None:
+    with pytest.raises(ValidationError, match="distinct players"):
+        Battle(
+            side_a=side("#AAA111"),
+            side_b=side("#AAA111", deck(offset=8)),
+            outcome=BattleOutcome.SIDE_A_WIN,
+            timestamp=datetime(2026, 6, 15, tzinfo=UTC),
+            mode="Ranked1v1_NewArena",
+            source_id="kaggle:source:v6",
+        )
+
+
+def test_balance_era_boundaries_must_align_with_evidence() -> None:
+    base = era().model_dump(mode="json")
+
+    with pytest.raises(ValidationError, match="valid_from must align"):
+        BalanceEra.model_validate(
+            {**base, "valid_from": datetime(2026, 6, 2, tzinfo=UTC)},
+        )
+
+    with pytest.raises(ValidationError, match="valid_to must align"):
+        BalanceEra.model_validate({**base, "valid_to": datetime(2026, 7, 2, tzinfo=UTC)})
 
 
 def test_registry_lookup_respects_half_open_edges() -> None:
@@ -175,34 +237,21 @@ def test_registry_rejects_naive_timestamps() -> None:
 
 
 def test_registry_allows_adjacent_half_open_intervals() -> None:
-    july = era().model_copy(
-        update={
-            "era_id": "2026-07",
-            "valid_from": datetime(2026, 7, 1, tzinfo=UTC),
-            "valid_to": datetime(2026, 8, 1, tzinfo=UTC),
-        }
-    )
-    registry = BalanceEraRegistry(registry_version="test:v1", eras=(era(), july))
+    registry = BalanceEraRegistry(registry_version="test:v1", eras=(era(), july_era()))
+    boundary = datetime(2026, 7, 1, tzinfo=UTC)
 
-    assert registry.lookup(datetime(2026, 7, 1, tzinfo=UTC)) is july
+    assert registry.lookup(boundary - timedelta(microseconds=1)) == era()
+    assert registry.lookup(boundary) == july_era()
 
 
 def test_registry_rejects_overlapping_intervals() -> None:
-    overlap = era().model_copy(
-        update={"era_id": "2026-06-overlap", "valid_from": datetime(2026, 6, 15, tzinfo=UTC)}
-    )
-
     with pytest.raises(ValidationError, match="overlap"):
-        BalanceEraRegistry(registry_version="test:v1", eras=(era(), overlap))
+        BalanceEraRegistry(registry_version="test:v1", eras=(era(), overlapping_era()))
 
 
 def test_registry_rejects_an_open_ended_interval_followed_by_another() -> None:
-    open_ended = era().model_copy(
-        update={"era_id": "2026-open", "valid_to": None, "end_evidence": None}
-    )
-
     with pytest.raises(ValidationError, match="overlap"):
-        BalanceEraRegistry(registry_version="test:v1", eras=(open_ended, era()))
+        BalanceEraRegistry(registry_version="test:v1", eras=(open_ended_era(), era()))
 
 
 def test_registry_rejects_duplicate_era_ids() -> None:
@@ -211,7 +260,7 @@ def test_registry_rejects_duplicate_era_ids() -> None:
 
 
 def test_registry_supports_open_ended_final_intervals() -> None:
-    open_ended = era().model_copy(update={"valid_to": None, "end_evidence": None})
+    open_ended = open_ended_era()
     registry = BalanceEraRegistry(registry_version="test:v1", eras=(open_ended,))
 
     assert registry.lookup(datetime(2030, 1, 1, tzinfo=UTC)) is open_ended
@@ -222,6 +271,14 @@ def test_empty_registry_assigns_no_era() -> None:
 
     assert registry.eras == ()
     assert registry.lookup(datetime(2026, 6, 15, tzinfo=UTC)) is None
+
+
+def test_registry_normalizes_era_order_for_deterministic_serialization() -> None:
+    forward = BalanceEraRegistry(registry_version="test:v1", eras=(era(), july_era()))
+    reversed_input = BalanceEraRegistry(registry_version="test:v1", eras=(july_era(), era()))
+
+    assert forward.eras == reversed_input.eras
+    assert forward.model_dump_json() == reversed_input.model_dump_json()
 
 
 @given(st.sampled_from(tuple(BattleOutcome)))

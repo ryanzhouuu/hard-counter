@@ -3,7 +3,7 @@ from datetime import UTC, datetime, timedelta
 import pytest
 from hypothesis import given
 from hypothesis import strategies as st
-from pydantic import AnyHttpUrl
+from pydantic import AnyHttpUrl, ValidationError
 
 from clash_sos.application.rolling_sos import calculate_rolling_sos
 from clash_sos.domain.analytics import (
@@ -24,6 +24,7 @@ from clash_sos.domain.canonical import (
     CardRef,
     Deck,
     EraBoundaryEvidence,
+    EraBoundaryPolicy,
     PlayerId,
     RecordDisposition,
     RecordIssue,
@@ -31,13 +32,18 @@ from clash_sos.domain.canonical import (
 )
 
 TARGET = PlayerId("#TARGET1")
-EVIDENCE = EraBoundaryEvidence(
-    summary="A documented balance update effective June 1, 2026.",
-    reference=AnyHttpUrl("https://example.test/balance-notes/june"),
-    stated_date=datetime(2026, 6, 1, tzinfo=UTC),
-    precision="day",
-    boundary_policy="Boundaries stay conservative at day precision.",
-)
+
+
+def evidence(stated_date: datetime, policy: EraBoundaryPolicy) -> EraBoundaryEvidence:
+    return EraBoundaryEvidence(
+        summary="A documented balance update.",
+        reference=AnyHttpUrl("https://example.test/balance-notes/june"),
+        stated_date=stated_date,
+        precision="day",
+        boundary_policy=policy,
+    )
+
+
 ERA = BalanceEra(
     era_id="2026-06",
     valid_from=datetime(2026, 6, 1, tzinfo=UTC),
@@ -46,8 +52,10 @@ ERA = BalanceEra(
     changed_cards=(
         BalanceChange(card_id=CardId("knight"), change_type="buff", summary="More hitpoints"),
     ),
-    start_evidence=EVIDENCE,
-    end_evidence=EVIDENCE,
+    start_evidence=evidence(
+        datetime(2026, 5, 31, tzinfo=UTC), EraBoundaryPolicy.DAY_AFTER_STATED_DATE
+    ),
+    end_evidence=evidence(datetime(2026, 7, 1, tzinfo=UTC), EraBoundaryPolicy.AT_STATED_DATE),
 )
 PROVENANCE = PredictionProvenance(
     model_version="model:v1",
@@ -99,6 +107,7 @@ def battle(
             source_id=f"source:row-{index}",
         ),
         balance_era_id=ERA.era_id,
+        card_catalog_version=ERA.card_catalog_version,
         prediction=MatchupPrediction(
             state=PredictionState.AVAILABLE,
             side_a_win_probability=probability,
@@ -177,6 +186,41 @@ def test_excluded_records_do_not_consume_slots_and_are_reported() -> None:
         RecordIssue.UNAVAILABLE_MODEL_COVERAGE: 1,
         RecordIssue.UNSUPPORTED_MODE: 1,
     }
+
+
+def test_incompatible_prediction_catalog_is_stale() -> None:
+    record = battle(0, 0.5).model_copy(
+        update={
+            "prediction": MatchupPrediction(
+                state=PredictionState.AVAILABLE,
+                side_a_win_probability=0.5,
+                provenance=PROVENANCE.model_copy(
+                    update={"card_catalog_version": "catalog:2026-05"}
+                ),
+            )
+        }
+    )
+
+    result = calculate_rolling_sos(TARGET, [record], window_size=1)
+
+    assert result.status is AnalysisState.INSUFFICIENT_DATA
+    assert result.exclusion_reasons[0].issue is RecordIssue.STALE_BALANCE_ERA
+
+
+def test_valid_records_require_era_and_catalog_annotations() -> None:
+    base = battle(0, 0.5)
+
+    with pytest.raises(ValidationError, match="balance-era and card-catalog"):
+        BattleAnalysisRecord(battle=base.battle, prediction=base.prediction)
+
+    quarantined = BattleAnalysisRecord(
+        battle=base.battle,
+        disposition=RecordDisposition(
+            state=RecordState.QUARANTINED, issues=(RecordIssue.UNKNOWN_CARD,)
+        ),
+    )
+    assert quarantined.balance_era_id is None
+    assert quarantined.card_catalog_version is None
 
 
 def test_target_side_orientation_inverts_probability_and_actual_result() -> None:

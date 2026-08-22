@@ -53,8 +53,19 @@ def valid_record_disposition() -> RecordDisposition:
 class BattleAnalysisRecord(DomainModel):
     battle: Battle
     balance_era_id: str | None = None
+    card_catalog_version: str | None = None
     disposition: RecordDisposition = Field(default_factory=valid_record_disposition)
     prediction: MatchupPrediction | None = None
+
+    @model_validator(mode="after")
+    def validate_provenance_annotations(self) -> Self:
+        if self.disposition.state is RecordState.VALID and (
+            self.balance_era_id is None or self.card_catalog_version is None
+        ):
+            raise ValueError(
+                "valid analysis records require balance-era and card-catalog annotations"
+            )
+        return self
 
 
 class AnalysisState(StrEnum):
