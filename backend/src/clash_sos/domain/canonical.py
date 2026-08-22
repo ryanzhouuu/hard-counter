@@ -4,10 +4,12 @@ import re
 from datetime import UTC, datetime
 from enum import StrEnum
 from hashlib import sha256
+from itertools import pairwise
 from json import dumps
-from typing import Self
+from typing import Literal, Self
 
 from pydantic import (
+    AnyHttpUrl,
     BaseModel,
     ConfigDict,
     Field,
@@ -115,6 +117,7 @@ class RecordIssue(StrEnum):
     UNKNOWN_CARD = "unknown_card"
     REPEATED_CARD = "repeated_card"
     INCOMPLETE_DECK = "incomplete_deck"
+    IDENTICAL_PLAYERS = "identical_players"
     DUPLICATE_BATTLE = "duplicate_battle"
     CONFLICTING_BATTLE = "conflicting_battle"
     UNSUPPORTED_MODE = "unsupported_mode"
@@ -146,12 +149,31 @@ class BalanceChange(DomainModel):
     summary: str = Field(min_length=1)
 
 
+class EraBoundaryEvidence(DomainModel):
+    """Stable citation for one balance-era interval boundary."""
+
+    summary: str = Field(min_length=1)
+    reference: AnyHttpUrl
+    stated_date: datetime
+    precision: Literal["day"]
+    boundary_policy: str = Field(min_length=1)
+
+    @field_validator("stated_date")
+    @classmethod
+    def require_timezone(cls, value: datetime) -> datetime:
+        if value.tzinfo is None or value.utcoffset() is None:
+            raise ValueError("evidence dates must be timezone-aware")
+        return value
+
+
 class BalanceEra(DomainModel):
     era_id: str = Field(min_length=1)
     valid_from: datetime
     valid_to: datetime | None = None
     card_catalog_version: str = Field(min_length=1)
     changed_cards: tuple[BalanceChange, ...] = ()
+    start_evidence: EraBoundaryEvidence
+    end_evidence: EraBoundaryEvidence | None = None
 
     @field_validator("valid_from", "valid_to")
     @classmethod
@@ -164,12 +186,39 @@ class BalanceEra(DomainModel):
     def validate_range(self) -> Self:
         if self.valid_to is not None and self.valid_to <= self.valid_from:
             raise ValueError("balance-era valid_to must be later than valid_from")
+        if self.valid_to is not None and self.end_evidence is None:
+            raise ValueError("finite balance-era boundaries require end-evidence provenance")
         return self
 
     def contains(self, timestamp: datetime) -> bool:
         if timestamp.tzinfo is None or timestamp.utcoffset() is None:
             raise ValueError("timestamp must be timezone-aware")
         return self.valid_from <= timestamp and (self.valid_to is None or timestamp < self.valid_to)
+
+
+class BalanceEraRegistry(DomainModel):
+    """Versioned single authority for balance-era assignment."""
+
+    registry_version: str = Field(min_length=1)
+    eras: tuple[BalanceEra, ...] = ()
+
+    @model_validator(mode="after")
+    def validate_eras(self) -> Self:
+        era_ids = [era.era_id for era in self.eras]
+        if len(set(era_ids)) != len(era_ids):
+            raise ValueError("balance-era IDs must be unique within a registry")
+        ordered = sorted(self.eras, key=lambda era: era.valid_from)
+        for earlier, later in pairwise(ordered):
+            if earlier.valid_to is None or earlier.valid_to > later.valid_from:
+                raise ValueError("balance-era intervals must not overlap")
+        return self
+
+    def lookup(self, timestamp: datetime) -> BalanceEra | None:
+        """Return the unique era whose half-open interval contains the timestamp."""
+
+        if timestamp.tzinfo is None or timestamp.utcoffset() is None:
+            raise ValueError("timestamp must be timezone-aware")
+        return next((era for era in self.eras if era.contains(timestamp)), None)
 
 
 class BattleSide(DomainModel):
@@ -187,13 +236,14 @@ class BattleSide(DomainModel):
 
 
 class Battle(DomainModel):
+    """Identity-only battle entity; policy annotations such as eras live elsewhere."""
+
     side_a: BattleSide
     side_b: BattleSide
     outcome: BattleOutcome
     timestamp: datetime
     mode: str = Field(min_length=1)
     source_id: str = Field(min_length=1)
-    balance_era: BalanceEra
 
     @field_validator("timestamp")
     @classmethod
@@ -201,14 +251,6 @@ class Battle(DomainModel):
         if value.tzinfo is None or value.utcoffset() is None:
             raise ValueError("battle timestamp must be timezone-aware")
         return value
-
-    @model_validator(mode="after")
-    def validate_sides_and_era(self) -> Self:
-        if self.side_a.player_id == self.side_b.player_id:
-            raise ValueError("battle sides must have distinct players")
-        if not self.balance_era.contains(self.timestamp):
-            raise ValueError("battle timestamp must fall within its balance era")
-        return self
 
     @computed_field
     @property

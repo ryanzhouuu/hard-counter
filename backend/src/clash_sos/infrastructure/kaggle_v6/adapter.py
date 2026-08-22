@@ -6,7 +6,7 @@ from datetime import UTC, datetime
 from pydantic import Field, ValidationError
 
 from clash_sos.domain.canonical import (
-    BalanceEra,
+    BalanceEraRegistry,
     Battle,
     BattleOutcome,
     BattleSide,
@@ -20,18 +20,7 @@ from clash_sos.domain.canonical import (
 )
 from clash_sos.infrastructure.kaggle_v6.catalog import KAGGLE_V6_CARDS, KaggleCardCatalog
 from clash_sos.infrastructure.kaggle_v6.schema import ROW_COLUMNS
-from clash_sos.infrastructure.kaggle_v6.source import (
-    KAGGLE_V6_OBSERVED_TIMESTAMP_EXCLUSIVE_END_UTC,
-    KAGGLE_V6_OBSERVED_TIMESTAMP_MIN_UTC,
-    KAGGLE_V6_SOURCE_ID,
-)
-
-KAGGLE_V6_BALANCE_ERA = BalanceEra(
-    era_id="2026-06-kaggle-v6",
-    valid_from=KAGGLE_V6_OBSERVED_TIMESTAMP_MIN_UTC,
-    valid_to=KAGGLE_V6_OBSERVED_TIMESTAMP_EXCLUSIVE_END_UTC,
-    card_catalog_version=KAGGLE_V6_CARDS.version,
-)
+from clash_sos.infrastructure.kaggle_v6.source import KAGGLE_V6_SOURCE_ID
 
 
 class SourceRowLocation(DomainModel):
@@ -46,6 +35,7 @@ class SourceRowLocation(DomainModel):
 class AdaptedKaggleRecord(DomainModel):
     location: SourceRowLocation
     battle: Battle | None
+    balance_era_id: str | None = None
     disposition: RecordDisposition
 
 
@@ -68,6 +58,11 @@ def adapt_valid_row(
         timestamp = _timestamp(row["time"])
         winner = _side(row, "winner", catalog)
         loser = _side(row, "loser", catalog)
+        if winner.player_id == loser.player_id:
+            raise KaggleRowError(
+                RecordIssue.IDENTICAL_PLAYERS,
+                "winner and loser must be distinct players",
+            )
         mode = _required_string(row["game_mode"], "game_mode")
         return Battle(
             side_a=winner,
@@ -76,7 +71,6 @@ def adapt_valid_row(
             timestamp=timestamp,
             mode=mode,
             source_id=KAGGLE_V6_SOURCE_ID,
-            balance_era=KAGGLE_V6_BALANCE_ERA,
         )
     except KaggleRowError:
         raise
@@ -88,6 +82,7 @@ def adapt_row(
     row: Mapping[str, object],
     *,
     location: SourceRowLocation,
+    era_registry: BalanceEraRegistry,
     catalog: KaggleCardCatalog = KAGGLE_V6_CARDS,
 ) -> AdaptedKaggleRecord:
     try:
@@ -105,17 +100,25 @@ def adapt_row(
             ),
         )
 
+    era = era_registry.lookup(battle.timestamp)
     issues: list[RecordIssue] = []
     if battle.mode != "Ranked1v1_NewArena":
         issues.append(RecordIssue.UNSUPPORTED_MODE)
     if any(level != 16 for side in (battle.side_a, battle.side_b) for level in side.card_levels):
         issues.append(RecordIssue.NON_MAX_CARD_LEVEL)
+    if era is None:
+        issues.append(RecordIssue.STALE_BALANCE_ERA)
     disposition = (
         RecordDisposition(state=RecordState.UNSUPPORTED, issues=tuple(issues))
         if issues
         else RecordDisposition(state=RecordState.VALID)
     )
-    return AdaptedKaggleRecord(location=location, battle=battle, disposition=disposition)
+    return AdaptedKaggleRecord(
+        location=location,
+        battle=battle,
+        balance_era_id=None if era is None else era.era_id,
+        disposition=disposition,
+    )
 
 
 def _side(row: Mapping[str, object], side: str, catalog: KaggleCardCatalog) -> BattleSide:

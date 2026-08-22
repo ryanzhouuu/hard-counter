@@ -114,8 +114,8 @@ class RollingSoSAnalyzer:
         if prediction.provenance is None:
             return (RecordIssue.UNAVAILABLE_MODEL_COVERAGE,)
         if (
-            prediction.provenance.balance_era_id != battle.balance_era.era_id
-            or prediction.provenance.card_catalog_version != battle.balance_era.card_catalog_version
+            record.balance_era_id is not None
+            and prediction.provenance.balance_era_id != record.balance_era_id
         ):
             return (RecordIssue.STALE_BALANCE_ERA,)
         return ()

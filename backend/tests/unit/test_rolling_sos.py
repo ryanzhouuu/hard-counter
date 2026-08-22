@@ -3,6 +3,7 @@ from datetime import UTC, datetime, timedelta
 import pytest
 from hypothesis import given
 from hypothesis import strategies as st
+from pydantic import AnyHttpUrl
 
 from clash_sos.application.rolling_sos import calculate_rolling_sos
 from clash_sos.domain.analytics import (
@@ -13,6 +14,7 @@ from clash_sos.domain.analytics import (
     PredictionState,
 )
 from clash_sos.domain.canonical import (
+    BalanceChange,
     BalanceEra,
     Battle,
     BattleOutcome,
@@ -21,6 +23,7 @@ from clash_sos.domain.canonical import (
     CardId,
     CardRef,
     Deck,
+    EraBoundaryEvidence,
     PlayerId,
     RecordDisposition,
     RecordIssue,
@@ -28,11 +31,23 @@ from clash_sos.domain.canonical import (
 )
 
 TARGET = PlayerId("#TARGET1")
+EVIDENCE = EraBoundaryEvidence(
+    summary="A documented balance update effective June 1, 2026.",
+    reference=AnyHttpUrl("https://example.test/balance-notes/june"),
+    stated_date=datetime(2026, 6, 1, tzinfo=UTC),
+    precision="day",
+    boundary_policy="Boundaries stay conservative at day precision.",
+)
 ERA = BalanceEra(
     era_id="2026-06",
     valid_from=datetime(2026, 6, 1, tzinfo=UTC),
     valid_to=datetime(2026, 7, 1, tzinfo=UTC),
     card_catalog_version="catalog:2026-06",
+    changed_cards=(
+        BalanceChange(card_id=CardId("knight"), change_type="buff", summary="More hitpoints"),
+    ),
+    start_evidence=EVIDENCE,
+    end_evidence=EVIDENCE,
 )
 PROVENANCE = PredictionProvenance(
     model_version="model:v1",
@@ -82,8 +97,8 @@ def battle(
             timestamp=timestamp or datetime(2026, 6, 10, tzinfo=UTC) + timedelta(minutes=index),
             mode=mode,
             source_id=f"source:row-{index}",
-            balance_era=ERA,
         ),
+        balance_era_id=ERA.era_id,
         prediction=MatchupPrediction(
             state=PredictionState.AVAILABLE,
             side_a_win_probability=probability,

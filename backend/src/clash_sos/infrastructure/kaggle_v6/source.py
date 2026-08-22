@@ -1,6 +1,6 @@
 """Pinned source registration for the Kaggle version 6 snapshot."""
 
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 
 from pydantic import AnyHttpUrl
 
@@ -15,11 +15,9 @@ KAGGLE_V6_ARCHIVE_NAME = "clash-royale-matchups-june2026-v6.zip"
 KAGGLE_V6_ARCHIVE_SIZE = 6_148_754_593
 KAGGLE_V6_ARCHIVE_SHA256 = "280ab43d916b34dd178856ada449a69cf8130f5200737572ecd994eadaa5a89b"
 KAGGLE_V6_CARD_MAPPING_NAME = "cardToID.json"
+# Observed source-coverage facts only; they are not evidence of balance-era boundaries.
 KAGGLE_V6_OBSERVED_TIMESTAMP_MIN_UTC = datetime(2026, 5, 22, 20, 16, 15, tzinfo=UTC)
 KAGGLE_V6_OBSERVED_TIMESTAMP_MAX_UTC = datetime(2026, 6, 26, 18, 32, 2, tzinfo=UTC)
-KAGGLE_V6_OBSERVED_TIMESTAMP_EXCLUSIVE_END_UTC = KAGGLE_V6_OBSERVED_TIMESTAMP_MAX_UTC + timedelta(
-    microseconds=1
-)
 
 KAGGLE_V6_SOURCE = SourceManifest(
     source_id=KAGGLE_V6_SOURCE_ID,

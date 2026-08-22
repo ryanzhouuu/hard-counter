@@ -3,11 +3,12 @@ from datetime import UTC, datetime, timedelta, timezone
 import pytest
 from hypothesis import given
 from hypothesis import strategies as st
-from pydantic import ValidationError
+from pydantic import AnyHttpUrl, ValidationError
 
 from clash_sos.domain.canonical import (
     BalanceChange,
     BalanceEra,
+    BalanceEraRegistry,
     Battle,
     BattleOutcome,
     BattleSide,
@@ -15,6 +16,7 @@ from clash_sos.domain.canonical import (
     CardId,
     CardRef,
     Deck,
+    EraBoundaryEvidence,
     PlayerId,
     RecordDisposition,
     RecordIssue,
@@ -32,6 +34,16 @@ def deck(offset: int = 0) -> Deck:
     )
 
 
+def evidence() -> EraBoundaryEvidence:
+    return EraBoundaryEvidence(
+        summary="A documented balance update effective June 1, 2026.",
+        reference=AnyHttpUrl("https://example.test/balance-notes/june"),
+        stated_date=datetime(2026, 6, 1, tzinfo=UTC),
+        precision="day",
+        boundary_policy="Boundaries stay conservative at day precision.",
+    )
+
+
 def era() -> BalanceEra:
     return BalanceEra(
         era_id="2026-06",
@@ -41,6 +53,8 @@ def era() -> BalanceEra:
         changed_cards=(
             BalanceChange(card_id=CardId("knight"), change_type="buff", summary="More hitpoints"),
         ),
+        start_evidence=evidence(),
+        end_evidence=evidence(),
     )
 
 
@@ -108,7 +122,30 @@ def test_balance_era_uses_half_open_interval() -> None:
     assert not current.contains(datetime(2026, 7, 1, tzinfo=UTC))
 
 
-def test_battle_requires_distinct_sides_aligned_levels_and_era() -> None:
+def test_balance_era_requires_provenance_for_finite_boundaries() -> None:
+    with pytest.raises(ValidationError, match="start_evidence"):
+        BalanceEra.model_validate(
+            {
+                "era_id": "2026-06",
+                "valid_from": datetime(2026, 6, 1, tzinfo=UTC),
+                "valid_to": datetime(2026, 7, 1, tzinfo=UTC),
+                "card_catalog_version": "2026-06-v1",
+            }
+        )
+
+    with pytest.raises(ValidationError, match="end-evidence"):
+        BalanceEra.model_validate(
+            {
+                "era_id": "2026-06",
+                "valid_from": datetime(2026, 6, 1, tzinfo=UTC),
+                "valid_to": datetime(2026, 7, 15, tzinfo=UTC),
+                "card_catalog_version": "2026-06-v1",
+                "start_evidence": evidence().model_dump(mode="json"),
+            }
+        )
+
+
+def test_battle_requires_aligned_card_levels() -> None:
     battle = Battle(
         side_a=side("#AAA111"),
         side_b=side("#BBB222", deck(offset=8)),
@@ -116,10 +153,75 @@ def test_battle_requires_distinct_sides_aligned_levels_and_era() -> None:
         timestamp=datetime(2026, 6, 15, tzinfo=UTC),
         mode="Ranked1v1_NewArena",
         source_id="kaggle:source:v6",
-        balance_era=era(),
     )
 
     assert battle.side_a.card_levels == (16,) * 8
+
+
+def test_registry_lookup_respects_half_open_edges() -> None:
+    registry = BalanceEraRegistry(registry_version="test:v1", eras=(era(),))
+
+    assert registry.lookup(datetime(2026, 6, 1, tzinfo=UTC)) == era()
+    assert registry.lookup(datetime(2026, 6, 30, 23, 59, tzinfo=UTC)) == era()
+    assert registry.lookup(datetime(2026, 5, 31, 23, 59, tzinfo=UTC)) is None
+    assert registry.lookup(datetime(2026, 7, 1, tzinfo=UTC)) is None
+
+
+def test_registry_rejects_naive_timestamps() -> None:
+    registry = BalanceEraRegistry(registry_version="test:v1", eras=(era(),))
+
+    with pytest.raises(ValueError, match="timezone-aware"):
+        registry.lookup(datetime(2026, 6, 15))
+
+
+def test_registry_allows_adjacent_half_open_intervals() -> None:
+    july = era().model_copy(
+        update={
+            "era_id": "2026-07",
+            "valid_from": datetime(2026, 7, 1, tzinfo=UTC),
+            "valid_to": datetime(2026, 8, 1, tzinfo=UTC),
+        }
+    )
+    registry = BalanceEraRegistry(registry_version="test:v1", eras=(era(), july))
+
+    assert registry.lookup(datetime(2026, 7, 1, tzinfo=UTC)) is july
+
+
+def test_registry_rejects_overlapping_intervals() -> None:
+    overlap = era().model_copy(
+        update={"era_id": "2026-06-overlap", "valid_from": datetime(2026, 6, 15, tzinfo=UTC)}
+    )
+
+    with pytest.raises(ValidationError, match="overlap"):
+        BalanceEraRegistry(registry_version="test:v1", eras=(era(), overlap))
+
+
+def test_registry_rejects_an_open_ended_interval_followed_by_another() -> None:
+    open_ended = era().model_copy(
+        update={"era_id": "2026-open", "valid_to": None, "end_evidence": None}
+    )
+
+    with pytest.raises(ValidationError, match="overlap"):
+        BalanceEraRegistry(registry_version="test:v1", eras=(open_ended, era()))
+
+
+def test_registry_rejects_duplicate_era_ids() -> None:
+    with pytest.raises(ValidationError, match="unique"):
+        BalanceEraRegistry(registry_version="test:v1", eras=(era(), era()))
+
+
+def test_registry_supports_open_ended_final_intervals() -> None:
+    open_ended = era().model_copy(update={"valid_to": None, "end_evidence": None})
+    registry = BalanceEraRegistry(registry_version="test:v1", eras=(open_ended,))
+
+    assert registry.lookup(datetime(2030, 1, 1, tzinfo=UTC)) is open_ended
+
+
+def test_empty_registry_assigns_no_era() -> None:
+    registry = BalanceEraRegistry(registry_version="empty:v1")
+
+    assert registry.eras == ()
+    assert registry.lookup(datetime(2026, 6, 15, tzinfo=UTC)) is None
 
 
 @given(st.sampled_from(tuple(BattleOutcome)))
@@ -133,7 +235,6 @@ def test_battle_fingerprint_is_independent_of_side_orientation(
         timestamp=datetime(2026, 6, 15, tzinfo=UTC),
         mode="Ranked1v1_NewArena",
         source_id="kaggle:source:v6:row-1",
-        balance_era=era(),
     )
     swapped = battle.model_copy(
         update={
@@ -168,7 +269,6 @@ def test_battle_identity_preserves_card_level_alignment_across_deck_order(
         timestamp=datetime(2026, 6, 15, tzinfo=UTC),
         mode="Ranked1v1_NewArena",
         source_id="kaggle:source:v6",
-        balance_era=era(),
     )
 
     assert battle.fingerprint == battle.model_copy(update={"side_a": reordered_side}).fingerprint
@@ -183,7 +283,6 @@ def test_battle_identity_normalizes_equivalent_timestamp_offsets(offset: int) ->
         timestamp=datetime(2026, 6, 15, 12, tzinfo=UTC),
         mode="Ranked1v1_NewArena",
         source_id="kaggle:source:v6",
-        balance_era=era(),
     )
     equivalent = battle.model_copy(
         update={"timestamp": battle.timestamp.astimezone(timezone(timedelta(hours=offset)))}
@@ -204,7 +303,6 @@ def test_battle_fingerprint_distinguishes_conflicting_outcomes(
         timestamp=datetime(2026, 6, 15, tzinfo=UTC),
         mode="Ranked1v1_NewArena",
         source_id="kaggle:source:v6",
-        balance_era=era(),
     )
     conflict = battle.model_copy(update={"outcome": outcome.swapped()})
 
@@ -212,7 +310,7 @@ def test_battle_fingerprint_distinguishes_conflicting_outcomes(
     assert battle.fingerprint != conflict.fingerprint
 
 
-def test_battle_rejects_naive_or_out_of_era_timestamp() -> None:
+def test_battle_rejects_naive_timestamps() -> None:
     with pytest.raises(ValidationError, match="timezone-aware"):
         Battle(
             side_a=side("#AAA111"),
@@ -221,18 +319,6 @@ def test_battle_rejects_naive_or_out_of_era_timestamp() -> None:
             timestamp=datetime(2026, 6, 15),
             mode="Ranked1v1_NewArena",
             source_id="kaggle:source:v6",
-            balance_era=era(),
-        )
-
-    with pytest.raises(ValidationError, match="balance era"):
-        Battle(
-            side_a=side("#AAA111"),
-            side_b=side("#BBB222", deck(offset=8)),
-            outcome=BattleOutcome.SIDE_A_WIN,
-            timestamp=datetime(2026, 7, 1, tzinfo=UTC),
-            mode="Ranked1v1_NewArena",
-            source_id="kaggle:source:v6",
-            balance_era=era(),
         )
 
 

@@ -52,6 +52,7 @@ def valid_record_disposition() -> RecordDisposition:
 
 class BattleAnalysisRecord(DomainModel):
     battle: Battle
+    balance_era_id: str | None = None
     disposition: RecordDisposition = Field(default_factory=valid_record_disposition)
     prediction: MatchupPrediction | None = None
 

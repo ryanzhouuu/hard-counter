@@ -2,7 +2,6 @@ from datetime import UTC, datetime
 
 from clash_sos.application.dataset_audit import BattleIdentityIndex
 from clash_sos.domain.canonical import (
-    BalanceEra,
     Battle,
     BattleOutcome,
     BattleSide,
@@ -20,12 +19,6 @@ def battle() -> Battle:
     cards = tuple(
         CardRef(card_id=CardId(f"card-{index}"), form=CardForm.BASE) for index in range(16)
     )
-    era = BalanceEra(
-        era_id="june",
-        valid_from=datetime(2026, 6, 1, tzinfo=UTC),
-        valid_to=datetime(2026, 7, 1, tzinfo=UTC),
-        card_catalog_version="v1",
-    )
     return Battle(
         side_a=BattleSide(
             player_id=PlayerId("#AAA"),
@@ -41,7 +34,6 @@ def battle() -> Battle:
         timestamp=datetime(2026, 6, 15, tzinfo=UTC),
         mode="Ranked1v1_NewArena",
         source_id="source:v1",
-        balance_era=era,
     )
 
 

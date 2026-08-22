@@ -3,14 +3,19 @@ from datetime import UTC, datetime, timedelta, timezone
 import pytest
 
 from clash_sos.application.dataset_audit import BattleIdentityIndex
-from clash_sos.domain.canonical import BattleOutcome, CardForm, RecordIssue, RecordState
+from clash_sos.domain.canonical import (
+    BattleOutcome,
+    CardForm,
+    RecordIssue,
+    RecordState,
+)
 from clash_sos.infrastructure.kaggle_v6.adapter import (
-    KAGGLE_V6_BALANCE_ERA,
     KaggleRowError,
     SourceRowLocation,
     adapt_row,
     adapt_valid_row,
 )
+from clash_sos.infrastructure.kaggle_v6.balance_eras import KAGGLE_V6_ERA_REGISTRY
 from clash_sos.infrastructure.kaggle_v6.schema import (
     KAGGLE_V6_SCHEMA,
     IncompatibleKaggleSchemaError,
@@ -18,7 +23,6 @@ from clash_sos.infrastructure.kaggle_v6.schema import (
     validate_kaggle_v6_schema,
 )
 from clash_sos.infrastructure.kaggle_v6.source import (
-    KAGGLE_V6_OBSERVED_TIMESTAMP_EXCLUSIVE_END_UTC,
     KAGGLE_V6_OBSERVED_TIMESTAMP_MAX_UTC,
     KAGGLE_V6_OBSERVED_TIMESTAMP_MIN_UTC,
     KAGGLE_V6_SOURCE_ID,
@@ -54,10 +58,19 @@ def test_valid_winner_first_row_adapts_to_canonical_battle() -> None:
     assert battle.timestamp == datetime(2026, 6, 21, 12, tzinfo=UTC)
 
 
-def test_balance_era_covers_the_audited_timestamp_range() -> None:
-    assert KAGGLE_V6_BALANCE_ERA.contains(KAGGLE_V6_OBSERVED_TIMESTAMP_MIN_UTC)
-    assert KAGGLE_V6_BALANCE_ERA.contains(KAGGLE_V6_OBSERVED_TIMESTAMP_MAX_UTC)
-    assert not KAGGLE_V6_BALANCE_ERA.contains(KAGGLE_V6_OBSERVED_TIMESTAMP_EXCLUSIVE_END_UTC)
+def test_source_coverage_endpoints_do_not_define_balance_eras() -> None:
+    may = KAGGLE_V6_ERA_REGISTRY.lookup(KAGGLE_V6_OBSERVED_TIMESTAMP_MIN_UTC)
+    june = KAGGLE_V6_ERA_REGISTRY.lookup(KAGGLE_V6_OBSERVED_TIMESTAMP_MAX_UTC)
+
+    assert may is not None
+    assert may.era_id == "2026-05"
+    assert may.valid_from != KAGGLE_V6_OBSERVED_TIMESTAMP_MIN_UTC
+    assert june is not None
+    assert june.era_id == "2026-06"
+    assert june.valid_to != KAGGLE_V6_OBSERVED_TIMESTAMP_MAX_UTC
+
+    transition_day = datetime(2026, 6, 1, 12, tzinfo=UTC)
+    assert KAGGLE_V6_ERA_REGISTRY.lookup(transition_day) is None
 
 
 def test_adapter_preserves_deck_and_level_order() -> None:
@@ -120,10 +133,11 @@ def test_incompatible_source_schema_is_rejected() -> None:
 
 
 def test_valid_row_has_valid_disposition_and_provenance() -> None:
-    record = adapt_row(valid_row(), location=location())
+    record = adapt_row(valid_row(), location=location(), era_registry=KAGGLE_V6_ERA_REGISTRY)
 
     assert record.battle is not None
     assert record.location.row_number == 12
+    assert record.balance_era_id == "2026-06"
     assert record.disposition.state is RecordState.VALID
 
 
@@ -139,7 +153,7 @@ def test_unadaptable_decks_are_quarantined(field: str, value: object, issue: Rec
     row = valid_row()
     row[field] = value
 
-    record = adapt_row(row, location=location())
+    record = adapt_row(row, location=location(), era_registry=KAGGLE_V6_ERA_REGISTRY)
 
     assert record.battle is None
     assert record.disposition.state is RecordState.QUARANTINED
@@ -150,7 +164,7 @@ def test_malformed_rows_are_invalid() -> None:
     row = valid_row()
     row["time"] = None
 
-    record = adapt_row(row, location=location())
+    record = adapt_row(row, location=location(), era_registry=KAGGLE_V6_ERA_REGISTRY)
 
     assert record.battle is None
     assert record.disposition.state is RecordState.INVALID
@@ -170,7 +184,7 @@ def test_out_of_population_rows_are_unsupported(
     row = valid_row()
     row[field] = value
 
-    record = adapt_row(row, location=location())
+    record = adapt_row(row, location=location(), era_registry=KAGGLE_V6_ERA_REGISTRY)
 
     assert record.battle is not None
     assert record.disposition.state is RecordState.UNSUPPORTED
@@ -182,7 +196,7 @@ def test_unsupported_mode_and_level_are_both_reported() -> None:
     row["game_mode"] = "Ladder"
     row["winner_card_0_level"] = 15
 
-    record = adapt_row(row, location=location())
+    record = adapt_row(row, location=location(), era_registry=KAGGLE_V6_ERA_REGISTRY)
 
     assert record.disposition.issues == (
         RecordIssue.UNSUPPORTED_MODE,
@@ -190,11 +204,76 @@ def test_unsupported_mode_and_level_are_both_reported() -> None:
     )
 
 
+def test_adapted_rows_stage_the_registry_era_for_their_timestamp() -> None:
+    may_row = valid_row()
+    may_row["time"] = datetime(2026, 5, 23, tzinfo=UTC)
+
+    june = adapt_row(valid_row(), location=location(), era_registry=KAGGLE_V6_ERA_REGISTRY)
+    may = adapt_row(may_row, location=location(), era_registry=KAGGLE_V6_ERA_REGISTRY)
+
+    assert june.balance_era_id == "2026-06"
+    assert may.balance_era_id == "2026-05"
+
+
+def test_out_of_era_rows_stage_without_an_era_and_stay_adaptable() -> None:
+    row = valid_row()
+    row["time"] = datetime(2026, 6, 1, 12, tzinfo=UTC)
+
+    record = adapt_row(row, location=location(), era_registry=KAGGLE_V6_ERA_REGISTRY)
+
+    assert record.battle is not None
+    assert record.balance_era_id is None
+    assert record.disposition.state is RecordState.UNSUPPORTED
+    assert record.disposition.issues == (RecordIssue.STALE_BALANCE_ERA,)
+
+
+def test_stale_era_combines_with_other_population_issues() -> None:
+    row = valid_row()
+    row["time"] = datetime(2026, 6, 1, 12, tzinfo=UTC)
+    row["game_mode"] = "Ladder"
+
+    record = adapt_row(row, location=location(), era_registry=KAGGLE_V6_ERA_REGISTRY)
+
+    assert record.disposition.issues == (
+        RecordIssue.UNSUPPORTED_MODE,
+        RecordIssue.STALE_BALANCE_ERA,
+    )
+
+
+@pytest.mark.parametrize("level", [0, 17])
+def test_scalar_card_level_violations_remain_invalid(level: int) -> None:
+    row = valid_row()
+    row["winner_card_0_level"] = level
+
+    record = adapt_row(row, location=location(), era_registry=KAGGLE_V6_ERA_REGISTRY)
+
+    assert record.battle is None
+    assert record.disposition.state is RecordState.INVALID
+    assert record.disposition.issues == (RecordIssue.MALFORMED_ROW,)
+
+
+def test_identical_players_are_detected_before_battle_construction() -> None:
+    row = valid_row()
+    row["loser_id"] = "#winner"
+
+    with pytest.raises(KaggleRowError) as captured:
+        adapt_valid_row(row)
+
+    assert captured.value.issue is RecordIssue.IDENTICAL_PLAYERS
+
+    record = adapt_row(row, location=location(), era_registry=KAGGLE_V6_ERA_REGISTRY)
+
+    assert record.battle is None
+    assert record.balance_era_id is None
+    assert record.disposition.state is RecordState.QUARANTINED
+    assert record.disposition.issues == (RecordIssue.IDENTICAL_PLAYERS,)
+
+
 def test_duplicates_across_source_locations_are_detected() -> None:
     index = BattleIdentityIndex()
-    first = adapt_row(valid_row(), location=location())
+    first = adapt_row(valid_row(), location=location(), era_registry=KAGGLE_V6_ERA_REGISTRY)
     second_location = SourceRowLocation(archive_member="other.parquet", row_number=2)
-    second = adapt_row(valid_row(), location=second_location)
+    second = adapt_row(valid_row(), location=second_location, era_registry=KAGGLE_V6_ERA_REGISTRY)
     assert first.battle is not None
     assert second.battle is not None
 
@@ -207,7 +286,7 @@ def test_duplicates_across_source_locations_are_detected() -> None:
 
 def test_swapped_winner_record_is_a_conflict() -> None:
     index = BattleIdentityIndex()
-    first = adapt_row(valid_row(), location=location())
+    first = adapt_row(valid_row(), location=location(), era_registry=KAGGLE_V6_ERA_REGISTRY)
     swapped_row = valid_row()
     for suffix in ("id", *(f"card_{index}" for index in range(8))):
         swapped_row[f"winner_{suffix}"], swapped_row[f"loser_{suffix}"] = (
@@ -215,7 +294,9 @@ def test_swapped_winner_record_is_a_conflict() -> None:
             swapped_row[f"winner_{suffix}"],
         )
     assert first.battle is not None
-    conflict_record = adapt_row(swapped_row, location=location())
+    conflict_record = adapt_row(
+        swapped_row, location=location(), era_registry=KAGGLE_V6_ERA_REGISTRY
+    )
     assert conflict_record.battle is not None
 
     assert index.observe(first.battle, location="first") is None
