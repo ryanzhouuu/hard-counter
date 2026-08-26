@@ -199,8 +199,11 @@ class DatasetManifest(ManifestModel):
         return self
 
 
-def _validate_relative_path(path: str) -> None:
+def validate_relative_path(path: str) -> None:
     if path.startswith("/") or "\\" in path:
         raise ValueError("file path must be a relative POSIX path")
     if any(part in {"", ".", ".."} for part in path.split("/")):
         raise ValueError("file path must not contain empty, dot, or parent components")
+
+
+_validate_relative_path = validate_relative_path
