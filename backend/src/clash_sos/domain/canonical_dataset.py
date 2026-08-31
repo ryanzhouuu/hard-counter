@@ -69,10 +69,7 @@ def _canonicalize(value: Any) -> Any:
     if isinstance(value, list):
         return [_canonicalize(item) for item in cast(list[Any], value)]
     if isinstance(value, dict):
-        return {
-            str(key): _canonicalize(item)
-            for key, item in cast(dict[Any, Any], value).items()
-        }
+        return {str(key): _canonicalize(item) for key, item in cast(dict[Any, Any], value).items()}
     return value
 
 
