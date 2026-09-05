@@ -14,7 +14,8 @@ from clash_sos.application.dataset_staging import (
     adapted_to_unadaptable_row,
     ensure_raw_audit_manifest,
 )
-from clash_sos.domain.canonical import RecordIssue, RecordState
+from clash_sos.domain.canonical import BattleOutcome, RecordIssue, RecordState
+from clash_sos.domain.canonical_dataset import deck_content_hash
 from clash_sos.domain.manifests import (
     ArchiveManifest,
     DatasetFileManifest,
@@ -63,6 +64,36 @@ def valid_row() -> dict[str, object]:
 
 def location() -> SourceRowLocation:
     return SourceRowLocation(archive_member="part.parquet", row_number=12)
+
+
+def staged_row(**overrides: object) -> StagedBattleRow:
+    card_ids = tuple(f"card-{index}" for index in range(8))
+    card_forms = ("base",) * 8
+    card_levels = (16,) * 8
+    payload: dict[str, object] = {
+        "source_id": KAGGLE_V6_SOURCE_ID,
+        "timestamp": datetime(2026, 6, 21, 12, tzinfo=UTC),
+        "mode": "Ranked1v1_NewArena",
+        "balance_era_id": "2026-06",
+        "outcome": BattleOutcome.SIDE_A_WIN,
+        "event_key": "a" * 64,
+        "fingerprint": "a" * 64,
+        "side_a_player_id": "#AAA",
+        "side_b_player_id": "#BBB",
+        "side_a_card_ids": card_ids,
+        "side_a_card_forms": card_forms,
+        "side_a_card_levels": card_levels,
+        "side_a_deck_hash": deck_content_hash(card_ids, card_forms, card_levels),
+        "side_b_card_ids": card_ids,
+        "side_b_card_forms": card_forms,
+        "side_b_card_levels": card_levels,
+        "side_b_deck_hash": deck_content_hash(card_ids, card_forms, card_levels),
+        "observation_issues": (),
+        "archive_member": "part.parquet",
+        "row_number": 0,
+    }
+    payload.update(overrides)
+    return StagedBattleRow.model_validate(payload)
 
 
 def test_staging_config_rejects_non_positive_values() -> None:
@@ -218,6 +249,45 @@ def test_write_staged_and_unadaptable_parts_round_trip(tmp_path: Path) -> None:
         write_staged_part(staged_path, [], row_group_rows=131072)
     with pytest.raises(KaggleV6StagingError, match="empty"):
         write_unadaptable_part(unadaptable_path, [], row_group_rows=131072)
+
+
+def test_write_staged_part_keeps_era_after_leading_nulls(tmp_path: Path) -> None:
+    rows = [
+        staged_row(
+            balance_era_id=None,
+            observation_issues=(),
+            side_b_player_id=f"#B{index}",
+            row_number=index,
+        )
+        for index in range(100)
+    ]
+    rows.append(
+        staged_row(
+            mode="Ladder",
+            balance_era_id="2026-06",
+            observation_issues=(RecordIssue.UNSUPPORTED_MODE,),
+            side_b_player_id="#ERA",
+            row_number=100,
+        )
+    )
+    path = tmp_path / "staged.parquet"
+    write_staged_part(path, rows, row_group_rows=131072)
+    connection = duckdb.connect()
+    try:
+        era_row = connection.execute(
+            "SELECT balance_era_id, observation_issues FROM read_parquet(?) WHERE row_number = 100",
+            [str(path)],
+        ).fetchone()
+        null_count = connection.execute(
+            "SELECT count(*) FROM read_parquet(?) WHERE balance_era_id IS NULL",
+            [str(path)],
+        ).fetchone()
+    finally:
+        connection.close()
+    assert era_row is not None
+    assert era_row[0] == "2026-06"
+    assert list(era_row[1]) == ["unsupported_mode"]
+    assert null_count == (100,)
 
 
 def test_adapted_to_staged_row_maps_population_observations() -> None:
