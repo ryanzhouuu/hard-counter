@@ -10,12 +10,33 @@ from zipfile import ZipFile
 import duckdb
 import polars as pl
 
-from clash_sos.domain.staged_dataset import StagedBattleRow, UnadaptableRow
+from clash_sos.domain.manifests import SchemaColumnManifest
+from clash_sos.domain.staged_dataset import (
+    STAGED_SCHEMA,
+    UNADAPTABLE_SCHEMA,
+    StagedBattleRow,
+    UnadaptableRow,
+)
 from clash_sos.infrastructure.kaggle_v6.audit_io import validate_archive_members
 
 
 class KaggleV6StagingError(ValueError):
     pass
+
+
+PolarsSchemaType = pl.DataType | type[pl.DataType]
+_POLARS_PHYSICAL_TYPES: dict[str, PolarsSchemaType] = {
+    "BIGINT": pl.Int64,
+    "TIMESTAMP WITH TIME ZONE": pl.Datetime(time_zone="UTC"),
+    "UTINYINT[]": pl.List(pl.UInt8),
+    "VARCHAR": pl.String,
+    "VARCHAR[]": pl.List(pl.String),
+}
+
+
+def polars_schema(columns: Sequence[SchemaColumnManifest]) -> dict[str, PolarsSchemaType]:
+    """Translate DuckDB physical types from a staged schema into Polars dtypes."""
+    return {column.name: _POLARS_PHYSICAL_TYPES[column.physical_type] for column in columns}
 
 
 def connect_staging_duckdb(
@@ -102,25 +123,27 @@ def unadaptable_row_to_record(row: UnadaptableRow) -> dict[str, object]:
 
 
 def write_staged_part(path: Path, rows: Sequence[StagedBattleRow], *, row_group_rows: int) -> None:
-    """Write one staging part; raises when asked to persist an empty batch."""
+    """Write one staging part with the staged schema so nullable eras survive leading nulls."""
     if not rows:
         raise KaggleV6StagingError("refusing to write an empty staging part")
     path.parent.mkdir(parents=True, exist_ok=True)
-    pl.DataFrame([staged_row_to_record(row) for row in rows]).write_parquet(
-        path, compression="zstd", row_group_size=row_group_rows
-    )
+    pl.DataFrame(
+        [staged_row_to_record(row) for row in rows],
+        schema=polars_schema(STAGED_SCHEMA),
+    ).write_parquet(path, compression="zstd", row_group_size=row_group_rows)
 
 
 def write_unadaptable_part(
     path: Path, rows: Sequence[UnadaptableRow], *, row_group_rows: int
 ) -> None:
-    """Write one unadaptable part; raises when asked to persist an empty batch."""
+    """Write one unadaptable part with the unadaptable schema. Raises on an empty batch."""
     if not rows:
         raise KaggleV6StagingError("refusing to write an empty unadaptable part")
     path.parent.mkdir(parents=True, exist_ok=True)
-    pl.DataFrame([unadaptable_row_to_record(row) for row in rows]).write_parquet(
-        path, compression="zstd", row_group_size=row_group_rows
-    )
+    pl.DataFrame(
+        [unadaptable_row_to_record(row) for row in rows],
+        schema=polars_schema(UNADAPTABLE_SCHEMA),
+    ).write_parquet(path, compression="zstd", row_group_size=row_group_rows)
 
 
 def directory_byte_size(path: Path) -> int:

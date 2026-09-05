@@ -338,9 +338,7 @@ def test_incompatible_schema_fails(tmp_path: Path) -> None:
     assert not workspace.exists()
 
 
-def test_representative_member_throughput(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str]
-) -> None:
+def test_representative_member_throughput(tmp_path: Path) -> None:
     archive = os.environ.get("CLASH_SOS_KAGGLE_ARCHIVE")
     manifest = Path(
         os.environ.get("CLASH_SOS_KAGGLE_MANIFEST", "data/metadata/kaggle-v6-dataset.json")
