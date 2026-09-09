@@ -1,11 +1,13 @@
 """DuckDB join, sorted COPY, and schema inspection for canonical Parquet."""
 
+from collections.abc import Iterator
 from pathlib import Path
 
 import duckdb
 
-from clash_sos.domain.canonical_dataset import CANONICAL_SCHEMA
+from clash_sos.domain.canonical_dataset import CANONICAL_SCHEMA, CanonicalBattleRow
 from clash_sos.domain.manifests import SchemaColumnManifest
+from clash_sos.infrastructure.kaggle_v6.staging_io import row_mapping
 
 _CANONICAL_SELECT = """
 SELECT
@@ -73,20 +75,22 @@ def write_canonical_parquet(
     """Join valid dispositions to staging rows and COPY sorted zstd canonical Parquet."""
     if output_path.exists():
         raise KaggleV6MaterializeError("canonical parquet already exists")
-    if not staging_files:
-        raise KaggleV6MaterializeError("staging parquet is required")
     if not disposition_files:
         raise KaggleV6MaterializeError("disposition parquet is required")
     output_path.parent.mkdir(parents=True, exist_ok=True)
     connection.execute("DROP TABLE IF EXISTS canonical_rows")
-    connection.execute(
-        f"CREATE TEMP TABLE canonical_rows AS {_CANONICAL_SELECT}",
-        [
-            dataset_version,
-            [str(path) for path in staging_files],
-            [str(path) for path in disposition_files],
-        ],
-    )
+    if staging_files:
+        connection.execute(
+            f"CREATE TEMP TABLE canonical_rows AS {_CANONICAL_SELECT}",
+            [
+                dataset_version,
+                [str(path) for path in staging_files],
+                [str(path) for path in disposition_files],
+            ],
+        )
+    else:
+        columns = ", ".join(f"{column.name} {column.physical_type}" for column in CANONICAL_SCHEMA)
+        connection.execute(f"CREATE TEMP TABLE canonical_rows ({columns})")
     counted = connection.execute("SELECT COUNT(*) FROM canonical_rows").fetchone()
     if counted is None:
         raise KaggleV6MaterializeError("canonical row count is unavailable")
@@ -101,3 +105,27 @@ def write_canonical_parquet(
     )
     connection.execute("DROP TABLE canonical_rows")
     return row_count
+
+
+def iter_canonical_rows(path: Path, *, batch_rows: int) -> Iterator[CanonicalBattleRow]:
+    """Yield canonical rows in sort order without loading the full file."""
+    if batch_rows < 1:
+        raise KaggleV6MaterializeError("batch_rows must be at least 1")
+    connection = duckdb.connect()
+    try:
+        result = connection.execute(
+            """
+            SELECT * FROM read_parquet(?)
+            ORDER BY timestamp, fingerprint, archive_member, row_number
+            """,
+            [str(path)],
+        )
+        columns = [str(column[0]) for column in result.description]
+        while True:
+            batch = result.fetchmany(batch_rows)
+            if not batch:
+                break
+            for values in batch:
+                yield CanonicalBattleRow.model_validate(row_mapping(columns, values))
+    finally:
+        connection.close()

@@ -1,18 +1,27 @@
 from datetime import UTC, datetime
 from pathlib import Path, PurePosixPath
+from shutil import copytree
 
 import duckdb
 import pytest
 
 from clash_sos.application.dataset_grouping import group_staged_dataset
+from clash_sos.application.dataset_materialize import materialize_canonical_dataset
 from clash_sos.application.dataset_staging import StagingConfig
 from clash_sos.domain.canonical import BattleOutcome, RecordIssue, RecordState
-from clash_sos.domain.canonical_dataset import CANONICAL_SCHEMA, deck_content_hash
+from clash_sos.domain.canonical_dataset import (
+    CANONICAL_SCHEMA,
+    CanonicalBattleRow,
+    deck_content_hash,
+    logical_canonical_content_hash,
+)
 from clash_sos.domain.processed_manifest import DEFAULT_DATASET_VERSION
 from clash_sos.domain.staged_dataset import StagedBattleRow, UnadaptableRow
+from clash_sos.infrastructure.kaggle_v6.audit_io import hash_file
 from clash_sos.infrastructure.kaggle_v6.grouping_io import list_parquet_files
 from clash_sos.infrastructure.kaggle_v6.materialize_io import (
     KaggleV6MaterializeError,
+    iter_canonical_rows,
     read_canonical_schema,
     write_canonical_parquet,
 )
@@ -247,3 +256,96 @@ def test_write_canonical_refuses_existing_output(tmp_path: Path) -> None:
         _write_canonical(workspace, tmp_path, output)
     assert output.read_text(encoding="utf-8") == "sentinel"
     assert list((workspace / "staging").rglob("*.parquet"))
+
+
+def test_materialize_records_logical_and_physical_hashes(tmp_path: Path) -> None:
+    workspace = _write_workspace(tmp_path, staged=(staged_row(),))
+    _group(workspace, tmp_path, 1)
+    result = materialize_canonical_dataset(
+        workspace,
+        workspace,
+        config=StagingConfig(threads=8, memory_limit="256MB", batch_rows=1),
+        temp_directory=tmp_path / "materialize-tmp",
+    )
+    rows = tuple(iter_canonical_rows(result.canonical_path, batch_rows=1))
+    size, physical = hash_file(result.canonical_path, CONFIG.chunk_size)
+    assert result.row_count == 1
+    assert result.size_bytes == size
+    assert result.sha256 == physical
+    assert result.logical_sha256 == logical_canonical_content_hash(rows)
+    CanonicalBattleRow.model_validate(rows[0].model_dump())
+
+
+def test_materialize_fails_when_published_version_exists(tmp_path: Path) -> None:
+    workspace = _write_workspace(tmp_path, staged=(staged_row(),))
+    _group(workspace, tmp_path, 1)
+    published = tmp_path / "published"
+    published.mkdir()
+    with pytest.raises(KaggleV6MaterializeError, match="already exists"):
+        materialize_canonical_dataset(
+            workspace,
+            workspace,
+            config=CONFIG,
+            temp_directory=tmp_path / "materialize-tmp",
+            published_version=published,
+        )
+    assert not (workspace / "canonical.parquet").exists()
+
+
+def test_materialize_removes_canonical_after_hash_failure(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    workspace = _write_workspace(tmp_path, staged=(staged_row(),))
+    _group(workspace, tmp_path, 1)
+
+    def fail_hash(path: Path, chunk_size: int) -> tuple[int, str]:
+        raise RuntimeError("hash failed")
+
+    monkeypatch.setattr(
+        "clash_sos.application.dataset_materialize.hash_file",
+        fail_hash,
+    )
+    with pytest.raises(RuntimeError, match="hash failed"):
+        materialize_canonical_dataset(
+            workspace,
+            workspace,
+            config=CONFIG,
+            temp_directory=tmp_path / "materialize-tmp",
+        )
+    assert not (workspace / "canonical.parquet").exists()
+    assert list((workspace / "dispositions").glob("*.parquet"))
+
+
+def test_materialize_repeated_writes_match_bytes_and_hashes(tmp_path: Path) -> None:
+    workspace = _write_workspace(tmp_path, staged=(staged_row(),))
+    _group(workspace, tmp_path, 1)
+    first = tmp_path / "out-a"
+    second = tmp_path / "out-b"
+    copytree(workspace / "dispositions", first / "dispositions")
+    copytree(workspace / "dispositions", second / "dispositions")
+    result_a = materialize_canonical_dataset(
+        workspace, first, config=CONFIG, temp_directory=tmp_path / "tmp-a"
+    )
+    result_b = materialize_canonical_dataset(
+        workspace, second, config=CONFIG, temp_directory=tmp_path / "tmp-b"
+    )
+    assert result_a.logical_sha256 == result_b.logical_sha256
+    assert result_a.sha256 == result_b.sha256
+    assert result_a.canonical_path.read_bytes() == result_b.canonical_path.read_bytes()
+
+
+def test_materialize_writes_empty_canonical_when_no_valid_rows(tmp_path: Path) -> None:
+    unadaptable = UnadaptableRow(
+        archive_member="a.parquet",
+        row_number=0,
+        state=RecordState.INVALID,
+        issues=(RecordIssue.MALFORMED_ROW,),
+    )
+    workspace = _write_workspace(tmp_path, unadaptable=(unadaptable,))
+    _group(workspace, tmp_path, 1)
+    result = materialize_canonical_dataset(
+        workspace, workspace, config=CONFIG, temp_directory=tmp_path / "materialize-tmp"
+    )
+    assert result.row_count == 0
+    assert tuple(iter_canonical_rows(result.canonical_path, batch_rows=8)) == ()
+    assert result.logical_sha256 == logical_canonical_content_hash(())
