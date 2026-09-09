@@ -97,7 +97,7 @@ def create_ledger(
     if staged_files:
         execute(
             "CREATE TEMP TABLE staged AS SELECT * FROM read_parquet(?)",
-            [str(path) for path in staged_files],
+            [[str(path) for path in staged_files]],
         )
         execute(_STAGED_LEDGER_SQL)
     if unadaptable_files:
