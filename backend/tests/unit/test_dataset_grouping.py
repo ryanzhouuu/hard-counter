@@ -1,16 +1,24 @@
 from datetime import UTC, datetime
+from pathlib import Path
 
+import duckdb
+import pytest
 from hypothesis import given
 from hypothesis import strategies as st
 
 from clash_sos.application.dataset_grouping import (
+    KaggleV6GroupingError,
     disposition_from_unadaptable,
     finalize_event_group,
+    group_staged_dataset,
 )
+from clash_sos.application.dataset_staging import StagingConfig
 from clash_sos.domain.canonical import BattleOutcome, RecordIssue, RecordState
 from clash_sos.domain.canonical_dataset import deck_content_hash
+from clash_sos.domain.disposition_ledger import DISPOSITION_SCHEMA
 from clash_sos.domain.staged_dataset import StagedBattleRow, UnadaptableRow
 from clash_sos.infrastructure.kaggle_v6.source import KAGGLE_V6_SOURCE_ID
+from clash_sos.infrastructure.kaggle_v6.staging_io import write_staged_part, write_unadaptable_part
 
 EVENT_KEY = "a" * 64
 FINGERPRINT_A = "b" * 64
@@ -174,3 +182,131 @@ def test_side_swapped_conflict_has_no_accepted_representative(left_fingerprint: 
     assert all(row.state is RecordState.QUARANTINED for row in result)
     assert all(RecordIssue.CONFLICTING_BATTLE in row.issues for row in result)
     assert all(row.representative_archive_member is None for row in result)
+
+
+def _write_workspace(
+    directory: Path,
+    *,
+    staged: tuple[StagedBattleRow, ...] = (),
+    unadaptable: tuple[UnadaptableRow, ...] = (),
+) -> Path:
+    workspace = directory / "workspace"
+    (workspace / "staging").mkdir(parents=True)
+    (workspace / "unadaptable").mkdir(parents=True)
+    if staged:
+        write_staged_part(
+            workspace / "staging" / "a" / "part-00000.parquet",
+            staged,
+            row_group_rows=131072,
+        )
+    if unadaptable:
+        write_unadaptable_part(
+            workspace / "unadaptable" / "a" / "part-00000.parquet",
+            unadaptable,
+            row_group_rows=131072,
+        )
+    return workspace
+
+
+def _read_disposition_rows(output_dir: Path) -> list[tuple[str, int, str, list[str], str | None]]:
+    paths = sorted((output_dir / "dispositions").glob("*.parquet"))
+    connection = duckdb.connect()
+    try:
+        query = " UNION ALL ".join(
+            "SELECT archive_member, row_number, state, issues, event_key FROM read_parquet(?)"
+            for _ in paths
+        )
+        rows = connection.execute(query, [str(path) for path in paths]).fetchall()
+        return [
+            (str(member), int(number), str(state), list(issues), None if key is None else str(key))
+            for member, number, state, issues, key in rows
+        ]
+    finally:
+        connection.close()
+
+
+def test_duckdb_grouping_matches_python_rules_and_passthrough(tmp_path: Path) -> None:
+    staged = (
+        staged_row(),
+        staged_row(archive_member="b.parquet", row_number=4),
+        staged_row(
+            archive_member="c.parquet",
+            row_number=1,
+            event_key="d" * 64,
+            fingerprint="e" * 64,
+            mode="Ladder",
+            observation_issues=(RecordIssue.UNSUPPORTED_MODE,),
+        ),
+    )
+    unadaptable = (
+        UnadaptableRow(
+            archive_member="a.parquet",
+            row_number=3,
+            state=RecordState.INVALID,
+            issues=(RecordIssue.MALFORMED_ROW,),
+        ),
+    )
+    workspace = _write_workspace(tmp_path, staged=staged, unadaptable=unadaptable)
+    result = group_staged_dataset(
+        workspace,
+        workspace,
+        source_row_count=4,
+        config=StagingConfig(threads=1, memory_limit="256MB"),
+        temp_directory=tmp_path / "tmp",
+    )
+    expected = {
+        (row.archive_member, row.row_number): (
+            row.state.value,
+            [issue.value for issue in row.issues],
+        )
+        for row in (
+            *finalize_event_group(staged[:2]),
+            *finalize_event_group((staged[2],)),
+            disposition_from_unadaptable(unadaptable[0]),
+        )
+    }
+    observed = {
+        (member, number): (state, issues)
+        for member, number, state, issues, _key in _read_disposition_rows(workspace)
+    }
+    assert observed == expected
+    assert result.summary.source_row_count == 4
+    assert result.summary.duplicate_row_count == 1
+    files = {path.name for path in result.disposition_files}
+    assert files == {"a.parquet", "b.parquet", "c.parquet"}
+    connection = duckdb.connect()
+    try:
+        mixed = next(path for path in result.disposition_files if path.name == "a.parquet")
+        columns = connection.execute(
+            "DESCRIBE SELECT * FROM read_parquet(?)", [str(mixed)]
+        ).fetchall()
+        assert [str(row[0]) for row in columns] == [column.name for column in DISPOSITION_SCHEMA]
+    finally:
+        connection.close()
+
+
+def test_grouping_fails_closed_on_count_mismatch(tmp_path: Path) -> None:
+    workspace = _write_workspace(tmp_path, staged=(staged_row(),))
+    with pytest.raises(KaggleV6GroupingError, match="source_row_count"):
+        group_staged_dataset(
+            workspace,
+            workspace,
+            source_row_count=2,
+            config=StagingConfig(threads=1, memory_limit="256MB"),
+            temp_directory=tmp_path / "tmp",
+        )
+    assert not (workspace / "dispositions").exists()
+    assert list((workspace / "staging").rglob("*.parquet"))
+
+
+def test_grouping_refuses_existing_disposition_output(tmp_path: Path) -> None:
+    workspace = _write_workspace(tmp_path, staged=(staged_row(),))
+    (workspace / "dispositions").mkdir()
+    with pytest.raises(KaggleV6GroupingError, match="already exists"):
+        group_staged_dataset(
+            workspace,
+            workspace,
+            source_row_count=1,
+            config=StagingConfig(threads=1, memory_limit="256MB"),
+            temp_directory=tmp_path / "tmp",
+        )
