@@ -1,5 +1,5 @@
 from datetime import UTC, datetime
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 import duckdb
 import pytest
@@ -193,16 +193,22 @@ def _write_workspace(
     workspace = directory / "workspace"
     (workspace / "staging").mkdir(parents=True)
     (workspace / "unadaptable").mkdir(parents=True)
-    if staged:
+    staged_by_member: dict[str, list[StagedBattleRow]] = {}
+    for row in staged:
+        staged_by_member.setdefault(row.archive_member, []).append(row)
+    for member, rows in staged_by_member.items():
         write_staged_part(
-            workspace / "staging" / "a" / "part-00000.parquet",
-            staged,
+            workspace / "staging" / PurePosixPath(member).stem / "part-00000.parquet",
+            rows,
             row_group_rows=131072,
         )
-    if unadaptable:
+    unadaptable_by_member: dict[str, list[UnadaptableRow]] = {}
+    for row in unadaptable:
+        unadaptable_by_member.setdefault(row.archive_member, []).append(row)
+    for member, rows in unadaptable_by_member.items():
         write_unadaptable_part(
-            workspace / "unadaptable" / "a" / "part-00000.parquet",
-            unadaptable,
+            workspace / "unadaptable" / PurePosixPath(member).stem / "part-00000.parquet",
+            rows,
             row_group_rows=131072,
         )
     return workspace
