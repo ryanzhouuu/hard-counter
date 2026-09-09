@@ -1,6 +1,6 @@
 """Accepted canonical row contracts for versioned processed datasets."""
 
-from collections.abc import Sequence
+from collections.abc import Iterable, Sequence
 from datetime import UTC, datetime
 from enum import Enum
 from hashlib import sha256
@@ -108,10 +108,23 @@ def canonical_row_sort_key(row: "CanonicalBattleRow") -> tuple[datetime, str, st
     return (row.timestamp, row.fingerprint, row.archive_member, row.row_number)
 
 
+def stream_logical_canonical_content_hash(rows: Iterable["CanonicalBattleRow"]) -> str:
+    """SHA-256 of a JSON array of rows in the given order, matching dumps of the full list."""
+    digest = sha256()
+    digest.update(b"[")
+    first = True
+    for row in rows:
+        if not first:
+            digest.update(b",")
+        digest.update(canonical_json_bytes(_canonicalize(row.model_dump(mode="python"))))
+        first = False
+    digest.update(b"]")
+    return digest.hexdigest()
+
+
 def logical_canonical_content_hash(rows: Sequence["CanonicalBattleRow"]) -> str:
-    sorted_rows = sorted(rows, key=canonical_row_sort_key)
-    payload = [_canonicalize(row.model_dump(mode="python")) for row in sorted_rows]
-    return sha256(canonical_json_bytes(payload)).hexdigest()
+    """SHA-256 of sorted canonical rows using the streaming JSON-array encoding."""
+    return stream_logical_canonical_content_hash(sorted(rows, key=canonical_row_sort_key))
 
 
 class CanonicalBattleRow(DomainModel):

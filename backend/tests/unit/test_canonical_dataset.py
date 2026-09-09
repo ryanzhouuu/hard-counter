@@ -13,6 +13,7 @@ from clash_sos.domain.canonical_dataset import (
     canonical_schema_fingerprint,
     deck_content_hash,
     logical_canonical_content_hash,
+    stream_logical_canonical_content_hash,
 )
 from clash_sos.infrastructure.kaggle_v6.source import KAGGLE_V6_SOURCE_ID
 
@@ -160,5 +161,31 @@ def test_logical_hash_is_stable_for_equivalent_row_order() -> None:
 def test_logical_hash_changes_when_row_content_changes() -> None:
     baseline = logical_canonical_content_hash((canonical_row(),))
     changed = logical_canonical_content_hash((canonical_row(balance_era_id="2026-05"),))
+    assert baseline != changed
+    assert len(baseline) == 64
+
+
+def test_stream_logical_hash_matches_empty_array() -> None:
+    assert stream_logical_canonical_content_hash(()) == logical_canonical_content_hash(())
+    assert len(stream_logical_canonical_content_hash(())) == 64
+
+
+def test_stream_logical_hash_matches_sorted_two_row_payload() -> None:
+    first = canonical_row(fingerprint="b" * 64, row_number=1)
+    second = canonical_row(
+        timestamp=datetime(2026, 6, 22, tzinfo=UTC),
+        fingerprint="a" * 64,
+        archive_member="other.parquet",
+        row_number=0,
+    )
+    shuffled = (second, first)
+    ordered = tuple(sorted(shuffled, key=canonical_row_sort_key))
+    streamed = stream_logical_canonical_content_hash(ordered)
+    assert streamed == logical_canonical_content_hash(shuffled)
+
+
+def test_stream_logical_hash_changes_when_row_content_changes() -> None:
+    baseline = stream_logical_canonical_content_hash((canonical_row(),))
+    changed = stream_logical_canonical_content_hash((canonical_row(balance_era_id="2026-05"),))
     assert baseline != changed
     assert len(baseline) == 64
