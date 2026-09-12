@@ -1,20 +1,27 @@
-"""Assemble processed manifests, verification reports, and publication cleanup.
+"""Assemble processed manifests and publish a versioned dataset directory.
 
-Accepted summaries are DuckDB aggregates over `canonical.parquet`. Frozen checks
-raise unless every artifact passes. Manifest assembly inventories hashed files
-and writes `manifest.json` last. Publication is a same-filesystem rename.
+Chains staging, grouping, materialization, splits, frozen verification, and a
+same-filesystem rename. Staging files never enter the published layout.
 """
 
 from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
+from shutil import rmtree
 from typing import Literal
 
-from clash_sos.application.dataset_staging import StagingConfig
+from clash_sos.application.dataset_grouping import group_staged_dataset
+from clash_sos.application.dataset_materialize import materialize_canonical_dataset
+from clash_sos.application.dataset_splits import write_player_disjoint_split, write_temporal_split
+from clash_sos.application.dataset_staging import StagingConfig, stage_kaggle_v6
 from clash_sos.domain.canonical_dataset import CANONICAL_SCHEMA_VERSION
 from clash_sos.domain.dataset_splits import VERIFICATION_CHECK_IDS
+from clash_sos.domain.manifests import DatasetManifest
 from clash_sos.domain.processed_manifest import (
     DEFAULT_DATASET_VERSION,
+    DEFAULT_PLAYER_HASH_SEED,
+    DEFAULT_PLAYER_TRAIN_MAX,
+    DEFAULT_PLAYER_VALIDATION_MAX,
     PREPARATION_POLICY_VERSION,
     AcceptedSummary,
     DispositionSummary,
@@ -35,8 +42,10 @@ from clash_sos.infrastructure.kaggle_v6.balance_eras import KAGGLE_V6_ERA_REGIST
 from clash_sos.infrastructure.kaggle_v6.catalog import KAGGLE_V6_CARDS
 from clash_sos.infrastructure.kaggle_v6.grouping_io import list_parquet_files
 from clash_sos.infrastructure.kaggle_v6.publish_io import (
+    KaggleV6PublishError,
     check_prepare_preconditions,
     cleanup_prepare_workspaces,
+    publish_processed_version,
 )
 from clash_sos.infrastructure.kaggle_v6.source import KAGGLE_V6_SOURCE_ID
 from clash_sos.infrastructure.kaggle_v6.staging_io import connect_staging_duckdb, python_cell
@@ -292,3 +301,114 @@ def execute_with_prepare_cleanup[T](
     except BaseException:
         cleanup_prepare_workspaces(output_workspace, staging_workspace)
         raise
+
+
+def prepare_kaggle_v6_dataset(
+    archive: Path,
+    destination: Path,
+    *,
+    staging_workspace: Path,
+    output_workspace: Path,
+    temp_directory: Path,
+    train_end: datetime,
+    validation_end: datetime,
+    config: StagingConfig,
+    raw_manifest_path: Path,
+    player_seed: int = DEFAULT_PLAYER_HASH_SEED,
+    player_train_max: float = DEFAULT_PLAYER_TRAIN_MAX,
+    player_validation_max: float = DEFAULT_PLAYER_VALIDATION_MAX,
+    dataset_version: str = DEFAULT_DATASET_VERSION,
+) -> Path:
+    """Stage, group, materialize, split, verify, and atomically publish one version."""
+
+    def body() -> Path:
+        staged = stage_kaggle_v6(
+            archive,
+            staging_workspace,
+            temp_directory=temp_directory / "stage",
+            config=config,
+            raw_manifest_path=raw_manifest_path,
+        )
+        grouped = group_staged_dataset(
+            staging_workspace,
+            output_workspace,
+            source_row_count=staged.source_row_count,
+            config=config,
+            temp_directory=temp_directory / "group",
+        )
+        materialized = materialize_canonical_dataset(
+            staging_workspace,
+            output_workspace,
+            config=config,
+            temp_directory=temp_directory / "materialize",
+            dataset_version=dataset_version,
+            published_version=destination,
+        )
+        temporal_path = output_workspace / "splits-temporal.parquet"
+        player_path = output_workspace / "splits-player-disjoint.parquet"
+        temporal = write_temporal_split(
+            materialized.canonical_path,
+            temporal_path,
+            train_end=train_end,
+            validation_end=validation_end,
+            config=config,
+            temp_directory=temp_directory / "temporal",
+        )
+        player = write_player_disjoint_split(
+            materialized.canonical_path,
+            player_path,
+            config=config,
+            temp_directory=temp_directory / "player",
+            player_seed=player_seed,
+            player_train_max=player_train_max,
+            player_validation_max=player_validation_max,
+        )
+        accepted = summarize_accepted(
+            materialized.canonical_path,
+            config=config,
+            temp_directory=temp_directory / "accepted",
+        )
+        write_verification_report(
+            output_workspace / "verification-report.json",
+            canonical_path=materialized.canonical_path,
+            disposition_files=grouped.disposition_files,
+            temporal_split_path=temporal_path,
+            player_split_path=player_path,
+            train_end=train_end,
+            validation_end=validation_end,
+            excluded_bridge_rows=player.excluded_bridge_rows,
+            config=config,
+            temp_directory=temp_directory / "verify",
+        )
+        raw = DatasetManifest.model_validate_json(raw_manifest_path.read_text(encoding="utf-8"))
+        if raw.dataset_schema is None:
+            raise KaggleV6PrepareError("raw audit manifest is missing a schema fingerprint")
+        _, archive_sha256 = hash_file(archive, config.chunk_size)
+        manifest = assemble_processed_manifest(
+            output_workspace,
+            config=config,
+            temporal_split=temporal,
+            player_disjoint_split=player,
+            dispositions=grouped.summary,
+            accepted=accepted,
+            canonical_logical_sha256=materialized.logical_sha256,
+            raw_manifest_path=raw_manifest_path,
+            archive_sha256=archive_sha256,
+            source_schema_fingerprint=raw.dataset_schema.fingerprint,
+            source_members=staged.members,
+            dataset_version=dataset_version,
+        )
+        write_processed_manifest(output_workspace, manifest)
+        return publish_processed_version(output_workspace, destination)
+
+    try:
+        published = execute_with_prepare_cleanup(
+            destination=destination,
+            output_workspace=output_workspace,
+            staging_workspace=staging_workspace,
+            body=body,
+        )
+    except KaggleV6PublishError as error:
+        raise KaggleV6PrepareError(str(error)) from error
+    rmtree(staging_workspace, ignore_errors=True)
+    return published
