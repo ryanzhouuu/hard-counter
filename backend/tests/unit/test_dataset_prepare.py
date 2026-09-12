@@ -3,8 +3,13 @@ from json import loads
 from pathlib import Path
 
 import duckdb
+import pytest
 
-from clash_sos.application.dataset_prepare import summarize_accepted
+from clash_sos.application.dataset_prepare import (
+    KaggleV6PrepareError,
+    summarize_accepted,
+    write_verification_report,
+)
 from clash_sos.application.dataset_staging import StagingConfig
 from clash_sos.domain.canonical_dataset import canonical_json_bytes
 from clash_sos.domain.dataset_splits import VERIFICATION_CHECK_IDS
@@ -15,6 +20,9 @@ from clash_sos.domain.processed_manifest import (
 )
 
 CONFIG = StagingConfig(threads=1, memory_limit="256MB")
+TRAIN_END = datetime(2026, 6, 10, tzinfo=UTC)
+VALIDATION_END = datetime(2026, 6, 20, tzinfo=UTC)
+FINGERPRINT = "a" * 64
 
 
 def _report() -> VerificationReport:
@@ -35,6 +43,47 @@ def test_dump_verification_report_is_byte_stable() -> None:
     payload = loads(first)
     assert [check["check_id"] for check in payload["checks"]] == list(VERIFICATION_CHECK_IDS)
     assert not any("manifest" in key for key in payload)
+
+
+def test_write_verification_report_rejects_duplicate_identity(tmp_path: Path) -> None:
+    canonical = tmp_path / "canonical.parquet"
+    connection = duckdb.connect()
+    try:
+        connection.execute(
+            """
+            CREATE TABLE identities (
+                timestamp TIMESTAMPTZ,
+                fingerprint VARCHAR,
+                archive_member VARCHAR,
+                row_number BIGINT
+            )
+            """
+        )
+        connection.executemany(
+            "INSERT INTO identities VALUES (?, ?, ?, ?)",
+            [
+                (datetime(2026, 6, 9, tzinfo=UTC), FINGERPRINT, "a.parquet", 0),
+                (datetime(2026, 6, 9, tzinfo=UTC), FINGERPRINT, "a.parquet", 0),
+            ],
+        )
+        connection.execute("COPY identities TO ? (FORMAT PARQUET)", [str(canonical)])
+    finally:
+        connection.close()
+    output = tmp_path / "verification-report.json"
+    with pytest.raises(KaggleV6PrepareError, match="identity"):
+        write_verification_report(
+            output,
+            canonical_path=canonical,
+            disposition_files=(),
+            temporal_split_path=tmp_path / "missing-temporal.parquet",
+            player_split_path=tmp_path / "missing-player.parquet",
+            train_end=TRAIN_END,
+            validation_end=VALIDATION_END,
+            excluded_bridge_rows=0,
+            config=CONFIG,
+            temp_directory=tmp_path / "tmp",
+        )
+    assert not output.exists()
 
 
 def test_summarize_accepted_matches_duckdb_aggregates(tmp_path: Path) -> None:
