@@ -346,3 +346,8 @@ class ProcessedDatasetManifest(ManifestModel):
 
 def dump_processed_manifest(manifest: ProcessedDatasetManifest) -> bytes:
     return canonical_json_bytes(manifest.model_dump(mode="python")) + b"\n"
+
+
+def dump_verification_report(report: VerificationReport) -> bytes:
+    """Serialize a passed-only verification report as canonical JSON plus a newline."""
+    return canonical_json_bytes(report.model_dump(mode="python")) + b"\n"
