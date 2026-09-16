@@ -1,5 +1,5 @@
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from typer.testing import CliRunner
 
@@ -60,3 +60,42 @@ def test_dataset_audit_command_is_thin(tmp_path: Path) -> None:
         threads=1,
     )
     write.assert_called_once_with(audit.return_value, output)
+
+
+def test_dataset_inspect_command_is_thin(tmp_path: Path) -> None:
+    archive = tmp_path / "source.zip"
+    manifest = MagicMock()
+    manifest.model_dump_json.return_value = '{"source_id":"kaggle-v6"}'
+    with (
+        patch(
+            "clash_sos.interfaces.cli.main.audit_kaggle_v6_archive",
+            return_value=manifest,
+        ) as audit,
+        patch("clash_sos.interfaces.cli.main.write_dataset_manifest") as write,
+    ):
+        result = runner.invoke(
+            cli_app,
+            [
+                "dataset",
+                "inspect-kaggle-v6",
+                "--archive",
+                str(archive),
+                "--temp-directory",
+                str(tmp_path),
+                "--memory-limit",
+                "512MB",
+                "--threads",
+                "1",
+            ],
+        )
+
+    assert result.exit_code == 0
+    assert result.stdout == '{"source_id":"kaggle-v6"}\n'
+    audit.assert_called_once_with(
+        archive,
+        temp_directory=tmp_path,
+        memory_limit="512MB",
+        threads=1,
+    )
+    write.assert_not_called()
+    manifest.model_dump_json.assert_called_once_with(by_alias=True, indent=2)

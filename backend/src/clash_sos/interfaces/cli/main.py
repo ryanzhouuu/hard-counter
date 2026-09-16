@@ -1,3 +1,5 @@
+"""Typer entry point for clash-sos. Dataset commands stay thin service adapters."""
+
 from pathlib import Path
 
 import typer
@@ -32,6 +34,7 @@ def audit_kaggle_v6(
     memory_limit: str = "1GB",
     threads: int = 2,
 ) -> None:
+    """Write the raw Kaggle v6 audit manifest after verifying archive identity."""
     manifest = audit_kaggle_v6_archive(
         archive,
         temp_directory=temp_directory,
@@ -40,3 +43,20 @@ def audit_kaggle_v6(
     )
     write_dataset_manifest(manifest, output)
     typer.echo(output)
+
+
+@dataset_app.command("inspect-kaggle-v6")
+def inspect_kaggle_v6(
+    archive: Path = Path("data/raw/kaggle") / KAGGLE_V6_ARCHIVE_NAME,
+    temp_directory: Path = Path("data/tmp"),
+    memory_limit: str = "1GB",
+    threads: int = 2,
+) -> None:
+    """Print the Kaggle v6 audit manifest JSON without writing any files."""
+    manifest = audit_kaggle_v6_archive(
+        archive,
+        temp_directory=temp_directory,
+        memory_limit=memory_limit,
+        threads=threads,
+    )
+    typer.echo(manifest.model_dump_json(by_alias=True, indent=2))
