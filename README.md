@@ -54,6 +54,30 @@ The command verifies the archive identity, member checksums, card catalog, and a
 schemas before writing `data/metadata/kaggle-v6-dataset.json`. It profiles the archive with
 bounded memory and does not create the R2 processed dataset.
 
+Print the same audit facts without writing a manifest:
+
+```bash
+uv run clash-sos dataset inspect-kaggle-v6
+```
+
+Prepare a versioned processed dataset. Temporal cutovers are required and must be
+timezone-aware ISO-8601 timestamps:
+
+```bash
+uv run clash-sos dataset prepare-kaggle-v6 \
+  --train-end 2026-06-10T00:00:00+00:00 \
+  --validation-end 2026-06-20T00:00:00+00:00
+```
+
+The command records the effective options in the processed manifest and fails before doing
+work if `data/processed/kaggle-v6-ranked16-v1` already exists.
+
+Validate a published version in place without rewriting it:
+
+```bash
+uv run clash-sos dataset verify-kaggle-v6
+```
+
 ## Quality checks
 
 Run the same checks used by GitHub Actions:
