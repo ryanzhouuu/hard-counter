@@ -1,10 +1,21 @@
 """Typer entry point for clash-sos. Dataset commands stay thin service adapters."""
 
+from datetime import datetime
 from pathlib import Path
+from typing import Annotated
 
 import typer
 
 from clash_sos import __version__
+from clash_sos.application.dataset_prepare import prepare_kaggle_v6_dataset
+from clash_sos.application.dataset_staging import StagingConfig
+from clash_sos.application.dataset_verify import verify_kaggle_v6_dataset
+from clash_sos.domain.processed_manifest import (
+    DEFAULT_DATASET_VERSION,
+    DEFAULT_PLAYER_HASH_SEED,
+    DEFAULT_PLAYER_TRAIN_MAX,
+    DEFAULT_PLAYER_VALIDATION_MAX,
+)
 from clash_sos.infrastructure.kaggle_v6.audit import (
     audit_kaggle_v6_archive,
     write_dataset_manifest,
@@ -14,6 +25,19 @@ from clash_sos.infrastructure.kaggle_v6.source import KAGGLE_V6_ARCHIVE_NAME
 app = typer.Typer(no_args_is_help=True)
 dataset_app = typer.Typer(no_args_is_help=True)
 app.add_typer(dataset_app, name="dataset")
+
+
+def parse_aware_datetime(value: str) -> datetime:
+    """Parse a timezone-aware ISO-8601 timestamp for temporal cutovers."""
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError as error:
+        raise typer.BadParameter(
+            "temporal cutovers must be timezone-aware ISO-8601 timestamps"
+        ) from error
+    if parsed.tzinfo is None or parsed.utcoffset() is None:
+        raise typer.BadParameter("temporal cutovers must be timezone-aware ISO-8601 timestamps")
+    return parsed
 
 
 @app.callback()
@@ -60,3 +84,67 @@ def inspect_kaggle_v6(
         threads=threads,
     )
     typer.echo(manifest.model_dump_json(by_alias=True, indent=2))
+
+
+@dataset_app.command("prepare-kaggle-v6")
+def prepare_kaggle_v6(
+    train_end: Annotated[datetime, typer.Option(parser=parse_aware_datetime)],
+    validation_end: Annotated[datetime, typer.Option(parser=parse_aware_datetime)],
+    archive: Path = Path("data/raw/kaggle") / KAGGLE_V6_ARCHIVE_NAME,
+    destination: Path = Path("data/processed") / DEFAULT_DATASET_VERSION,
+    staging_workspace: Path = Path("data/tmp/kaggle-v6-staging"),
+    output_workspace: Path = Path("data/tmp/kaggle-v6-output"),
+    temp_directory: Path = Path("data/tmp"),
+    raw_manifest: Path = Path("data/metadata/kaggle-v6-dataset.json"),
+    memory_limit: str = "1GB",
+    threads: int = 2,
+    chunk_size: int = 8 * 1024 * 1024,
+    batch_rows: int = 10_000,
+    player_seed: int = DEFAULT_PLAYER_HASH_SEED,
+    player_train_max: float = DEFAULT_PLAYER_TRAIN_MAX,
+    player_validation_max: float = DEFAULT_PLAYER_VALIDATION_MAX,
+    dataset_version: str = DEFAULT_DATASET_VERSION,
+) -> None:
+    """Publish one processed Kaggle v6 version. Fails if the destination already exists."""
+    published = prepare_kaggle_v6_dataset(
+        archive,
+        destination,
+        staging_workspace=staging_workspace,
+        output_workspace=output_workspace,
+        temp_directory=temp_directory,
+        train_end=train_end,
+        validation_end=validation_end,
+        config=StagingConfig(
+            memory_limit=memory_limit,
+            threads=threads,
+            chunk_size=chunk_size,
+            batch_rows=batch_rows,
+        ),
+        raw_manifest_path=raw_manifest,
+        player_seed=player_seed,
+        player_train_max=player_train_max,
+        player_validation_max=player_validation_max,
+        dataset_version=dataset_version,
+    )
+    typer.echo(published)
+
+
+@dataset_app.command("verify-kaggle-v6")
+def verify_kaggle_v6(
+    dataset: Path = Path("data/processed") / DEFAULT_DATASET_VERSION,
+    temp_directory: Path = Path("data/tmp"),
+    memory_limit: str = "1GB",
+    threads: int = 2,
+    chunk_size: int = 8 * 1024 * 1024,
+) -> None:
+    """Validate a published Kaggle v6 version in place without rewriting it."""
+    verify_kaggle_v6_dataset(
+        dataset,
+        config=StagingConfig(
+            memory_limit=memory_limit,
+            threads=threads,
+            chunk_size=chunk_size,
+        ),
+        temp_directory=temp_directory,
+    )
+    typer.echo(dataset)

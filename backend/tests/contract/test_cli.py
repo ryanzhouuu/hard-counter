@@ -1,9 +1,15 @@
+from datetime import UTC, datetime
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
+import pytest
+import typer
 from typer.testing import CliRunner
 
+from clash_sos.application.dataset_prepare import KaggleV6PrepareError
+from clash_sos.application.dataset_staging import StagingConfig
 from clash_sos.interfaces.cli.main import app as cli_app
+from clash_sos.interfaces.cli.main import parse_aware_datetime
 from clash_sos.interfaces.workers.main import app as worker_app
 
 runner = CliRunner()
@@ -99,3 +105,141 @@ def test_dataset_inspect_command_is_thin(tmp_path: Path) -> None:
     )
     write.assert_not_called()
     manifest.model_dump_json.assert_called_once_with(by_alias=True, indent=2)
+
+
+def test_dataset_prepare_command_is_thin(tmp_path: Path) -> None:
+    archive = tmp_path / "source.zip"
+    destination = tmp_path / "published"
+    staging = tmp_path / "staging"
+    output = tmp_path / "output"
+    temp_directory = tmp_path / "tmp"
+    raw_manifest = tmp_path / "raw.json"
+    with patch(
+        "clash_sos.interfaces.cli.main.prepare_kaggle_v6_dataset",
+        return_value=destination,
+    ) as prepare:
+        result = runner.invoke(
+            cli_app,
+            [
+                "dataset",
+                "prepare-kaggle-v6",
+                "--archive",
+                str(archive),
+                "--destination",
+                str(destination),
+                "--staging-workspace",
+                str(staging),
+                "--output-workspace",
+                str(output),
+                "--temp-directory",
+                str(temp_directory),
+                "--raw-manifest",
+                str(raw_manifest),
+                "--train-end",
+                "2026-06-10T00:00:00+00:00",
+                "--validation-end",
+                "2026-06-20T00:00:00+00:00",
+                "--memory-limit",
+                "512MB",
+                "--threads",
+                "1",
+                "--chunk-size",
+                "1024",
+                "--batch-rows",
+                "8",
+                "--player-seed",
+                "3",
+                "--player-train-max",
+                "0.6",
+                "--player-validation-max",
+                "0.8",
+                "--dataset-version",
+                "test-v1",
+            ],
+        )
+
+    assert result.exit_code == 0
+    assert result.stdout == f"{destination}\n"
+    prepare.assert_called_once_with(
+        archive,
+        destination,
+        staging_workspace=staging,
+        output_workspace=output,
+        temp_directory=temp_directory,
+        train_end=datetime(2026, 6, 10, tzinfo=UTC),
+        validation_end=datetime(2026, 6, 20, tzinfo=UTC),
+        config=StagingConfig(
+            memory_limit="512MB",
+            threads=1,
+            chunk_size=1024,
+            batch_rows=8,
+        ),
+        raw_manifest_path=raw_manifest,
+        player_seed=3,
+        player_train_max=0.6,
+        player_validation_max=0.8,
+        dataset_version="test-v1",
+    )
+
+
+def test_dataset_prepare_command_requires_temporal_cutovers() -> None:
+    result = runner.invoke(cli_app, ["dataset", "prepare-kaggle-v6"])
+
+    assert result.exit_code != 0
+
+
+def test_dataset_prepare_command_surfaces_existing_version() -> None:
+    with patch(
+        "clash_sos.interfaces.cli.main.prepare_kaggle_v6_dataset",
+        side_effect=KaggleV6PrepareError("published dataset version already exists"),
+    ):
+        result = runner.invoke(
+            cli_app,
+            [
+                "dataset",
+                "prepare-kaggle-v6",
+                "--train-end",
+                "2026-06-10T00:00:00+00:00",
+                "--validation-end",
+                "2026-06-20T00:00:00+00:00",
+            ],
+        )
+
+    assert result.exit_code != 0
+    assert result.exception is not None
+
+
+def test_dataset_verify_command_is_thin(tmp_path: Path) -> None:
+    dataset = tmp_path / "published"
+    temp_directory = tmp_path / "tmp"
+    with patch("clash_sos.interfaces.cli.main.verify_kaggle_v6_dataset") as verify:
+        result = runner.invoke(
+            cli_app,
+            [
+                "dataset",
+                "verify-kaggle-v6",
+                "--dataset",
+                str(dataset),
+                "--temp-directory",
+                str(temp_directory),
+                "--memory-limit",
+                "512MB",
+                "--threads",
+                "1",
+                "--chunk-size",
+                "1024",
+            ],
+        )
+
+    assert result.exit_code == 0
+    assert result.stdout == f"{dataset}\n"
+    verify.assert_called_once_with(
+        dataset,
+        config=StagingConfig(memory_limit="512MB", threads=1, chunk_size=1024),
+        temp_directory=temp_directory,
+    )
+
+
+def test_parse_aware_datetime_requires_timezone() -> None:
+    with pytest.raises(typer.BadParameter, match="timezone-aware"):
+        parse_aware_datetime("2026-06-10T00:00:00")
