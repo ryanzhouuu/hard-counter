@@ -22,12 +22,15 @@ from clash_sos.infrastructure.kaggle_v6.grouping_io import (
     KaggleV6GroupingError as KaggleV6GroupingError,
 )
 from clash_sos.infrastructure.kaggle_v6.grouping_io import (
-    create_ledger,
     list_parquet_files,
     summary_from_ledger,
     write_disposition_files,
+    write_event_groups,
+    write_identity_projection,
 )
 from clash_sos.infrastructure.kaggle_v6.staging_io import connect_staging_duckdb
+
+GROUPING_MEMORY_LIMIT = "8GB"
 
 
 def _sorted_issues(*groups: Sequence[RecordIssue]) -> tuple[RecordIssue, ...]:
@@ -137,27 +140,55 @@ def group_staged_dataset(
     config: StagingConfig,
     temp_directory: Path,
 ) -> GroupingResult:
-    """Group staged Parquet externally and write one disposition file per archive member."""
+    """Group staged Parquet externally and write one disposition file per archive member.
+
+    Uses at least 8GB DuckDB RAM and prefix-partitioned event_key aggregates so the
+    corpus never lands in DuckDB temp as a windowed ledger.
+    """
     if source_row_count < 0:
         raise KaggleV6GroupingError("source_row_count must be non-negative")
     dispositions = output_dir / "dispositions"
     if dispositions.exists():
         raise KaggleV6GroupingError("disposition output already exists")
     temp_directory.mkdir(parents=True, exist_ok=True)
+    identity_dir = temp_directory / "identity"
+    groups_dir = temp_directory / "event-groups"
+    shutil.rmtree(identity_dir, ignore_errors=True)
+    shutil.rmtree(groups_dir, ignore_errors=True)
     staged_files = list_parquet_files(staging_workspace / "staging")
     unadaptable_files = list_parquet_files(staging_workspace / "unadaptable")
     connection = connect_staging_duckdb(
-        memory_limit=config.memory_limit,
+        memory_limit=GROUPING_MEMORY_LIMIT,
         threads=config.threads,
         temp_directory=temp_directory,
     )
     try:
-        create_ledger(connection, staged_files, unadaptable_files)
-        row_count, summary = summary_from_ledger(connection, source_row_count=source_row_count)
+        group_files: tuple[Path, ...] = ()
+        if staged_files:
+            write_identity_projection(
+                connection,
+                staged_files,
+                identity_dir,
+                row_group_rows=config.parquet_row_group_rows,
+            )
+            group_files = write_event_groups(
+                connection,
+                identity_dir,
+                groups_dir,
+                row_group_rows=config.parquet_row_group_rows,
+            )
+            shutil.rmtree(identity_dir, ignore_errors=True)
         files = write_disposition_files(
             connection,
             output_dir,
+            staged_files=staged_files,
+            unadaptable_files=unadaptable_files,
+            group_files=group_files,
             row_group_rows=config.parquet_row_group_rows,
+        )
+        shutil.rmtree(groups_dir, ignore_errors=True)
+        row_count, summary = summary_from_ledger(
+            connection, files, source_row_count=source_row_count
         )
         return GroupingResult(summary=summary, disposition_files=files, row_count=row_count)
     except BaseException:
@@ -165,3 +196,5 @@ def group_staged_dataset(
         raise
     finally:
         connection.close()
+        shutil.rmtree(identity_dir, ignore_errors=True)
+        shutil.rmtree(groups_dir, ignore_errors=True)

@@ -42,7 +42,10 @@ def polars_schema(columns: Sequence[SchemaColumnManifest]) -> dict[str, PolarsSc
 def connect_staging_duckdb(
     *, memory_limit: str, threads: int, temp_directory: Path
 ) -> duckdb.DuckDBPyConnection:
-    """Open a DuckDB session with UTC timestamps and bounded resource settings."""
+    """Open a DuckDB session with UTC timestamps and bounded resource settings.
+
+    Disables preserve_insertion_order so large scans do not keep extra buffers.
+    """
     connection = duckdb.connect(
         config={
             "memory_limit": memory_limit,
@@ -51,6 +54,7 @@ def connect_staging_duckdb(
         }
     )
     connection.execute("SET TimeZone='UTC'")
+    connection.execute("SET preserve_insertion_order=false")
     return connection
 
 

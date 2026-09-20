@@ -146,6 +146,10 @@ def test_connect_staging_duckdb_uses_utc(tmp_path: Path) -> None:
     try:
         timezone_name = connection.execute("SELECT current_setting('TimeZone')").fetchone()
         assert timezone_name == ("UTC",)
+        insertion_order = connection.execute(
+            "SELECT current_setting('preserve_insertion_order')"
+        ).fetchone()
+        assert insertion_order == (False,)
     finally:
         connection.close()
 

@@ -1,4 +1,5 @@
 from datetime import UTC, datetime
+from inspect import getsource
 from pathlib import Path, PurePosixPath
 
 import duckdb
@@ -17,6 +18,7 @@ from clash_sos.domain.canonical import BattleOutcome, RecordIssue, RecordState
 from clash_sos.domain.canonical_dataset import deck_content_hash
 from clash_sos.domain.disposition_ledger import DISPOSITION_SCHEMA
 from clash_sos.domain.staged_dataset import StagedBattleRow, UnadaptableRow
+from clash_sos.infrastructure.kaggle_v6 import grouping_io
 from clash_sos.infrastructure.kaggle_v6.source import KAGGLE_V6_SOURCE_ID
 from clash_sos.infrastructure.kaggle_v6.staging_io import write_staged_part, write_unadaptable_part
 
@@ -303,6 +305,21 @@ def test_grouping_fails_closed_on_count_mismatch(tmp_path: Path) -> None:
         )
     assert not (workspace / "dispositions").exists()
     assert list((workspace / "staging").rglob("*.parquet"))
+
+
+def test_grouping_sql_aggregates_event_keys_without_windows_or_temp_ledgers() -> None:
+    source = getsource(grouping_io)
+    assert "FROM read_parquet(?, hive_partitioning = false)" in source
+    assert "SELECT *" not in source
+    assert "GROUP BY event_key" in source
+    assert "PARTITION_BY (prefix)" in source
+    assert "WINDOW" not in source
+    assert "ROW_NUMBER() OVER" not in source
+    assert "COUNT(DISTINCT fingerprint) OVER" not in source
+    assert "CREATE TEMP TABLE staged" not in source
+    assert "CREATE TEMP TABLE staged_ledger" not in source
+    assert "CREATE TEMP TABLE ledger" not in source
+    assert "CREATE TEMP TABLE unadaptable_ledger" not in source
 
 
 def test_grouping_refuses_existing_disposition_output(tmp_path: Path) -> None:
