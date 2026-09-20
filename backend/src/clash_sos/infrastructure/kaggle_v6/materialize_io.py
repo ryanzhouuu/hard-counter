@@ -1,4 +1,8 @@
-"""DuckDB join, sorted COPY, and schema inspection for canonical Parquet."""
+"""DuckDB join, sorted COPY, and schema inspection for canonical Parquet.
+
+Valid disposition keys are copied to a narrow Parquet file first. Canonical
+output is COPY'd from the join; DuckDB never holds the corpus in a temp table.
+"""
 
 from collections.abc import Iterator
 from pathlib import Path
@@ -31,10 +35,9 @@ SELECT
     CAST(s.side_b_deck_hash AS VARCHAR) AS side_b_deck_hash,
     CAST(s.archive_member AS VARCHAR) AS archive_member,
     CAST(s.row_number AS BIGINT) AS row_number
-FROM read_parquet(?) AS s
-INNER JOIN read_parquet(?) AS d
+FROM read_parquet(?, hive_partitioning = false) AS s
+INNER JOIN read_parquet(?, hive_partitioning = false) AS d
     ON s.archive_member = d.archive_member AND s.row_number = d.row_number
-WHERE d.state = 'valid'
 ORDER BY s.timestamp, s.fingerprint, s.archive_member, s.row_number
 """
 
@@ -63,6 +66,41 @@ def read_canonical_schema(
     return observed
 
 
+def _sql_path(path: Path) -> str:
+    """Quote a filesystem path for interpolation into a DuckDB COPY target."""
+    return str(path).replace("'", "''")
+
+
+def _empty_canonical_select() -> str:
+    """Typed zero-row SELECT matching canonical Parquet columns."""
+    projections = ",\n    ".join(
+        f"CAST(NULL AS {column.physical_type}) AS {column.name}" for column in CANONICAL_SCHEMA
+    )
+    return f"SELECT\n    {projections}\nWHERE FALSE"
+
+
+def _copy_select_to_parquet(
+    connection: duckdb.DuckDBPyConnection,
+    select_sql: str,
+    params: list[object],
+    output_path: Path,
+    *,
+    row_group_rows: int,
+) -> None:
+    """COPY a SELECT to zstd Parquet without materializing a DuckDB temp table."""
+    target = _sql_path(output_path)
+    connection.execute(
+        f"""
+        COPY (
+            {select_sql}
+        ) TO '{target}' (
+            FORMAT PARQUET, COMPRESSION ZSTD, ROW_GROUP_SIZE {int(row_group_rows)}
+        )
+        """,
+        params,
+    )
+
+
 def write_canonical_parquet(
     connection: duckdb.DuckDBPyConnection,
     *,
@@ -72,39 +110,63 @@ def write_canonical_parquet(
     dataset_version: str,
     row_group_rows: int,
 ) -> int:
-    """Join valid dispositions to staging rows and COPY sorted zstd canonical Parquet."""
+    """Join valid disposition keys to staging rows and COPY sorted zstd canonical Parquet."""
     if output_path.exists():
         raise KaggleV6MaterializeError("canonical parquet already exists")
     if not disposition_files:
         raise KaggleV6MaterializeError("disposition parquet is required")
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    connection.execute("DROP TABLE IF EXISTS canonical_rows")
-    if staging_files:
-        connection.execute(
-            f"CREATE TEMP TABLE canonical_rows AS {_CANONICAL_SELECT}",
-            [
-                dataset_version,
-                [str(path) for path in staging_files],
-                [str(path) for path in disposition_files],
-            ],
-        )
-    else:
-        columns = ", ".join(f"{column.name} {column.physical_type}" for column in CANONICAL_SCHEMA)
-        connection.execute(f"CREATE TEMP TABLE canonical_rows ({columns})")
-    counted = connection.execute("SELECT COUNT(*) FROM canonical_rows").fetchone()
+    valid_keys = output_path.with_name(".canonical-valid-keys.parquet")
+    try:
+        if staging_files:
+            _copy_select_to_parquet(
+                connection,
+                """
+                SELECT archive_member, row_number
+                FROM read_parquet(?, hive_partitioning = false)
+                WHERE state = 'valid'
+                """,
+                [[str(path) for path in disposition_files]],
+                valid_keys,
+                row_group_rows=row_group_rows,
+            )
+            if valid_keys.exists():
+                _copy_select_to_parquet(
+                    connection,
+                    _CANONICAL_SELECT,
+                    [
+                        dataset_version,
+                        [str(path) for path in staging_files],
+                        str(valid_keys),
+                    ],
+                    output_path,
+                    row_group_rows=row_group_rows,
+                )
+            else:
+                _copy_select_to_parquet(
+                    connection,
+                    _empty_canonical_select(),
+                    [],
+                    output_path,
+                    row_group_rows=row_group_rows,
+                )
+        else:
+            _copy_select_to_parquet(
+                connection,
+                _empty_canonical_select(),
+                [],
+                output_path,
+                row_group_rows=row_group_rows,
+            )
+        counted = connection.execute(
+            "SELECT COUNT(*) FROM read_parquet(?, hive_partitioning = false)",
+            [str(output_path)],
+        ).fetchone()
+    finally:
+        valid_keys.unlink(missing_ok=True)
     if counted is None:
         raise KaggleV6MaterializeError("canonical row count is unavailable")
-    row_count = int(counted[0])
-    target = str(output_path).replace("'", "''")
-    connection.execute(
-        f"""
-        COPY canonical_rows TO '{target}' (
-            FORMAT PARQUET, COMPRESSION ZSTD, ROW_GROUP_SIZE {int(row_group_rows)}
-        )
-        """
-    )
-    connection.execute("DROP TABLE canonical_rows")
-    return row_count
+    return int(counted[0])
 
 
 def iter_canonical_rows(path: Path, *, batch_rows: int) -> Iterator[CanonicalBattleRow]:

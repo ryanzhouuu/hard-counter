@@ -1,4 +1,5 @@
 from datetime import UTC, datetime
+from inspect import getsource
 from pathlib import Path, PurePosixPath
 from shutil import copytree
 
@@ -17,6 +18,7 @@ from clash_sos.domain.canonical_dataset import (
 )
 from clash_sos.domain.processed_manifest import DEFAULT_DATASET_VERSION
 from clash_sos.domain.staged_dataset import StagedBattleRow, UnadaptableRow
+from clash_sos.infrastructure.kaggle_v6 import materialize_io
 from clash_sos.infrastructure.kaggle_v6.audit_io import hash_file
 from clash_sos.infrastructure.kaggle_v6.grouping_io import list_parquet_files
 from clash_sos.infrastructure.kaggle_v6.materialize_io import (
@@ -245,6 +247,14 @@ def test_write_canonical_preserves_deck_order_and_hashes(tmp_path: Path) -> None
     expected = (CARD_IDS, CARD_FORMS, CARD_LEVELS, (DECK_HASH, DECK_HASH))
     assert (card_ids, forms, levels, hashes) == expected
     assert hashes[0] == deck_content_hash(card_ids, forms, levels)
+
+
+def test_canonical_sql_copies_valid_join_without_temp_table() -> None:
+    source = getsource(materialize_io)
+    assert "CREATE TEMP TABLE canonical_rows AS" not in source
+    assert "WHERE d.state = 'valid'" not in source
+    assert "WHERE state = 'valid'" in source
+    assert "COPY (" in source
 
 
 def test_write_canonical_refuses_existing_output(tmp_path: Path) -> None:
