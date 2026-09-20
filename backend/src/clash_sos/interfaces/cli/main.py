@@ -105,7 +105,10 @@ def prepare_kaggle_v6(
     player_validation_max: float = DEFAULT_PLAYER_VALIDATION_MAX,
     dataset_version: str = DEFAULT_DATASET_VERSION,
 ) -> None:
-    """Publish one processed Kaggle v6 version. Fails if the destination already exists."""
+    """Publish one processed Kaggle v6 version. Fails if the destination already exists.
+
+    Identity grouping uses 8GB DuckDB RAM regardless of --memory-limit.
+    """
     published = prepare_kaggle_v6_dataset(
         archive,
         destination,
