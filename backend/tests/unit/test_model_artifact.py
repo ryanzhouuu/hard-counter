@@ -6,6 +6,7 @@ from pydantic import ValidationError
 
 from clash_sos.domain.matchup_baseline import DEFAULT_MIRROR_SEED, DEFAULT_SMOOTHING_ALPHA
 from clash_sos.domain.model_artifact import (
+    DEFAULT_LIGHTGBM_MODEL_VERSION,
     DEFAULT_MODEL_VERSION,
     DEFAULT_PAIR_MODEL_VERSION,
     EvaluationReport,
@@ -76,6 +77,7 @@ def test_accumulator_matches_batch_metrics() -> None:
 def test_default_model_literals() -> None:
     assert DEFAULT_MODEL_VERSION == "kaggle-v6-ranked16-card-logodds-v1"
     assert DEFAULT_PAIR_MODEL_VERSION == "kaggle-v6-ranked16-card-pair-v3"
+    assert DEFAULT_LIGHTGBM_MODEL_VERSION == "kaggle-v6-ranked16-lightgbm-v1"
     assert DEFAULT_SMOOTHING_ALPHA == 1.0
     assert DEFAULT_MIRROR_SEED == 0
 
@@ -113,6 +115,42 @@ def test_card_pair_report_requires_pair_metrics() -> None:
                 ),
             ),
         )
+
+
+def test_lightgbm_report_requires_lightgbm_metrics() -> None:
+    with pytest.raises(ValidationError, match="lightgbm"):
+        EvaluationReport(
+            promoted_model="lightgbm",
+            splits=(
+                SplitEvaluation(
+                    split="temporal",
+                    partition="validation",
+                    prior=metrics(),
+                    exact_matchup=metrics(),
+                    card_log_odds=metrics(),
+                ),
+            ),
+        )
+
+
+def test_lightgbm_report_round_trips() -> None:
+    report = EvaluationReport(
+        promoted_model="lightgbm",
+        splits=(
+            SplitEvaluation(
+                split="temporal",
+                partition="test",
+                prior=metrics(),
+                exact_matchup=metrics(),
+                card_log_odds=metrics(),
+                lightgbm=metrics(),
+            ),
+        ),
+    )
+    loaded = EvaluationReport.model_validate_json(dump_evaluation_report(report))
+    assert loaded.promoted_model == "lightgbm"
+    assert loaded.splits[0].lightgbm == metrics()
+    assert loaded.splits[0].card_pair is None
 
 
 def test_card_pair_report_round_trips() -> None:

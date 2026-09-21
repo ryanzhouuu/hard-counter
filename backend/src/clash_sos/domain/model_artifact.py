@@ -16,6 +16,7 @@ from clash_sos.domain.matchup_baseline import (
 
 DEFAULT_MODEL_VERSION = "kaggle-v6-ranked16-card-logodds-v1"
 DEFAULT_PAIR_MODEL_VERSION = "kaggle-v6-ranked16-card-pair-v3"
+DEFAULT_LIGHTGBM_MODEL_VERSION = "kaggle-v6-ranked16-lightgbm-v1"
 MODEL_ARTIFACT_TYPE = "matchup_baseline"
 REQUIRED_FILE_KINDS = ("card_catalog", "evaluation", "feature_schema", "predictor")
 EVALUATION_SPLITS = ("temporal", "player_disjoint")
@@ -139,7 +140,7 @@ class ProbabilityMetricAccumulator:
 
 
 class SplitEvaluation(ManifestModel):
-    """Prior, exact-matchup, card-log-odds, and optional card-pair metrics for one slice."""
+    """Baseline metrics for one slice, plus optional card-pair and LightGBM scores."""
 
     split: Literal["temporal", "player_disjoint"]
     partition: Literal["train", "validation", "test"]
@@ -147,13 +148,14 @@ class SplitEvaluation(ManifestModel):
     exact_matchup: ProbabilityMetrics
     card_log_odds: ProbabilityMetrics
     card_pair: ProbabilityMetrics | None = None
+    lightgbm: ProbabilityMetrics | None = None
 
 
 class EvaluationReport(ManifestModel):
     """Frozen evaluation output written beside the promoted predictor."""
 
     report_version: Literal[1] = 1
-    promoted_model: Literal["card_log_odds", "card_pair"] = "card_log_odds"
+    promoted_model: Literal["card_log_odds", "card_pair", "lightgbm"] = "card_log_odds"
     splits: tuple[SplitEvaluation, ...]
 
     @model_validator(mode="after")
@@ -164,6 +166,10 @@ class EvaluationReport(ManifestModel):
             split.card_pair is None for split in self.splits
         ):
             raise ValueError("card_pair reports require card_pair metrics on every split")
+        if self.promoted_model == "lightgbm" and any(
+            split.lightgbm is None for split in self.splits
+        ):
+            raise ValueError("lightgbm reports require lightgbm metrics on every split")
         return self
 
 
