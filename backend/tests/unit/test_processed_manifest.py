@@ -191,7 +191,7 @@ def processed_manifest() -> ProcessedDatasetManifest:
 
 def test_version_literals() -> None:
     assert PROCESSED_MANIFEST_TYPE == "processed"
-    assert DEFAULT_DATASET_VERSION == "kaggle-v6-ranked16-v1"
+    assert DEFAULT_DATASET_VERSION == "kaggle-v6-ranked16-v2"
     assert PREPARATION_POLICY_VERSION == "kaggle-v6-ranked16-policy:v1"
     assert FINALIZATION_ORDER == ("data_artifacts", "verification_report", "manifest")
 
