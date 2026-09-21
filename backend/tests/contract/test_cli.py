@@ -8,6 +8,7 @@ from typer.testing import CliRunner
 
 from clash_sos.application.dataset_prepare import KaggleV6PrepareError
 from clash_sos.application.dataset_staging import StagingConfig
+from clash_sos.application.model_train import KaggleV6ModelTrainError
 from clash_sos.interfaces.cli.main import app as cli_app
 from clash_sos.interfaces.cli.main import parse_aware_datetime
 from clash_sos.interfaces.workers.main import app as worker_app
@@ -243,3 +244,65 @@ def test_dataset_verify_command_is_thin(tmp_path: Path) -> None:
 def test_parse_aware_datetime_requires_timezone() -> None:
     with pytest.raises(typer.BadParameter, match="timezone-aware"):
         parse_aware_datetime("2026-06-10T00:00:00")
+
+
+def test_model_train_command_is_thin(tmp_path: Path) -> None:
+    dataset = tmp_path / "dataset"
+    destination = tmp_path / "model"
+    output = tmp_path / "output"
+    temp_directory = tmp_path / "tmp"
+    with patch(
+        "clash_sos.interfaces.cli.main.train_matchup_baseline",
+        return_value=destination,
+    ) as train:
+        result = runner.invoke(
+            cli_app,
+            [
+                "model",
+                "train",
+                "--dataset",
+                str(dataset),
+                "--destination",
+                str(destination),
+                "--output-workspace",
+                str(output),
+                "--temp-directory",
+                str(temp_directory),
+                "--memory-limit",
+                "512MB",
+                "--threads",
+                "1",
+                "--chunk-size",
+                "1024",
+                "--smoothing-alpha",
+                "2.0",
+                "--mirror-seed",
+                "4",
+                "--model-version",
+                "test-model-v1",
+            ],
+        )
+
+    assert result.exit_code == 0
+    assert result.stdout == f"{destination}\n"
+    train.assert_called_once_with(
+        dataset,
+        destination,
+        output_workspace=output,
+        temp_directory=temp_directory,
+        config=StagingConfig(memory_limit="512MB", threads=1, chunk_size=1024),
+        smoothing_alpha=2.0,
+        mirror_seed=4,
+        model_version="test-model-v1",
+    )
+
+
+def test_model_train_command_surfaces_existing_version() -> None:
+    with patch(
+        "clash_sos.interfaces.cli.main.train_matchup_baseline",
+        side_effect=KaggleV6ModelTrainError("published model version already exists"),
+    ):
+        result = runner.invoke(cli_app, ["model", "train"])
+
+    assert result.exit_code != 0
+    assert result.exception is not None
