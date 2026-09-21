@@ -5,6 +5,7 @@ player-disjoint partitions. Destination versions are never overwritten.
 """
 
 from collections.abc import Callable, Iterator, Mapping, Sequence
+from dataclasses import dataclass
 from json import loads
 from pathlib import Path
 from shutil import rmtree
@@ -22,6 +23,7 @@ from clash_sos.domain.matchup_baseline import (
     exact_matchup_probability,
     predict_card_log_odds,
 )
+from clash_sos.domain.matchup_pair import PAIR_FEATURE_SCHEMA_VERSION, CardPairPredictor
 from clash_sos.domain.model_artifact import (
     DEFAULT_MODEL_VERSION,
     EVALUATION_PARTITIONS,
@@ -65,17 +67,78 @@ FileKind = Literal["card_catalog", "evaluation", "feature_schema", "predictor"]
 SplitName = Literal["temporal", "player_disjoint"]
 
 
-def _kind_path(dataset: Path, manifest: ProcessedDatasetManifest, kind: str) -> Path:
+@dataclass(frozen=True)
+class PartitionScores:
+    """Held-out metrics for one split partition. card_pair is set when a pair model is scored."""
+
+    prior: ProbabilityMetrics
+    exact_matchup: ProbabilityMetrics
+    card_log_odds: ProbabilityMetrics
+    card_pair: ProbabilityMetrics | None = None
+
+
+def kind_path(dataset: Path, manifest: ProcessedDatasetManifest, kind: str) -> Path:
     """Resolve an inventoried processed-dataset file under the published directory."""
     match = next(file for file in manifest.files if file.kind == kind)
     return dataset / match.path
 
 
-def _partition_row_count(
+def partition_row_count(
     split: TemporalSplitManifest | PlayerDisjointSplitManifest, partition: str
 ) -> int:
     """Return the processed-manifest row count for one split partition."""
     return next(item.row_count for item in split.partitions if item.partition == partition)
+
+
+def write_canonical_json(path: Path, payload: object) -> None:
+    """Write canonical JSON plus a trailing newline."""
+    path.write_bytes(canonical_json_bytes(payload) + b"\n")
+
+
+def inventory_model_file(
+    path: Path, root: Path, kind: FileKind, chunk_size: int
+) -> ModelOutputFile:
+    """Hash an artifact file relative to the output workspace."""
+    size_bytes, digest = hash_file(path, chunk_size)
+    return ModelOutputFile(
+        path=path.relative_to(root).as_posix(),
+        kind=kind,
+        size_bytes=size_bytes,
+        sha256=digest,
+    )
+
+
+def require_publish_paths(destination: Path, output_workspace: Path) -> None:
+    """Reject existing destinations and require a same-filesystem rename."""
+    if destination.exists():
+        raise KaggleV6ModelTrainError("published model version already exists")
+    if output_workspace.exists():
+        raise KaggleV6ModelTrainError("output workspace already exists")
+    output_workspace.parent.mkdir(parents=True, exist_ok=True)
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        require_same_filesystem(output_workspace.parent, destination.parent)
+    except KaggleV6PublishError as error:
+        raise KaggleV6ModelTrainError(str(error)) from error
+
+
+def processed_training_paths(
+    dataset: Path,
+) -> tuple[ProcessedDatasetManifest, Path, Path, Path]:
+    """Load a one-era processed dataset and resolve canonical plus split files."""
+    processed = load_processed_dataset(dataset)
+    if len(processed.accepted.eras) != 1:
+        raise KaggleV6ModelTrainError("training requires exactly one accepted balance era")
+    if processed.catalog_version != KAGGLE_V6_CARDS.version:
+        raise KaggleV6ModelTrainError(
+            "processed catalog version does not match the training catalog"
+        )
+    return (
+        processed,
+        kind_path(dataset, processed, "canonical"),
+        kind_path(dataset, processed, "temporal_split"),
+        kind_path(dataset, processed, "player_disjoint_split"),
+    )
 
 
 def score_partition(
@@ -85,11 +148,13 @@ def score_partition(
     matchup_counts: Mapping[tuple[str, str], tuple[int, int]],
     alpha: float,
     expected_rows: int | None = None,
-) -> tuple[ProbabilityMetrics, ProbabilityMetrics, ProbabilityMetrics]:
+    pair_predictor: CardPairPredictor | None = None,
+) -> PartitionScores:
     """Score one partition in a single pass. expected_rows, when set, must match."""
     prior = ProbabilityMetricAccumulator()
     exact = ProbabilityMetricAccumulator()
     card = ProbabilityMetricAccumulator()
+    pair = ProbabilityMetricAccumulator() if pair_predictor is not None else None
     for example in examples:
         prior.update(example.label, 0.5)
         exact.update(
@@ -102,24 +167,80 @@ def score_partition(
             example.label,
             predict_card_log_odds(example.side_a_keys, example.side_b_keys, effects),
         )
-    metrics = (prior.finalize(), exact.finalize(), card.finalize())
-    if expected_rows is not None and metrics[0].row_count != expected_rows:
-        raise KaggleV6ModelTrainError(f"scored row count {metrics[0].row_count} != {expected_rows}")
-    return metrics
-
-
-def _write_json(path: Path, payload: object) -> None:
-    path.write_bytes(canonical_json_bytes(payload) + b"\n")
-
-
-def _inventory(path: Path, root: Path, kind: FileKind, chunk_size: int) -> ModelOutputFile:
-    size_bytes, digest = hash_file(path, chunk_size)
-    return ModelOutputFile(
-        path=path.relative_to(root).as_posix(),
-        kind=kind,
-        size_bytes=size_bytes,
-        sha256=digest,
+        if pair is not None and pair_predictor is not None:
+            pair.update(
+                example.label,
+                pair_predictor.predict(example.side_a_keys, example.side_b_keys),
+            )
+    scores = PartitionScores(
+        prior=prior.finalize(),
+        exact_matchup=exact.finalize(),
+        card_log_odds=card.finalize(),
+        card_pair=pair.finalize() if pair is not None else None,
     )
+    if expected_rows is not None and scores.prior.row_count != expected_rows:
+        raise KaggleV6ModelTrainError(
+            f"scored row count {scores.prior.row_count} != {expected_rows}"
+        )
+    return scores
+
+
+def finalize_model_artifact(
+    output_workspace: Path,
+    destination: Path,
+    *,
+    processed: ProcessedDatasetManifest,
+    model_version: str,
+    smoothing_alpha: float,
+    mirror_seed: int,
+    chunk_size: int,
+) -> Path:
+    """Inventory required files, write manifest.json, and rename onto destination."""
+    files = tuple(
+        sorted(
+            (
+                inventory_model_file(
+                    output_workspace / "card-catalog.json",
+                    output_workspace,
+                    "card_catalog",
+                    chunk_size,
+                ),
+                inventory_model_file(
+                    output_workspace / "evaluation.json",
+                    output_workspace,
+                    "evaluation",
+                    chunk_size,
+                ),
+                inventory_model_file(
+                    output_workspace / "feature-schema.json",
+                    output_workspace,
+                    "feature_schema",
+                    chunk_size,
+                ),
+                inventory_model_file(
+                    output_workspace / "predictor.json",
+                    output_workspace,
+                    "predictor",
+                    chunk_size,
+                ),
+            ),
+            key=lambda file: file.path,
+        )
+    )
+    manifest = ModelArtifactManifest(
+        model_version=model_version,
+        dataset_version=processed.dataset_version,
+        catalog_version=processed.catalog_version,
+        balance_era_id=processed.accepted.eras[0].era_id,
+        smoothing_alpha=smoothing_alpha,
+        mirror_seed=mirror_seed,
+        files=files,
+    )
+    (output_workspace / "manifest.json").write_bytes(dump_model_manifest(manifest))
+    try:
+        return publish_processed_version(output_workspace, destination)
+    except KaggleV6PublishError as error:
+        raise KaggleV6ModelTrainError(str(error)) from error
 
 
 def load_processed_dataset(dataset: Path) -> ProcessedDatasetManifest:
@@ -141,21 +262,34 @@ def predict_matchup(
     """Load a published artifact and predict P(side A wins) from identity keys."""
     manifest_path = artifact / "manifest.json"
     predictor_path = artifact / "predictor.json"
-    if not manifest_path.is_file() or not predictor_path.is_file():
+    schema_path = artifact / "feature-schema.json"
+    if not manifest_path.is_file() or not predictor_path.is_file() or not schema_path.is_file():
         raise KaggleV6ModelTrainError("model artifact is incomplete")
     manifest = ModelArtifactManifest.model_validate_json(manifest_path.read_text(encoding="utf-8"))
-    payload = loads(predictor_path.read_text(encoding="utf-8"))
-    raw_effects = payload["effects"]
-    if not isinstance(raw_effects, dict):
-        raise KaggleV6ModelTrainError("predictor effects must be an object")
-    effects: dict[str, float] = {}
-    for key, value in cast(dict[object, object], raw_effects).items():
-        if not isinstance(key, str) or isinstance(value, bool):
-            raise KaggleV6ModelTrainError("predictor effects must map identities to numbers")
-        if not isinstance(value, int | float):
-            raise KaggleV6ModelTrainError("predictor effects must map identities to numbers")
-        effects[key] = float(value)
-    probability = predict_card_log_odds(side_a, side_b, effects)
+    schema_payload = loads(schema_path.read_text(encoding="utf-8"))
+    predictor_payload = loads(predictor_path.read_text(encoding="utf-8"))
+    if not isinstance(schema_payload, dict) or not isinstance(predictor_payload, dict):
+        raise KaggleV6ModelTrainError("model artifact is invalid")
+    schema = cast(dict[str, object], schema_payload)
+    predictor_body = cast(dict[str, object], predictor_payload)
+    if schema.get("feature_schema_version") == PAIR_FEATURE_SCHEMA_VERSION:
+        try:
+            pair_model = CardPairPredictor.from_payload(predictor_body)
+        except ValueError as error:
+            raise KaggleV6ModelTrainError(str(error)) from error
+        probability = pair_model.predict(side_a, side_b)
+    else:
+        raw_effects = predictor_body.get("effects")
+        if not isinstance(raw_effects, dict):
+            raise KaggleV6ModelTrainError("predictor effects must be an object")
+        effects: dict[str, float] = {}
+        for key, value in cast(dict[object, object], raw_effects).items():
+            if not isinstance(key, str) or isinstance(value, bool):
+                raise KaggleV6ModelTrainError("predictor effects must map identities to numbers")
+            if not isinstance(value, int | float):
+                raise KaggleV6ModelTrainError("predictor effects must map identities to numbers")
+            effects[key] = float(value)
+        probability = predict_card_log_odds(side_a, side_b, effects)
     return MatchupPrediction(
         state=PredictionState.AVAILABLE,
         side_a_win_probability=probability,
@@ -184,27 +318,8 @@ def train_matchup_baseline(
 
     progress, when set, receives dataset partition counts and per-slice scoring updates.
     """
-    if destination.exists():
-        raise KaggleV6ModelTrainError("published model version already exists")
-    if output_workspace.exists():
-        raise KaggleV6ModelTrainError("output workspace already exists")
-    output_workspace.parent.mkdir(parents=True, exist_ok=True)
-    destination.parent.mkdir(parents=True, exist_ok=True)
-    try:
-        require_same_filesystem(output_workspace.parent, destination.parent)
-    except KaggleV6PublishError as error:
-        raise KaggleV6ModelTrainError(str(error)) from error
-
-    processed = load_processed_dataset(dataset)
-    if len(processed.accepted.eras) != 1:
-        raise KaggleV6ModelTrainError("training requires exactly one accepted balance era")
-    if processed.catalog_version != KAGGLE_V6_CARDS.version:
-        raise KaggleV6ModelTrainError(
-            "processed catalog version does not match the training catalog"
-        )
-    canonical = _kind_path(dataset, processed, "canonical")
-    temporal = _kind_path(dataset, processed, "temporal_split")
-    player = _kind_path(dataset, processed, "player_disjoint_split")
+    require_publish_paths(destination, output_workspace)
+    processed, canonical, temporal, player = processed_training_paths(dataset)
     if progress is not None:
         temporal_counts = " ".join(
             f"{item.partition}={item.row_count}" for item in processed.temporal_split.partitions
@@ -226,7 +341,7 @@ def train_matchup_baseline(
     output_workspace.mkdir(parents=True)
     try:
         try:
-            train_rows = _partition_row_count(processed.temporal_split, "train")
+            train_rows = partition_row_count(processed.temporal_split, "train")
             require_partition_rows(
                 connection,
                 canonical_path=canonical,
@@ -264,7 +379,7 @@ def train_matchup_baseline(
             )
             for split_name, split_path, split_manifest in split_files:
                 for partition in EVALUATION_PARTITIONS:
-                    expected_rows = _partition_row_count(split_manifest, partition)
+                    expected_rows = partition_row_count(split_manifest, partition)
                     if progress is not None:
                         progress(f"scoring {split_name} {partition} ({expected_rows} rows)")
                     if (split_name, partition) != ("temporal", "train"):
@@ -277,7 +392,7 @@ def train_matchup_baseline(
                             seed=mirror_seed,
                             expected_rows=expected_rows,
                         )
-                    prior, exact, card = score_partition(
+                    scores = score_partition(
                         iter_oriented_examples(
                             connection,
                             canonical_path=canonical,
@@ -294,9 +409,9 @@ def train_matchup_baseline(
                         SplitEvaluation(
                             split=split_name,
                             partition=partition,
-                            prior=prior,
-                            exact_matchup=exact,
-                            card_log_odds=card,
+                            prior=scores.prior,
+                            exact_matchup=scores.exact_matchup,
+                            card_log_odds=scores.card_log_odds,
                         )
                     )
         except KaggleV6TrainError as error:
@@ -305,8 +420,8 @@ def train_matchup_baseline(
             connection.close()
 
         identities = tuple(sorted(entry.card.identity_key for entry in KAGGLE_V6_CARDS.entries))
-        _write_json(output_workspace / "predictor.json", {"effects": effects})
-        _write_json(
+        write_canonical_json(output_workspace / "predictor.json", {"effects": effects})
+        write_canonical_json(
             output_workspace / "feature-schema.json",
             {
                 "feature_schema_version": "card-log-odds:v1",
@@ -317,51 +432,15 @@ def train_matchup_baseline(
         (output_workspace / "card-catalog.json").write_bytes(KAGGLE_V6_CARDS.serialize() + b"\n")
         report = EvaluationReport(splits=tuple(evaluations))
         (output_workspace / "evaluation.json").write_bytes(dump_evaluation_report(report))
-        files = tuple(
-            sorted(
-                (
-                    _inventory(
-                        output_workspace / "card-catalog.json",
-                        output_workspace,
-                        "card_catalog",
-                        config.chunk_size,
-                    ),
-                    _inventory(
-                        output_workspace / "evaluation.json",
-                        output_workspace,
-                        "evaluation",
-                        config.chunk_size,
-                    ),
-                    _inventory(
-                        output_workspace / "feature-schema.json",
-                        output_workspace,
-                        "feature_schema",
-                        config.chunk_size,
-                    ),
-                    _inventory(
-                        output_workspace / "predictor.json",
-                        output_workspace,
-                        "predictor",
-                        config.chunk_size,
-                    ),
-                ),
-                key=lambda file: file.path,
-            )
-        )
-        manifest = ModelArtifactManifest(
+        return finalize_model_artifact(
+            output_workspace,
+            destination,
+            processed=processed,
             model_version=model_version,
-            dataset_version=processed.dataset_version,
-            catalog_version=processed.catalog_version,
-            balance_era_id=processed.accepted.eras[0].era_id,
             smoothing_alpha=smoothing_alpha,
             mirror_seed=mirror_seed,
-            files=files,
+            chunk_size=config.chunk_size,
         )
-        (output_workspace / "manifest.json").write_bytes(dump_model_manifest(manifest))
-        try:
-            return publish_processed_version(output_workspace, destination)
-        except KaggleV6PublishError as error:
-            raise KaggleV6ModelTrainError(str(error)) from error
     except BaseException:
         rmtree(output_workspace, ignore_errors=True)
         raise

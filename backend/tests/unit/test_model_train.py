@@ -242,17 +242,17 @@ def test_score_partition_consumes_a_one_shot_iterator() -> None:
         deck_a_hash="win-hash",
         deck_b_hash="lose-hash",
     )
-    prior, exact, card = score_partition(
+    scores = score_partition(
         (item for item in (example,)),
         effects={"knight:base": 0.8},
         matchup_counts={("win-hash", "lose-hash"): (1, 1)},
         alpha=1.0,
     )
-    assert prior.row_count == 1
-    assert exact.row_count == 1
-    assert card.row_count == 1
-    assert exact.log_loss < prior.log_loss
-    assert card.log_loss < prior.log_loss
+    assert scores.prior.row_count == 1
+    assert scores.exact_matchup.row_count == 1
+    assert scores.card_log_odds.row_count == 1
+    assert scores.exact_matchup.log_loss < scores.prior.log_loss
+    assert scores.card_log_odds.log_loss < scores.prior.log_loss
 
 
 def test_train_refuses_join_count_mismatch(tmp_path: Path) -> None:
