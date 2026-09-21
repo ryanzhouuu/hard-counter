@@ -17,9 +17,9 @@ from clash_sos.domain.matchup_baseline import (
     sigmoid,
 )
 
-DEFAULT_PAIR_LEARNING_RATE = 0.01
+DEFAULT_PAIR_LEARNING_RATE = 0.001
 DEFAULT_PAIR_L2 = 1e-5
-DEFAULT_PAIR_EPOCHS = 2
+DEFAULT_PAIR_EPOCHS = 1
 DEFAULT_PAIR_INIT_SCALE = 8.0
 PAIR_FEATURE_SCHEMA_VERSION = "card-pair:v1"
 
@@ -48,6 +48,20 @@ def _number_list(value: object, field: str) -> list[float]:
             raise ValueError(f"predictor {field} must be a list of numbers")
         items.append(float(item))
     return items
+
+
+def _positive_float(value: object, field: str, *, default: float | None = None) -> float:
+    """Parse a positive JSON number. Missing values use default when provided."""
+    if value is None:
+        if default is None:
+            raise ValueError(f"predictor {field} is required")
+        return default
+    if isinstance(value, bool) or not isinstance(value, int | float):
+        raise ValueError(f"predictor {field} must be a positive number")
+    number = float(value)
+    if number <= 0:
+        raise ValueError(f"predictor {field} must be a positive number")
+    return number
 
 
 def pair_upper_length(n: int) -> int:
@@ -89,10 +103,14 @@ class CardPairPredictor:
         identities: Sequence[str],
         additive: Sequence[float],
         pair_upper: Sequence[float],
+        *,
+        pair_init_scale: float = DEFAULT_PAIR_INIT_SCALE,
     ) -> None:
         keys = tuple(identities)
         if len(keys) != len(set(keys)):
             raise ValueError("identities must be unique")
+        if pair_init_scale <= 0:
+            raise ValueError("pair_init_scale must be positive")
         n = len(keys)
         if len(additive) != n:
             raise ValueError("additive length must match identities")
@@ -101,6 +119,7 @@ class CardPairPredictor:
         self.identities = keys
         self.additive = [float(value) for value in additive]
         self.pair_upper = [float(value) for value in pair_upper]
+        self.pair_init_scale = float(pair_init_scale)
         self._index = {key: index for index, key in enumerate(keys)}
 
     def pair_weight(self, i: int, j: int) -> float:
@@ -118,7 +137,7 @@ class CardPairPredictor:
         return [self._index[key] for key in side if key in self._index]
 
     def score(self, side_a: Sequence[str], side_b: Sequence[str]) -> float:
-        """Return matchup log-odds. Missing identities contribute 0."""
+        """Return matchup log-odds. Pair interactions are divided by pair_init_scale."""
         a_idx = self._resolved(side_a)
         b_idx = self._resolved(side_b)
         total = 0.0
@@ -126,10 +145,11 @@ class CardPairPredictor:
             total += self.additive[index]
         for index in b_idx:
             total -= self.additive[index]
+        pair_score = 0.0
         for i in a_idx:
             for j in b_idx:
-                total += self.pair_weight(i, j)
-        return total
+                pair_score += self.pair_weight(i, j)
+        return total + pair_score / self.pair_init_scale
 
     def predict(self, side_a: Sequence[str], side_b: Sequence[str]) -> float:
         """Return P(side A wins). Equal decks are 0.5; swapping sides inverts p."""
@@ -166,13 +186,15 @@ class CardPairPredictor:
                 low, high = (i, j) if i < j else (j, i)
                 slot = pair_upper_index(low, high, n)
                 sign = 1.0 if i < j else -1.0
-                self.pair_upper[slot] -= learning_rate * (sign * error + l2 * self.pair_upper[slot])
+                pair_grad = sign * error / self.pair_init_scale
+                self.pair_upper[slot] -= learning_rate * (pair_grad + l2 * self.pair_upper[slot])
 
     def to_payload(self) -> dict[str, object]:
         """Return canonical predictor JSON fields."""
         return {
             "additive": list(self.additive),
             "identities": list(self.identities),
+            "pair_init_scale": self.pair_init_scale,
             "pair_upper": list(self.pair_upper),
         }
 
@@ -183,6 +205,9 @@ class CardPairPredictor:
             _string_list(payload.get("identities"), "identities"),
             _number_list(payload.get("additive"), "additive"),
             _number_list(payload.get("pair_upper"), "pair_upper"),
+            pair_init_scale=_positive_float(
+                payload.get("pair_init_scale"), "pair_init_scale", default=1.0
+            ),
         )
 
 
@@ -194,7 +219,10 @@ def initialize_card_pair_predictor(
     alpha: float = DEFAULT_SMOOTHING_ALPHA,
     pair_init_scale: float = DEFAULT_PAIR_INIT_SCALE,
 ) -> CardPairPredictor:
-    """Initialize u from card Laplace log-odds and W from antisymmetric pair logits / scale."""
+    """Initialize u from card Laplace log-odds and W from antisymmetric pair logits.
+
+    pair_init_scale divides aᵀWb at scoring time so eight-card decks stay calibrated.
+    """
     if pair_init_scale <= 0:
         raise ValueError("pair_init_scale must be positive")
     keys = tuple(identities)
@@ -207,5 +235,5 @@ def initialize_card_pair_predictor(
             wins_ji, trials_ji = pair_counts.get((keys[j], keys[i]), (0, 0))
             forward = logit(laplace_probability(wins_ij, trials_ij, alpha=alpha))
             reverse = logit(laplace_probability(wins_ji, trials_ji, alpha=alpha))
-            pair_upper.append(0.5 * (forward - reverse) / pair_init_scale)
-    return CardPairPredictor(keys, additive, pair_upper)
+            pair_upper.append(0.5 * (forward - reverse))
+    return CardPairPredictor(keys, additive, pair_upper, pair_init_scale=pair_init_scale)
