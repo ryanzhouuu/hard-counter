@@ -65,12 +65,12 @@ timezone-aware ISO-8601 timestamps:
 
 ```bash
 uv run clash-sos dataset prepare-kaggle-v6 \
-  --train-end 2026-06-10T00:00:00+00:00 \
-  --validation-end 2026-06-20T00:00:00+00:00
+  --train-end 2026-06-21T00:00:00+00:00 \
+  --validation-end 2026-06-25T00:00:00+00:00
 ```
 
 The command records the effective options in the processed manifest and fails before doing
-work if `data/processed/kaggle-v6-ranked16-v1` already exists.
+work if `data/processed/kaggle-v6-ranked16-v2` already exists.
 
 Validate a published version in place without rewriting it:
 

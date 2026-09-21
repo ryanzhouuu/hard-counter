@@ -16,7 +16,7 @@ from clash_sos.domain.manifests import ManifestModel, RelativePath, Sha256, vali
 FINALIZATION_ORDER = ("data_artifacts", "verification_report", "manifest")
 
 PROCESSED_MANIFEST_TYPE = "processed"
-DEFAULT_DATASET_VERSION = "kaggle-v6-ranked16-v1"
+DEFAULT_DATASET_VERSION = "kaggle-v6-ranked16-v2"
 PREPARATION_POLICY_VERSION = "kaggle-v6-ranked16-policy:v1"
 DEFAULT_PLAYER_HASH_SEED = 0
 DEFAULT_PLAYER_TRAIN_MAX = 0.70
