@@ -7,6 +7,7 @@ from pydantic import ValidationError
 from clash_sos.domain.matchup_baseline import DEFAULT_MIRROR_SEED, DEFAULT_SMOOTHING_ALPHA
 from clash_sos.domain.model_artifact import (
     DEFAULT_MODEL_VERSION,
+    DEFAULT_PAIR_MODEL_VERSION,
     EvaluationReport,
     ModelArtifactManifest,
     ModelOutputFile,
@@ -74,8 +75,64 @@ def test_accumulator_matches_batch_metrics() -> None:
 
 def test_default_model_literals() -> None:
     assert DEFAULT_MODEL_VERSION == "kaggle-v6-ranked16-card-logodds-v1"
+    assert DEFAULT_PAIR_MODEL_VERSION == "kaggle-v6-ranked16-card-pair-v1"
     assert DEFAULT_SMOOTHING_ALPHA == 1.0
     assert DEFAULT_MIRROR_SEED == 0
+
+
+def test_card_log_odds_report_omits_pair_metrics() -> None:
+    dumped = dump_evaluation_report(
+        EvaluationReport(
+            splits=(
+                SplitEvaluation(
+                    split="temporal",
+                    partition="validation",
+                    prior=metrics(),
+                    exact_matchup=metrics(),
+                    card_log_odds=metrics(),
+                ),
+            )
+        )
+    )
+    report = EvaluationReport.model_validate_json(dumped)
+    assert report.promoted_model == "card_log_odds"
+    assert report.splits[0].card_pair is None
+
+
+def test_card_pair_report_requires_pair_metrics() -> None:
+    with pytest.raises(ValidationError, match="card_pair"):
+        EvaluationReport(
+            promoted_model="card_pair",
+            splits=(
+                SplitEvaluation(
+                    split="temporal",
+                    partition="validation",
+                    prior=metrics(),
+                    exact_matchup=metrics(),
+                    card_log_odds=metrics(),
+                ),
+            ),
+        )
+
+
+def test_card_pair_report_round_trips() -> None:
+    report = EvaluationReport(
+        promoted_model="card_pair",
+        splits=(
+            SplitEvaluation(
+                split="temporal",
+                partition="validation",
+                prior=metrics(),
+                exact_matchup=metrics(),
+                card_log_odds=metrics(),
+                card_pair=metrics(),
+            ),
+        ),
+    )
+    dumped = dump_evaluation_report(report)
+    loaded = EvaluationReport.model_validate_json(dumped)
+    assert loaded.promoted_model == "card_pair"
+    assert loaded.splits[0].card_pair == metrics()
 
 
 def test_manifest_requires_inventoried_artifact_files() -> None:

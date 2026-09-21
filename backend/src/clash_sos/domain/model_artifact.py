@@ -15,6 +15,7 @@ from clash_sos.domain.matchup_baseline import (
 )
 
 DEFAULT_MODEL_VERSION = "kaggle-v6-ranked16-card-logodds-v1"
+DEFAULT_PAIR_MODEL_VERSION = "kaggle-v6-ranked16-card-pair-v1"
 MODEL_ARTIFACT_TYPE = "matchup_baseline"
 REQUIRED_FILE_KINDS = ("card_catalog", "evaluation", "feature_schema", "predictor")
 EVALUATION_SPLITS = ("temporal", "player_disjoint")
@@ -138,26 +139,31 @@ class ProbabilityMetricAccumulator:
 
 
 class SplitEvaluation(ManifestModel):
-    """Prior, exact-matchup, and card-log-odds metrics for one evaluation slice."""
+    """Prior, exact-matchup, card-log-odds, and optional card-pair metrics for one slice."""
 
     split: Literal["temporal", "player_disjoint"]
     partition: Literal["train", "validation", "test"]
     prior: ProbabilityMetrics
     exact_matchup: ProbabilityMetrics
     card_log_odds: ProbabilityMetrics
+    card_pair: ProbabilityMetrics | None = None
 
 
 class EvaluationReport(ManifestModel):
     """Frozen evaluation output written beside the promoted predictor."""
 
     report_version: Literal[1] = 1
-    promoted_model: Literal["card_log_odds"] = "card_log_odds"
+    promoted_model: Literal["card_log_odds", "card_pair"] = "card_log_odds"
     splits: tuple[SplitEvaluation, ...]
 
     @model_validator(mode="after")
     def validate_splits(self) -> Self:
         if not self.splits:
             raise ValueError("evaluation report requires at least one split")
+        if self.promoted_model == "card_pair" and any(
+            split.card_pair is None for split in self.splits
+        ):
+            raise ValueError("card_pair reports require card_pair metrics on every split")
         return self
 
 
