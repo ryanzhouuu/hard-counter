@@ -66,12 +66,16 @@ def test_train_card_pair_model_writes_reloadable_artifact(tmp_path: Path) -> Non
         (destination / "manifest.json").read_text(encoding="utf-8")
     )
     assert manifest.dataset_version == train_processed_manifest().dataset_version
-    assert manifest.model_version == "kaggle-v6-ranked16-card-pair-v2"
+    assert manifest.model_version == "kaggle-v6-ranked16-card-pair-v3"
     schema = loads((destination / "feature-schema.json").read_text(encoding="utf-8"))
     predictor = loads((destination / "predictor.json").read_text(encoding="utf-8"))
     assert schema["epochs"] == 1
     assert schema["learning_rate"] == 0.001
     assert schema["pair_init_scale"] == 8.0
+    assert schema["skill_control"] == "past_laplace"
+    assert schema["skill_alpha"] == 8.0
+    assert schema["skill_coefficient"] > 0
+    assert "skill_coefficient" not in predictor
     assert predictor["pair_init_scale"] == 8.0
     knight = tuple(card_identity_key(card, "base") for card in WIN_IDS)
     archers = tuple(card_identity_key(card, "base") for card in LOSE_IDS)

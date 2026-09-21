@@ -1,7 +1,7 @@
 """Train, evaluate, and publish the antisymmetric card-pair logistic artifact.
 
-Fits temporal train only. Scores the same 2x3 grid as the card-log-odds baseline
-and promotes the pair model. Destination versions are never overwritten.
+Fits temporal train only, controlling for past-only player skill during SGD.
+Published probabilities stay deck-only. Destination versions are never overwritten.
 """
 
 from collections.abc import Callable
@@ -32,6 +32,7 @@ from clash_sos.domain.matchup_pair import (
     PAIR_FEATURE_SCHEMA_VERSION,
     accumulate_pair_counts,
     initialize_card_pair_predictor,
+    sgd_skill_controlled_pass,
 )
 from clash_sos.domain.model_artifact import (
     DEFAULT_PAIR_MODEL_VERSION,
@@ -40,6 +41,7 @@ from clash_sos.domain.model_artifact import (
     SplitEvaluation,
     dump_evaluation_report,
 )
+from clash_sos.domain.player_skill import DEFAULT_SKILL_ALPHA, PlayerSkillTracker
 from clash_sos.domain.processed_manifest import (
     PlayerDisjointSplitManifest,
     TemporalSplitManifest,
@@ -69,14 +71,18 @@ def train_card_pair_model(
     l2: float = DEFAULT_PAIR_L2,
     epochs: int = DEFAULT_PAIR_EPOCHS,
     pair_init_scale: float = DEFAULT_PAIR_INIT_SCALE,
+    skill_alpha: float = DEFAULT_SKILL_ALPHA,
     progress: Callable[[str], None] | None = None,
 ) -> Path:
     """Fit the card-pair logistic, evaluate splits, and publish one artifact version.
 
+    Each epoch starts a new player-rating table and applies rows in timestamp order.
     progress, when set, receives dataset counts, pair-count/SGD updates, and scoring lines.
     """
     if epochs < 1:
         raise KaggleV6ModelTrainError("epochs must be positive")
+    if skill_alpha <= 0:
+        raise KaggleV6ModelTrainError("skill alpha must be positive")
     require_publish_paths(destination, output_workspace)
     processed, canonical, temporal, player = processed_training_paths(dataset)
     if progress is not None:
@@ -151,20 +157,30 @@ def train_card_pair_model(
             for epoch in range(epochs):
                 if progress is not None:
                     progress(f"sgd epoch {epoch + 1}/{epochs}")
-                for example in iter_oriented_examples(
-                    connection,
-                    canonical_path=canonical,
-                    split_path=temporal,
-                    partition="train",
-                    seed=mirror_seed,
-                ):
-                    predictor.sgd_step(
-                        example.side_a_keys,
-                        example.side_b_keys,
-                        label=example.label,
-                        learning_rate=learning_rate,
-                        l2=l2,
-                    )
+                tracker = PlayerSkillTracker(alpha=skill_alpha)
+                sgd_skill_controlled_pass(
+                    predictor,
+                    (
+                        (
+                            example.label,
+                            example.side_a_keys,
+                            example.side_b_keys,
+                            example.side_a_player_id,
+                            example.side_b_player_id,
+                        )
+                        for example in iter_oriented_examples(
+                            connection,
+                            canonical_path=canonical,
+                            split_path=temporal,
+                            partition="train",
+                            seed=mirror_seed,
+                            order_by_time=True,
+                        )
+                    ),
+                    tracker,
+                    learning_rate=learning_rate,
+                    l2=l2,
+                )
             evaluations: list[SplitEvaluation] = []
             split_files: tuple[
                 tuple[SplitName, Path, TemporalSplitManifest | PlayerDisjointSplitManifest],
@@ -222,6 +238,9 @@ def train_card_pair_model(
                     "l2": l2,
                     "learning_rate": learning_rate,
                     "pair_init_scale": pair_init_scale,
+                    "skill_alpha": skill_alpha,
+                    "skill_coefficient": predictor.skill_coefficient,
+                    "skill_control": "past_laplace",
                     "smoothing_alpha": smoothing_alpha,
                 },
             )
