@@ -1,14 +1,17 @@
 import pytest
 
-from clash_sos.domain.matchup_baseline import card_log_odds, laplace_probability, logit
+from clash_sos.domain.matchup_baseline import card_log_odds, laplace_probability, logit, sigmoid
 from clash_sos.domain.matchup_pair import (
     DEFAULT_PAIR_EPOCHS,
     DEFAULT_PAIR_INIT_SCALE,
     DEFAULT_PAIR_LEARNING_RATE,
+    DEFAULT_SKILL_COEFFICIENT,
     CardPairPredictor,
     accumulate_pair_counts,
     initialize_card_pair_predictor,
+    sgd_skill_controlled_pass,
 )
+from clash_sos.domain.player_skill import PlayerSkillTracker
 
 
 def test_pair_fit_defaults_are_conservative() -> None:
@@ -156,3 +159,70 @@ def test_predictor_json_round_trip_preserves_prediction() -> None:
     assert loaded.pair_init_scale == predictor.pair_init_scale
     assert loaded.predict(side_a, side_b) == pytest.approx(predictor.predict(side_a, side_b))
     assert loaded.pair_weight(0, 2) == pytest.approx(predictor.pair_weight(0, 2))
+
+
+def test_skill_coefficient_starts_at_one() -> None:
+    predictor = CardPairPredictor(
+        identities=("the-log:base", "goblin-barrel:base"),
+        additive=[0.0, 0.0],
+        pair_upper=[0.0],
+    )
+    assert predictor.skill_coefficient == DEFAULT_SKILL_COEFFICIENT == 1.0
+    assert "skill_coefficient" not in predictor.to_payload()
+
+
+def test_matching_skill_gap_shrinks_the_card_update() -> None:
+    def step(skill_diff: float) -> float:
+        predictor = CardPairPredictor(
+            identities=("the-log:base", "goblin-barrel:base"),
+            additive=[0.0, 0.0],
+            pair_upper=[0.0],
+        )
+        predictor.sgd_step(
+            ("the-log:base",),
+            ("goblin-barrel:base",),
+            label=1,
+            learning_rate=0.5,
+            l2=0.0,
+            skill_diff=skill_diff,
+        )
+        return predictor.additive[0]
+
+    assert step(10.0) < step(0.0)
+
+
+def test_predict_ignores_skill_after_a_skill_step() -> None:
+    predictor = CardPairPredictor(
+        identities=("the-log:base", "goblin-barrel:base"),
+        additive=[0.0, 0.0],
+        pair_upper=[0.0],
+    )
+    side_a = ("the-log:base",)
+    side_b = ("goblin-barrel:base",)
+    predictor.sgd_step(side_a, side_b, label=1, learning_rate=0.5, l2=0.0, skill_diff=4.0)
+    assert predictor.predict(side_a, side_b) == pytest.approx(
+        sigmoid(predictor.score(side_a, side_b))
+    )
+    assert predictor.predict(side_b, side_a) == pytest.approx(
+        1.0 - predictor.predict(side_a, side_b)
+    )
+
+
+def test_skill_controlled_pass_uses_only_earlier_battles() -> None:
+    predictor = CardPairPredictor(
+        identities=("the-log:base", "goblin-barrel:base"),
+        additive=[0.0, 0.0],
+        pair_upper=[0.0],
+    )
+    gaps = sgd_skill_controlled_pass(
+        predictor,
+        (
+            (1, ("the-log:base",), ("goblin-barrel:base",), "#A", "#B"),
+            (1, ("the-log:base",), ("goblin-barrel:base",), "#A", "#B"),
+        ),
+        PlayerSkillTracker(),
+        learning_rate=0.5,
+        l2=0.0,
+    )
+    assert gaps[0] == pytest.approx(0.0)
+    assert gaps[1] > 0

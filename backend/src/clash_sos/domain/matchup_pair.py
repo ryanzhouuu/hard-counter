@@ -16,11 +16,13 @@ from clash_sos.domain.matchup_baseline import (
     logit,
     sigmoid,
 )
+from clash_sos.domain.player_skill import PlayerSkillTracker
 
 DEFAULT_PAIR_LEARNING_RATE = 0.001
 DEFAULT_PAIR_L2 = 1e-5
 DEFAULT_PAIR_EPOCHS = 1
 DEFAULT_PAIR_INIT_SCALE = 8.0
+DEFAULT_SKILL_COEFFICIENT = 1.0
 PAIR_FEATURE_SCHEMA_VERSION = "card-pair:v1"
 
 LabeledDeck = tuple[int, Sequence[str], Sequence[str]]
@@ -105,6 +107,7 @@ class CardPairPredictor:
         pair_upper: Sequence[float],
         *,
         pair_init_scale: float = DEFAULT_PAIR_INIT_SCALE,
+        skill_coefficient: float = DEFAULT_SKILL_COEFFICIENT,
     ) -> None:
         keys = tuple(identities)
         if len(keys) != len(set(keys)):
@@ -120,6 +123,7 @@ class CardPairPredictor:
         self.additive = [float(value) for value in additive]
         self.pair_upper = [float(value) for value in pair_upper]
         self.pair_init_scale = float(pair_init_scale)
+        self.skill_coefficient = float(skill_coefficient)
         self._index = {key: index for index, key in enumerate(keys)}
 
     def pair_weight(self, i: int, j: int) -> float:
@@ -163,15 +167,16 @@ class CardPairPredictor:
         label: int,
         learning_rate: float = DEFAULT_PAIR_LEARNING_RATE,
         l2: float = DEFAULT_PAIR_L2,
+        skill_diff: float = 0.0,
     ) -> None:
-        """Take one log-loss + L2 step. Updates only identities present in the row."""
+        """Take one log-loss + L2 step. skill_diff is a training control, not a feature."""
         if label not in (0, 1):
             raise ValueError("labels must be 0 or 1")
         if learning_rate <= 0:
             raise ValueError("learning_rate must be positive")
         if l2 < 0:
             raise ValueError("l2 must be non-negative")
-        error = self.predict(side_a, side_b) - label
+        error = sigmoid(self.score(side_a, side_b) + self.skill_coefficient * skill_diff) - label
         a_idx = self._resolved(side_a)
         b_idx = self._resolved(side_b)
         n = len(self.identities)
@@ -188,6 +193,7 @@ class CardPairPredictor:
                 sign = 1.0 if i < j else -1.0
                 pair_grad = sign * error / self.pair_init_scale
                 self.pair_upper[slot] -= learning_rate * (pair_grad + l2 * self.pair_upper[slot])
+        self.skill_coefficient -= learning_rate * (error * skill_diff + l2 * self.skill_coefficient)
 
     def to_payload(self) -> dict[str, object]:
         """Return canonical predictor JSON fields."""
@@ -209,6 +215,38 @@ class CardPairPredictor:
                 payload.get("pair_init_scale"), "pair_init_scale", default=1.0
             ),
         )
+
+
+SkillControlledRow = tuple[int, Sequence[str], Sequence[str], str, str]
+
+
+def sgd_skill_controlled_pass(
+    predictor: CardPairPredictor,
+    rows: Iterable[SkillControlledRow],
+    tracker: PlayerSkillTracker,
+    *,
+    learning_rate: float,
+    l2: float,
+) -> list[float]:
+    """SGD in caller order. Each returned gap excludes that row's own outcome.
+
+    After the step, side A is observed as the winner when label is 1.
+    """
+    gaps: list[float] = []
+    for label, side_a, side_b, player_a, player_b in rows:
+        gap = tracker.rating(player_a) - tracker.rating(player_b)
+        predictor.sgd_step(
+            side_a,
+            side_b,
+            label=label,
+            learning_rate=learning_rate,
+            l2=l2,
+            skill_diff=gap,
+        )
+        tracker.observe(player_a, won=label == 1)
+        tracker.observe(player_b, won=label == 0)
+        gaps.append(gap)
+    return gaps
 
 
 def initialize_card_pair_predictor(
