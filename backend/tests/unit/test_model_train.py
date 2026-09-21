@@ -121,7 +121,9 @@ def write_dataset(path: Path) -> Path:
                 side_b_card_ids VARCHAR[],
                 side_b_card_forms VARCHAR[],
                 side_a_deck_hash VARCHAR,
-                side_b_deck_hash VARCHAR
+                side_b_deck_hash VARCHAR,
+                side_a_player_id VARCHAR,
+                side_b_player_id VARCHAR
             )
             """
         )
@@ -132,7 +134,7 @@ def write_dataset(path: Path) -> Path:
         )
         for fingerprint, number, partition, win_hash, lose_hash in rows:
             connection.execute(
-                "INSERT INTO battles VALUES (?, ?, 'a.parquet', ?, ?, ?, ?, ?, ?, ?, ?)",
+                "INSERT INTO battles VALUES (?, ?, 'a.parquet', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 [
                     STAMP,
                     fingerprint,
@@ -144,6 +146,8 @@ def write_dataset(path: Path) -> Path:
                     FORMS,
                     win_hash,
                     lose_hash,
+                    "#WINNER",
+                    "#LOSER",
                 ],
             )
         connection.execute(
@@ -151,7 +155,8 @@ def write_dataset(path: Path) -> Path:
             COPY (
                 SELECT timestamp, fingerprint, archive_member, row_number,
                        side_a_card_ids, side_a_card_forms, side_b_card_ids,
-                       side_b_card_forms, side_a_deck_hash, side_b_deck_hash
+                       side_b_card_forms, side_a_deck_hash, side_b_deck_hash,
+                       side_a_player_id, side_b_player_id
                 FROM battles
             ) TO ? (FORMAT PARQUET)
             """,

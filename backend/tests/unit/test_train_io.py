@@ -18,6 +18,12 @@ KEEP_FP = next(
     f"fp-{index}" for index in range(256) if not should_mirror_sides(f"fp-{index}", seed=0)
 )
 SWAP_FP = next(f"fp-{index}" for index in range(256) if should_mirror_sides(f"fp-{index}", seed=0))
+EARLY_FP = next(
+    f"early-{index}" for index in range(256) if not should_mirror_sides(f"early-{index}", seed=0)
+)
+LATE_FP = next(
+    f"late-{index}" for index in range(256) if not should_mirror_sides(f"late-{index}", seed=0)
+)
 STAMP = datetime(2026, 6, 15, tzinfo=UTC)
 WIN_IDS = ["knight", "mini-pekka", "musketeer", "valkyrie", "hog", "fireball", "log", "cannon"]
 LOSE_IDS = ["archers", "goblins", "bomber", "skeletons", "tombstone", "zap", "arrows", "tesla"]
@@ -27,7 +33,11 @@ FORMS = ["base"] * 8
 def write_battle_parquet(
     path: Path,
     rows: tuple[tuple[str, str, int, str, list[str], list[str], str, str], ...],
+    *,
+    stamps: tuple[datetime, ...] | None = None,
 ) -> None:
+    if stamps is not None and len(stamps) != len(rows):
+        raise ValueError("stamps length must match rows")
     path.parent.mkdir(parents=True, exist_ok=True)
     connection = duckdb.connect()
     try:
@@ -44,17 +54,28 @@ def write_battle_parquet(
                 side_b_card_ids VARCHAR[],
                 side_b_card_forms VARCHAR[],
                 side_a_deck_hash VARCHAR,
-                side_b_deck_hash VARCHAR
+                side_b_deck_hash VARCHAR,
+                side_a_player_id VARCHAR,
+                side_b_player_id VARCHAR
             )
             """
         )
-        for fingerprint, member, number, partition, a_ids, b_ids, a_hash, b_hash in rows:
+        for index, (
+            fingerprint,
+            member,
+            number,
+            partition,
+            a_ids,
+            b_ids,
+            a_hash,
+            b_hash,
+        ) in enumerate(rows):
             connection.execute(
                 """
-                INSERT INTO battles VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO battles VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 [
-                    STAMP,
+                    STAMP if stamps is None else stamps[index],
                     fingerprint,
                     member,
                     number,
@@ -65,6 +86,8 @@ def write_battle_parquet(
                     FORMS,
                     a_hash,
                     b_hash,
+                    "#WINNER",
+                    "#LOSER",
                 ],
             )
         connection.execute(
@@ -72,7 +95,8 @@ def write_battle_parquet(
             COPY (
                 SELECT timestamp, fingerprint, archive_member, row_number,
                        side_a_card_ids, side_a_card_forms, side_b_card_ids,
-                       side_b_card_forms, side_a_deck_hash, side_b_deck_hash
+                       side_b_card_forms, side_a_deck_hash, side_b_deck_hash,
+                       side_a_player_id, side_b_player_id
                 FROM battles
             ) TO ? (FORMAT PARQUET)
             """,
@@ -229,3 +253,64 @@ def test_train_io_rejects_join_count_mismatch(tmp_path: Path) -> None:
             )
     finally:
         connection.close()
+
+
+def test_iter_oriented_examples_swaps_player_ids_when_mirrored(tmp_path: Path) -> None:
+    canonical = tmp_path / "canonical.parquet"
+    split = tmp_path / "splits-temporal.parquet"
+    write_battle_parquet(
+        canonical,
+        (
+            (KEEP_FP, "a.parquet", 0, "train", WIN_IDS, LOSE_IDS, "win-hash", "lose-hash"),
+            (SWAP_FP, "a.parquet", 1, "train", WIN_IDS, LOSE_IDS, "win-hash", "lose-hash"),
+        ),
+    )
+    connection = connect(tmp_path)
+    try:
+        examples = tuple(
+            iter_oriented_examples(
+                connection,
+                canonical_path=canonical,
+                split_path=split,
+                partition="train",
+                seed=0,
+            )
+        )
+    finally:
+        connection.close()
+    keep = next(example for example in examples if example.label == 1)
+    swap = next(example for example in examples if example.label == 0)
+    assert keep.side_a_player_id == "#WINNER"
+    assert keep.side_b_player_id == "#LOSER"
+    assert swap.side_a_player_id == "#LOSER"
+    assert swap.side_b_player_id == "#WINNER"
+
+
+def test_iter_oriented_examples_can_stream_in_timestamp_order(tmp_path: Path) -> None:
+    canonical = tmp_path / "canonical.parquet"
+    split = tmp_path / "splits-temporal.parquet"
+    later = datetime(2026, 6, 20, tzinfo=UTC)
+    earlier = datetime(2026, 6, 10, tzinfo=UTC)
+    write_battle_parquet(
+        canonical,
+        (
+            (LATE_FP, "a.parquet", 0, "train", WIN_IDS, LOSE_IDS, "late-hash", "lose-hash"),
+            (EARLY_FP, "b.parquet", 1, "train", WIN_IDS, LOSE_IDS, "early-hash", "lose-hash"),
+        ),
+        stamps=(later, earlier),
+    )
+    connection = connect(tmp_path)
+    try:
+        examples = tuple(
+            iter_oriented_examples(
+                connection,
+                canonical_path=canonical,
+                split_path=split,
+                partition="train",
+                seed=0,
+                order_by_time=True,
+            )
+        )
+    finally:
+        connection.close()
+    assert [example.deck_a_hash for example in examples] == ["early-hash", "late-hash"]

@@ -27,11 +27,19 @@ class OrientedExample:
     side_b_keys: tuple[str, ...]
     deck_a_hash: str
     deck_b_hash: str
+    side_a_player_id: str = ""
+    side_b_player_id: str = ""
 
 
 _ORIENTED_SQL = """
 WITH joined AS (
     SELECT
+        c.timestamp,
+        c.fingerprint,
+        c.archive_member,
+        c.row_number,
+        c.side_a_player_id,
+        c.side_b_player_id,
         c.side_a_card_ids,
         c.side_a_card_forms,
         c.side_b_card_ids,
@@ -54,6 +62,12 @@ WITH joined AS (
 ),
 oriented AS (
     SELECT
+        timestamp,
+        fingerprint,
+        archive_member,
+        row_number,
+        CASE WHEN mirrored THEN side_b_player_id ELSE side_a_player_id END AS side_a_player_id,
+        CASE WHEN mirrored THEN side_a_player_id ELSE side_b_player_id END AS side_b_player_id,
         CASE WHEN mirrored THEN 0 ELSE 1 END AS label,
         list_transform(
             list_zip(
@@ -194,16 +208,26 @@ def iter_oriented_examples(
     partition: str,
     seed: int,
     batch_rows: int = 10_000,
+    order_by_time: bool = False,
 ) -> Iterator[OrientedExample]:
-    """Yield mirrored examples for scoring without materializing the full corpus."""
+    """Yield mirrored examples for scoring without materializing the full corpus.
+
+    order_by_time sorts by timestamp, fingerprint, archive member, and row number
+    so a skill pass can use only earlier battles.
+    """
     if batch_rows < 1:
         raise KaggleV6TrainError("batch_rows must be positive")
     _require_paths(canonical_path, split_path)
+    order_clause = (
+        "ORDER BY timestamp, fingerprint, archive_member, row_number" if order_by_time else ""
+    )
     result = connection.execute(
         f"""
         {_ORIENTED_SQL}
-        SELECT label, side_a_keys, side_b_keys, deck_a_hash, deck_b_hash
+        SELECT label, side_a_keys, side_b_keys, deck_a_hash, deck_b_hash,
+               side_a_player_id, side_b_player_id
         FROM oriented
+        {order_clause}
         """,
         _oriented_params(canonical_path, split_path, partition=partition, seed=seed),
     )
@@ -211,11 +235,13 @@ def iter_oriented_examples(
         batch = result.fetchmany(batch_rows)
         if not batch:
             return
-        for label, side_a, side_b, deck_a, deck_b in batch:
+        for label, side_a, side_b, deck_a, deck_b, player_a, player_b in batch:
             yield OrientedExample(
                 label=_as_int(label),
                 side_a_keys=_as_keys(side_a),
                 side_b_keys=_as_keys(side_b),
                 deck_a_hash=_as_str(deck_a),
                 deck_b_hash=_as_str(deck_b),
+                side_a_player_id=_as_str(player_a),
+                side_b_player_id=_as_str(player_b),
             )
