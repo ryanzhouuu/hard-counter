@@ -1,6 +1,6 @@
 from datetime import UTC, datetime
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import ANY, MagicMock, patch
 
 import pytest
 import typer
@@ -294,6 +294,7 @@ def test_model_train_command_is_thin(tmp_path: Path) -> None:
         smoothing_alpha=2.0,
         mirror_seed=4,
         model_version="test-model-v1",
+        progress=ANY,
     )
 
 

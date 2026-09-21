@@ -109,14 +109,17 @@ def _oriented_params(
     return [seed, str(canonical_path), str(split_path), partition]
 
 
-def _require_partition_rows(
+def require_partition_rows(
     connection: duckdb.DuckDBPyConnection,
     canonical_path: Path,
     split_path: Path,
     *,
+    split: str,
     partition: str,
     seed: int,
-) -> None:
+    expected_rows: int,
+) -> int:
+    """Return the joined row count, or raise if the partition is empty or incomplete."""
     _require_paths(canonical_path, split_path)
     row = connection.execute(
         f"{_ORIENTED_SQL} SELECT COUNT(*) FROM oriented",
@@ -124,6 +127,10 @@ def _require_partition_rows(
     ).fetchone()
     if row is None or _as_int(row[0]) == 0:
         raise KaggleV6TrainError(f"split {partition} partition is empty")
+    count = _as_int(row[0])
+    if count != expected_rows:
+        raise KaggleV6TrainError(f"{split} {partition} join count {count} != {expected_rows}")
+    return count
 
 
 def aggregate_card_counts(
@@ -135,7 +142,7 @@ def aggregate_card_counts(
     seed: int,
 ) -> dict[str, tuple[int, int]]:
     """Return per-card (wins, trials) after mirroring rows in one split partition."""
-    _require_partition_rows(connection, canonical_path, split_path, partition=partition, seed=seed)
+    _require_paths(canonical_path, split_path)
     rows = connection.execute(
         f"""
         {_ORIENTED_SQL}
@@ -162,7 +169,7 @@ def aggregate_matchup_counts(
     seed: int,
 ) -> dict[tuple[str, str], tuple[int, int]]:
     """Return per oriented deck-pair (wins, trials) in one split partition."""
-    _require_partition_rows(connection, canonical_path, split_path, partition=partition, seed=seed)
+    _require_paths(canonical_path, split_path)
     rows = connection.execute(
         f"""
         {_ORIENTED_SQL}
@@ -191,7 +198,7 @@ def iter_oriented_examples(
     """Yield mirrored examples for scoring without materializing the full corpus."""
     if batch_rows < 1:
         raise KaggleV6TrainError("batch_rows must be positive")
-    _require_partition_rows(connection, canonical_path, split_path, partition=partition, seed=seed)
+    _require_paths(canonical_path, split_path)
     result = connection.execute(
         f"""
         {_ORIENTED_SQL}

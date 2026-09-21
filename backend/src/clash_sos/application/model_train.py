@@ -4,7 +4,7 @@ Fits only the temporal train partition. Evaluation scores temporal and
 player-disjoint partitions. Destination versions are never overwritten.
 """
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Iterator, Mapping, Sequence
 from json import loads
 from pathlib import Path
 from shutil import rmtree
@@ -28,15 +28,17 @@ from clash_sos.domain.model_artifact import (
     EvaluationReport,
     ModelArtifactManifest,
     ModelOutputFile,
+    ProbabilityMetricAccumulator,
     ProbabilityMetrics,
     SplitEvaluation,
-    brier_score,
     dump_evaluation_report,
     dump_model_manifest,
-    expected_calibration_error,
-    log_loss,
 )
-from clash_sos.domain.processed_manifest import ProcessedDatasetManifest
+from clash_sos.domain.processed_manifest import (
+    PlayerDisjointSplitManifest,
+    ProcessedDatasetManifest,
+    TemporalSplitManifest,
+)
 from clash_sos.infrastructure.kaggle_v6.audit_io import hash_file
 from clash_sos.infrastructure.kaggle_v6.catalog import KAGGLE_V6_CARDS
 from clash_sos.infrastructure.kaggle_v6.publish_io import (
@@ -51,6 +53,7 @@ from clash_sos.infrastructure.kaggle_v6.train_io import (
     aggregate_card_counts,
     aggregate_matchup_counts,
     iter_oriented_examples,
+    require_partition_rows,
 )
 
 
@@ -68,41 +71,41 @@ def _kind_path(dataset: Path, manifest: ProcessedDatasetManifest, kind: str) -> 
     return dataset / match.path
 
 
-def _probability_metrics(
-    labels: Sequence[int], probabilities: Sequence[float]
-) -> ProbabilityMetrics:
-    return ProbabilityMetrics(
-        log_loss=log_loss(labels, probabilities),
-        brier_score=brier_score(labels, probabilities),
-        expected_calibration_error=expected_calibration_error(labels, probabilities),
-        row_count=len(labels),
-    )
+def _partition_row_count(
+    split: TemporalSplitManifest | PlayerDisjointSplitManifest, partition: str
+) -> int:
+    """Return the processed-manifest row count for one split partition."""
+    return next(item.row_count for item in split.partitions if item.partition == partition)
 
 
-def _score_partition(
-    examples: Sequence[OrientedExample],
+def score_partition(
+    examples: Iterator[OrientedExample],
     *,
     effects: Mapping[str, float],
     matchup_counts: Mapping[tuple[str, str], tuple[int, int]],
     alpha: float,
+    expected_rows: int | None = None,
 ) -> tuple[ProbabilityMetrics, ProbabilityMetrics, ProbabilityMetrics]:
-    labels = [example.label for example in examples]
-    prior = [0.5] * len(labels)
-    exact = [
-        exact_matchup_probability(
-            example.deck_a_hash, example.deck_b_hash, matchup_counts, alpha=alpha
+    """Score one partition in a single pass. expected_rows, when set, must match."""
+    prior = ProbabilityMetricAccumulator()
+    exact = ProbabilityMetricAccumulator()
+    card = ProbabilityMetricAccumulator()
+    for example in examples:
+        prior.update(example.label, 0.5)
+        exact.update(
+            example.label,
+            exact_matchup_probability(
+                example.deck_a_hash, example.deck_b_hash, matchup_counts, alpha=alpha
+            ),
         )
-        for example in examples
-    ]
-    card = [
-        predict_card_log_odds(example.side_a_keys, example.side_b_keys, effects)
-        for example in examples
-    ]
-    return (
-        _probability_metrics(labels, prior),
-        _probability_metrics(labels, exact),
-        _probability_metrics(labels, card),
-    )
+        card.update(
+            example.label,
+            predict_card_log_odds(example.side_a_keys, example.side_b_keys, effects),
+        )
+    metrics = (prior.finalize(), exact.finalize(), card.finalize())
+    if expected_rows is not None and metrics[0].row_count != expected_rows:
+        raise KaggleV6ModelTrainError(f"scored row count {metrics[0].row_count} != {expected_rows}")
+    return metrics
 
 
 def _write_json(path: Path, payload: object) -> None:
@@ -175,8 +178,12 @@ def train_matchup_baseline(
     smoothing_alpha: float = DEFAULT_SMOOTHING_ALPHA,
     mirror_seed: int = DEFAULT_MIRROR_SEED,
     model_version: str = DEFAULT_MODEL_VERSION,
+    progress: Callable[[str], None] | None = None,
 ) -> Path:
-    """Fit the card-log-odds baseline, evaluate splits, and publish one artifact version."""
+    """Fit the card-log-odds baseline, evaluate splits, and publish one artifact version.
+
+    progress, when set, receives dataset partition counts and per-slice scoring updates.
+    """
     if destination.exists():
         raise KaggleV6ModelTrainError("published model version already exists")
     if output_workspace.exists():
@@ -191,9 +198,25 @@ def train_matchup_baseline(
     processed = load_processed_dataset(dataset)
     if len(processed.accepted.eras) != 1:
         raise KaggleV6ModelTrainError("training requires exactly one accepted balance era")
+    if processed.catalog_version != KAGGLE_V6_CARDS.version:
+        raise KaggleV6ModelTrainError(
+            "processed catalog version does not match the training catalog"
+        )
     canonical = _kind_path(dataset, processed, "canonical")
     temporal = _kind_path(dataset, processed, "temporal_split")
     player = _kind_path(dataset, processed, "player_disjoint_split")
+    if progress is not None:
+        temporal_counts = " ".join(
+            f"{item.partition}={item.row_count}" for item in processed.temporal_split.partitions
+        )
+        player_counts = " ".join(
+            f"{item.partition}={item.row_count}"
+            for item in processed.player_disjoint_split.partitions
+        )
+        progress(
+            f"dataset {processed.dataset_version} temporal {temporal_counts} "
+            f"player_disjoint {player_counts}"
+        )
     temp_directory.mkdir(parents=True, exist_ok=True)
     connection = connect_staging_duckdb(
         memory_limit=config.memory_limit,
@@ -203,6 +226,16 @@ def train_matchup_baseline(
     output_workspace.mkdir(parents=True)
     try:
         try:
+            train_rows = _partition_row_count(processed.temporal_split, "train")
+            require_partition_rows(
+                connection,
+                canonical_path=canonical,
+                split_path=temporal,
+                split="temporal",
+                partition="train",
+                seed=mirror_seed,
+                expected_rows=train_rows,
+            )
             card_counts = aggregate_card_counts(
                 connection,
                 canonical_path=canonical,
@@ -222,26 +255,40 @@ def train_matchup_baseline(
                 for identity, (wins, trials) in card_counts.items()
             }
             evaluations: list[SplitEvaluation] = []
-            split_files: tuple[tuple[SplitName, Path], ...] = (
-                ("temporal", temporal),
-                ("player_disjoint", player),
+            split_files: tuple[
+                tuple[SplitName, Path, TemporalSplitManifest | PlayerDisjointSplitManifest],
+                ...,
+            ] = (
+                ("temporal", temporal, processed.temporal_split),
+                ("player_disjoint", player, processed.player_disjoint_split),
             )
-            for split_name, split_path in split_files:
+            for split_name, split_path, split_manifest in split_files:
                 for partition in EVALUATION_PARTITIONS:
-                    examples = tuple(
+                    expected_rows = _partition_row_count(split_manifest, partition)
+                    if progress is not None:
+                        progress(f"scoring {split_name} {partition} ({expected_rows} rows)")
+                    if (split_name, partition) != ("temporal", "train"):
+                        require_partition_rows(
+                            connection,
+                            canonical_path=canonical,
+                            split_path=split_path,
+                            split=split_name,
+                            partition=partition,
+                            seed=mirror_seed,
+                            expected_rows=expected_rows,
+                        )
+                    prior, exact, card = score_partition(
                         iter_oriented_examples(
                             connection,
                             canonical_path=canonical,
                             split_path=split_path,
                             partition=partition,
                             seed=mirror_seed,
-                        )
-                    )
-                    prior, exact, card = _score_partition(
-                        examples,
+                        ),
                         effects=effects,
                         matchup_counts=matchup_counts,
                         alpha=smoothing_alpha,
+                        expected_rows=expected_rows,
                     )
                     evaluations.append(
                         SplitEvaluation(
