@@ -31,10 +31,13 @@ ml = [
 dev = [
   "httpx>=0.28,<1",
   "hypothesis>=6.136,<7",
+  "lightgbm>=4.6,<5",
   "pyright>=1.1.403,<2",
   "pytest>=8.4,<10",
   "pytest-cov>=6.2,<8",
   "ruff>=0.12,<1",
+  "scipy>=1.14,<2",
+  "scipy-stubs>=1.14",
 ]
 
 [project.scripts]

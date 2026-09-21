@@ -23,6 +23,7 @@ from clash_sos.domain.matchup_baseline import (
     exact_matchup_probability,
     predict_card_log_odds,
 )
+from clash_sos.domain.matchup_lgbm import LIGHTGBM_FEATURE_SCHEMA_VERSION
 from clash_sos.domain.matchup_pair import PAIR_FEATURE_SCHEMA_VERSION, CardPairPredictor
 from clash_sos.domain.model_artifact import (
     DEFAULT_MODEL_VERSION,
@@ -194,8 +195,13 @@ def finalize_model_artifact(
     smoothing_alpha: float,
     mirror_seed: int,
     chunk_size: int,
+    predictor_name: str = "predictor.json",
 ) -> Path:
-    """Inventory required files, write manifest.json, and rename onto destination."""
+    """Inventory required files, write manifest.json, and rename onto destination.
+
+    predictor_name is predictor.json for the logistic artifacts and predictor.txt
+    for the LightGBM booster.
+    """
     files = tuple(
         sorted(
             (
@@ -218,7 +224,7 @@ def finalize_model_artifact(
                     chunk_size,
                 ),
                 inventory_model_file(
-                    output_workspace / "predictor.json",
+                    output_workspace / predictor_name,
                     output_workspace,
                     "predictor",
                     chunk_size,
@@ -256,29 +262,48 @@ def load_processed_dataset(dataset: Path) -> ProcessedDatasetManifest:
         raise KaggleV6ModelTrainError("processed manifest is invalid") from error
 
 
+def _json_object(path: Path) -> dict[str, object]:
+    """Load a predictor JSON object. Raises KaggleV6ModelTrainError when malformed."""
+    payload = loads(path.read_text(encoding="utf-8"))
+    if not isinstance(payload, dict):
+        raise KaggleV6ModelTrainError("model artifact is invalid")
+    return cast(dict[str, object], payload)
+
+
 def predict_matchup(
     artifact: Path, side_a: Sequence[str], side_b: Sequence[str]
 ) -> MatchupPrediction:
     """Load a published artifact and predict P(side A wins) from identity keys."""
     manifest_path = artifact / "manifest.json"
-    predictor_path = artifact / "predictor.json"
     schema_path = artifact / "feature-schema.json"
-    if not manifest_path.is_file() or not predictor_path.is_file() or not schema_path.is_file():
+    if not manifest_path.is_file() or not schema_path.is_file():
         raise KaggleV6ModelTrainError("model artifact is incomplete")
     manifest = ModelArtifactManifest.model_validate_json(manifest_path.read_text(encoding="utf-8"))
     schema_payload = loads(schema_path.read_text(encoding="utf-8"))
-    predictor_payload = loads(predictor_path.read_text(encoding="utf-8"))
-    if not isinstance(schema_payload, dict) or not isinstance(predictor_payload, dict):
+    if not isinstance(schema_payload, dict):
         raise KaggleV6ModelTrainError("model artifact is invalid")
     schema = cast(dict[str, object], schema_payload)
-    predictor_body = cast(dict[str, object], predictor_payload)
-    if schema.get("feature_schema_version") == PAIR_FEATURE_SCHEMA_VERSION:
+    predictor_path = artifact / next(
+        file.path for file in manifest.files if file.kind == "predictor"
+    )
+    if not predictor_path.is_file():
+        raise KaggleV6ModelTrainError("model artifact is incomplete")
+    if schema.get("feature_schema_version") == LIGHTGBM_FEATURE_SCHEMA_VERSION:
+        from clash_sos.application.model_train_lgbm import predict_lightgbm_artifact
+
+        try:
+            probability = predict_lightgbm_artifact(predictor_path, schema, side_a, side_b)
+        except ValueError as error:
+            raise KaggleV6ModelTrainError(str(error)) from error
+    elif schema.get("feature_schema_version") == PAIR_FEATURE_SCHEMA_VERSION:
+        predictor_body = _json_object(predictor_path)
         try:
             pair_model = CardPairPredictor.from_payload(predictor_body)
         except ValueError as error:
             raise KaggleV6ModelTrainError(str(error)) from error
         probability = pair_model.predict(side_a, side_b)
     else:
+        predictor_body = _json_object(predictor_path)
         raw_effects = predictor_body.get("effects")
         if not isinstance(raw_effects, dict):
             raise KaggleV6ModelTrainError("predictor effects must be an object")
