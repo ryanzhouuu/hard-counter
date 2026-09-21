@@ -1,4 +1,4 @@
-"""Typer entry point for clash-sos. Dataset commands stay thin service adapters."""
+"""Typer entry point for clash-sos. Dataset and model commands stay thin adapters."""
 
 from datetime import datetime
 from pathlib import Path
@@ -10,6 +10,9 @@ from clash_sos import __version__
 from clash_sos.application.dataset_prepare import prepare_kaggle_v6_dataset
 from clash_sos.application.dataset_staging import StagingConfig
 from clash_sos.application.dataset_verify import verify_kaggle_v6_dataset
+from clash_sos.application.model_train import train_matchup_baseline
+from clash_sos.domain.matchup_baseline import DEFAULT_MIRROR_SEED, DEFAULT_SMOOTHING_ALPHA
+from clash_sos.domain.model_artifact import DEFAULT_MODEL_VERSION
 from clash_sos.domain.processed_manifest import (
     DEFAULT_DATASET_VERSION,
     DEFAULT_PLAYER_HASH_SEED,
@@ -24,7 +27,9 @@ from clash_sos.infrastructure.kaggle_v6.source import KAGGLE_V6_ARCHIVE_NAME
 
 app = typer.Typer(no_args_is_help=True)
 dataset_app = typer.Typer(no_args_is_help=True)
+model_app = typer.Typer(no_args_is_help=True)
 app.add_typer(dataset_app, name="dataset")
+app.add_typer(model_app, name="model")
 
 
 def parse_aware_datetime(value: str) -> datetime:
@@ -151,3 +156,34 @@ def verify_kaggle_v6(
         temp_directory=temp_directory,
     )
     typer.echo(dataset)
+
+
+@model_app.command("train")
+def train(
+    dataset: Path = Path("data/processed") / DEFAULT_DATASET_VERSION,
+    destination: Path = Path("models") / DEFAULT_MODEL_VERSION,
+    output_workspace: Path = Path("data/tmp/kaggle-v6-model-output"),
+    temp_directory: Path = Path("data/tmp"),
+    memory_limit: str = "1GB",
+    threads: int = 2,
+    chunk_size: int = 8 * 1024 * 1024,
+    smoothing_alpha: float = DEFAULT_SMOOTHING_ALPHA,
+    mirror_seed: int = DEFAULT_MIRROR_SEED,
+    model_version: str = DEFAULT_MODEL_VERSION,
+) -> None:
+    """Fit the card-log-odds baseline, evaluate splits, and write one artifact version."""
+    published = train_matchup_baseline(
+        dataset,
+        destination,
+        output_workspace=output_workspace,
+        temp_directory=temp_directory,
+        config=StagingConfig(
+            memory_limit=memory_limit,
+            threads=threads,
+            chunk_size=chunk_size,
+        ),
+        smoothing_alpha=smoothing_alpha,
+        mirror_seed=mirror_seed,
+        model_version=model_version,
+    )
+    typer.echo(published)
