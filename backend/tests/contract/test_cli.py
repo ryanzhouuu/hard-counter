@@ -252,7 +252,7 @@ def test_model_train_command_is_thin(tmp_path: Path) -> None:
     output = tmp_path / "output"
     temp_directory = tmp_path / "tmp"
     with patch(
-        "clash_sos.interfaces.cli.main.train_matchup_baseline",
+        "clash_sos.interfaces.cli.main.train_card_pair_model",
         return_value=destination,
     ) as train:
         result = runner.invoke(
@@ -298,9 +298,35 @@ def test_model_train_command_is_thin(tmp_path: Path) -> None:
     )
 
 
-def test_model_train_command_surfaces_existing_version() -> None:
+def test_model_train_command_dispatches_card_log_odds(tmp_path: Path) -> None:
+    destination = tmp_path / "model"
     with patch(
         "clash_sos.interfaces.cli.main.train_matchup_baseline",
+        return_value=destination,
+    ) as train:
+        result = runner.invoke(
+            cli_app,
+            [
+                "model",
+                "train",
+                "--promoted-model",
+                "card_log_odds",
+                "--destination",
+                str(destination),
+                "--model-version",
+                "test-model-v1",
+            ],
+        )
+
+    assert result.exit_code == 0
+    train.assert_called_once()
+    assert train.call_args.kwargs["model_version"] == "test-model-v1"
+    assert train.call_args.args[1] == destination
+
+
+def test_model_train_command_surfaces_existing_version() -> None:
+    with patch(
+        "clash_sos.interfaces.cli.main.train_card_pair_model",
         side_effect=KaggleV6ModelTrainError("published model version already exists"),
     ):
         result = runner.invoke(cli_app, ["model", "train"])
