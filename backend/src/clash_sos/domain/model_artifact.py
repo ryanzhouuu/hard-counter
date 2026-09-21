@@ -15,7 +15,7 @@ from clash_sos.domain.matchup_baseline import (
 )
 
 DEFAULT_MODEL_VERSION = "kaggle-v6-ranked16-card-logodds-v1"
-DEFAULT_PAIR_MODEL_VERSION = "kaggle-v6-ranked16-card-pair-v1"
+DEFAULT_PAIR_MODEL_VERSION = "kaggle-v6-ranked16-card-pair-v2"
 MODEL_ARTIFACT_TYPE = "matchup_baseline"
 REQUIRED_FILE_KINDS = ("card_catalog", "evaluation", "feature_schema", "predictor")
 EVALUATION_SPLITS = ("temporal", "player_disjoint")

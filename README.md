@@ -87,7 +87,7 @@ splits, and fails if the destination already exists:
 uv run clash-sos model train
 ```
 
-The default artifact path is `models/kaggle-v6-ranked16-card-pair-v1`. Retrain
+The default artifact path is `models/kaggle-v6-ranked16-card-pair-v2`. Retrain
 the frozen card-log-odds baseline with `--promoted-model card_log_odds` and a
 new `--destination`.
 
