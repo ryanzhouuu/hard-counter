@@ -78,15 +78,18 @@ Validate a published version in place without rewriting it:
 uv run clash-sos dataset verify-kaggle-v6
 ```
 
-Train a card-log-odds matchup baseline on the published processed dataset and write a
-versioned artifact. The command fits temporal train only, scores temporal and
-player-disjoint splits, and fails if the destination already exists:
+Train a matchup model on the published processed dataset and write a versioned
+artifact. The default promoted model is the antisymmetric card-pair logistic.
+The command fits temporal train only, scores temporal and player-disjoint
+splits, and fails if the destination already exists:
 
 ```bash
 uv run clash-sos model train
 ```
 
-The default artifact path is `models/kaggle-v6-ranked16-card-logodds-v1`.
+The default artifact path is `models/kaggle-v6-ranked16-card-pair-v1`. Retrain
+the frozen card-log-odds baseline with `--promoted-model card_log_odds` and a
+new `--destination`.
 
 ## Quality checks
 

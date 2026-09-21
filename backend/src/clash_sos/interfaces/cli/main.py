@@ -2,7 +2,7 @@
 
 from datetime import datetime
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Literal
 
 import typer
 
@@ -11,8 +11,9 @@ from clash_sos.application.dataset_prepare import prepare_kaggle_v6_dataset
 from clash_sos.application.dataset_staging import StagingConfig
 from clash_sos.application.dataset_verify import verify_kaggle_v6_dataset
 from clash_sos.application.model_train import train_matchup_baseline
+from clash_sos.application.model_train_pair import train_card_pair_model
 from clash_sos.domain.matchup_baseline import DEFAULT_MIRROR_SEED, DEFAULT_SMOOTHING_ALPHA
-from clash_sos.domain.model_artifact import DEFAULT_MODEL_VERSION
+from clash_sos.domain.model_artifact import DEFAULT_MODEL_VERSION, DEFAULT_PAIR_MODEL_VERSION
 from clash_sos.domain.processed_manifest import (
     DEFAULT_DATASET_VERSION,
     DEFAULT_PLAYER_HASH_SEED,
@@ -161,7 +162,7 @@ def verify_kaggle_v6(
 @model_app.command("train")
 def train(
     dataset: Path = Path("data/processed") / DEFAULT_DATASET_VERSION,
-    destination: Path = Path("models") / DEFAULT_MODEL_VERSION,
+    destination: Annotated[Path | None, typer.Option()] = None,
     output_workspace: Path = Path("data/tmp/kaggle-v6-model-output"),
     temp_directory: Path = Path("data/tmp"),
     memory_limit: str = "1GB",
@@ -169,12 +170,18 @@ def train(
     chunk_size: int = 8 * 1024 * 1024,
     smoothing_alpha: float = DEFAULT_SMOOTHING_ALPHA,
     mirror_seed: int = DEFAULT_MIRROR_SEED,
-    model_version: str = DEFAULT_MODEL_VERSION,
+    model_version: Annotated[str | None, typer.Option()] = None,
+    promoted_model: Literal["card_pair", "card_log_odds"] = "card_pair",
 ) -> None:
-    """Fit the card-log-odds baseline, evaluate splits, and write one artifact version."""
-    published = train_matchup_baseline(
+    """Fit a matchup model, evaluate splits, and write one artifact version."""
+    resolved_version = model_version or (
+        DEFAULT_PAIR_MODEL_VERSION if promoted_model == "card_pair" else DEFAULT_MODEL_VERSION
+    )
+    resolved_destination = destination or Path("models") / resolved_version
+    trainer = train_card_pair_model if promoted_model == "card_pair" else train_matchup_baseline
+    published = trainer(
         dataset,
-        destination,
+        resolved_destination,
         output_workspace=output_workspace,
         temp_directory=temp_directory,
         config=StagingConfig(
@@ -184,7 +191,7 @@ def train(
         ),
         smoothing_alpha=smoothing_alpha,
         mirror_seed=mirror_seed,
-        model_version=model_version,
+        model_version=resolved_version,
         progress=lambda message: typer.echo(message, err=True),
     )
     typer.echo(published)
