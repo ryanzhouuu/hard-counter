@@ -13,7 +13,12 @@ from clash_sos.application.dataset_verify import verify_kaggle_v6_dataset
 from clash_sos.application.model_train import train_matchup_baseline
 from clash_sos.application.model_train_pair import train_card_pair_model
 from clash_sos.domain.matchup_baseline import DEFAULT_MIRROR_SEED, DEFAULT_SMOOTHING_ALPHA
-from clash_sos.domain.model_artifact import DEFAULT_MODEL_VERSION, DEFAULT_PAIR_MODEL_VERSION
+from clash_sos.domain.matchup_lgbm import DEFAULT_NUM_THREADS
+from clash_sos.domain.model_artifact import (
+    DEFAULT_LIGHTGBM_MODEL_VERSION,
+    DEFAULT_MODEL_VERSION,
+    DEFAULT_PAIR_MODEL_VERSION,
+)
 from clash_sos.domain.processed_manifest import (
     DEFAULT_DATASET_VERSION,
     DEFAULT_PLAYER_HASH_SEED,
@@ -192,6 +197,46 @@ def train(
         smoothing_alpha=smoothing_alpha,
         mirror_seed=mirror_seed,
         model_version=resolved_version,
+        progress=lambda message: typer.echo(message, err=True),
+    )
+    typer.echo(published)
+
+
+@model_app.command("train-lgbm")
+def train_lgbm(
+    dataset: Path = Path("data/processed") / DEFAULT_DATASET_VERSION,
+    destination: Annotated[Path | None, typer.Option()] = None,
+    output_workspace: Path = Path("data/tmp/kaggle-v6-model-output"),
+    temp_directory: Path = Path("data/tmp"),
+    memory_limit: str = "1GB",
+    threads: int = DEFAULT_NUM_THREADS,
+    chunk_size: int = 8 * 1024 * 1024,
+    smoothing_alpha: float = DEFAULT_SMOOTHING_ALPHA,
+    mirror_seed: int = DEFAULT_MIRROR_SEED,
+    model_version: str = DEFAULT_LIGHTGBM_MODEL_VERSION,
+) -> None:
+    """Fit the LightGBM presence model and write one artifact version.
+
+    threads applies to LightGBM. DuckDB joins stay on one thread. This command
+    does not change the card-pair model published by model train.
+    """
+    from clash_sos.application.model_train_lgbm import train_lightgbm_model
+
+    resolved_destination = destination or Path("models") / model_version
+    published = train_lightgbm_model(
+        dataset,
+        resolved_destination,
+        output_workspace=output_workspace,
+        temp_directory=temp_directory,
+        config=StagingConfig(
+            memory_limit=memory_limit,
+            threads=1,
+            chunk_size=chunk_size,
+        ),
+        smoothing_alpha=smoothing_alpha,
+        mirror_seed=mirror_seed,
+        model_version=model_version,
+        num_threads=threads,
         progress=lambda message: typer.echo(message, err=True),
     )
     typer.echo(published)

@@ -324,6 +324,59 @@ def test_model_train_command_dispatches_card_log_odds(tmp_path: Path) -> None:
     assert train.call_args.args[1] == destination
 
 
+def test_model_train_lgbm_command_dispatches(tmp_path: Path) -> None:
+    dataset = tmp_path / "dataset"
+    destination = tmp_path / "model"
+    output = tmp_path / "output"
+    temp_directory = tmp_path / "tmp"
+    with patch(
+        "clash_sos.application.model_train_lgbm.train_lightgbm_model",
+        return_value=destination,
+    ) as train:
+        result = runner.invoke(
+            cli_app,
+            [
+                "model",
+                "train-lgbm",
+                "--dataset",
+                str(dataset),
+                "--destination",
+                str(destination),
+                "--output-workspace",
+                str(output),
+                "--temp-directory",
+                str(temp_directory),
+                "--memory-limit",
+                "512MB",
+                "--threads",
+                "1",
+                "--chunk-size",
+                "1024",
+                "--smoothing-alpha",
+                "2.0",
+                "--mirror-seed",
+                "4",
+                "--model-version",
+                "test-lgbm-v1",
+            ],
+        )
+
+    assert result.exit_code == 0
+    assert result.stdout == f"{destination}\n"
+    train.assert_called_once_with(
+        dataset,
+        destination,
+        output_workspace=output,
+        temp_directory=temp_directory,
+        config=StagingConfig(memory_limit="512MB", threads=1, chunk_size=1024),
+        smoothing_alpha=2.0,
+        mirror_seed=4,
+        model_version="test-lgbm-v1",
+        num_threads=1,
+        progress=ANY,
+    )
+
+
 def test_model_train_command_surfaces_existing_version() -> None:
     with patch(
         "clash_sos.interfaces.cli.main.train_card_pair_model",
