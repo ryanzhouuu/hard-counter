@@ -280,6 +280,8 @@ def test_model_train_command_is_thin(tmp_path: Path) -> None:
                 "4",
                 "--model-version",
                 "test-model-v1",
+                "--promoted-model",
+                "card_pair",
             ],
         )
 
@@ -295,6 +297,27 @@ def test_model_train_command_is_thin(tmp_path: Path) -> None:
         mirror_seed=4,
         model_version="test-model-v1",
         progress=ANY,
+    )
+
+
+def test_model_train_defaults_to_lightgbm(tmp_path: Path) -> None:
+    destination = tmp_path / "model"
+    with patch(
+        "clash_sos.application.model_train_lgbm.train_lightgbm_model",
+        return_value=destination,
+    ) as train:
+        result = runner.invoke(
+            cli_app,
+            ["model", "train", "--destination", str(destination)],
+        )
+
+    assert result.exit_code == 0
+    assert result.stdout == f"{destination}\n"
+    train.assert_called_once()
+    assert train.call_args.kwargs["model_version"] == "kaggle-v6-ranked16-lightgbm-v1"
+    assert train.call_args.kwargs["num_threads"] == 4
+    assert train.call_args.kwargs["config"] == StagingConfig(
+        memory_limit="1GB", threads=1, chunk_size=8 * 1024 * 1024
     )
 
 
@@ -379,7 +402,7 @@ def test_model_train_lgbm_command_dispatches(tmp_path: Path) -> None:
 
 def test_model_train_command_surfaces_existing_version() -> None:
     with patch(
-        "clash_sos.interfaces.cli.main.train_card_pair_model",
+        "clash_sos.application.model_train_lgbm.train_lightgbm_model",
         side_effect=KaggleV6ModelTrainError("published model version already exists"),
     ):
         result = runner.invoke(cli_app, ["model", "train"])

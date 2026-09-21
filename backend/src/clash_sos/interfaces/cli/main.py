@@ -171,34 +171,60 @@ def train(
     output_workspace: Path = Path("data/tmp/kaggle-v6-model-output"),
     temp_directory: Path = Path("data/tmp"),
     memory_limit: str = "1GB",
-    threads: int = 2,
+    threads: int = DEFAULT_NUM_THREADS,
     chunk_size: int = 8 * 1024 * 1024,
     smoothing_alpha: float = DEFAULT_SMOOTHING_ALPHA,
     mirror_seed: int = DEFAULT_MIRROR_SEED,
     model_version: Annotated[str | None, typer.Option()] = None,
-    promoted_model: Literal["card_pair", "card_log_odds"] = "card_pair",
+    promoted_model: Literal["lightgbm", "card_pair", "card_log_odds"] = "lightgbm",
 ) -> None:
-    """Fit a matchup model, evaluate splits, and write one artifact version."""
-    resolved_version = model_version or (
-        DEFAULT_PAIR_MODEL_VERSION if promoted_model == "card_pair" else DEFAULT_MODEL_VERSION
-    )
-    resolved_destination = destination or Path("models") / resolved_version
-    trainer = train_card_pair_model if promoted_model == "card_pair" else train_matchup_baseline
-    published = trainer(
-        dataset,
-        resolved_destination,
-        output_workspace=output_workspace,
-        temp_directory=temp_directory,
-        config=StagingConfig(
-            memory_limit=memory_limit,
-            threads=threads,
-            chunk_size=chunk_size,
-        ),
-        smoothing_alpha=smoothing_alpha,
-        mirror_seed=mirror_seed,
-        model_version=resolved_version,
-        progress=lambda message: typer.echo(message, err=True),
-    )
+    """Fit a matchup model, evaluate splits, and write one artifact version.
+
+    The default model is the LightGBM presence booster. threads applies to that
+    booster, while DuckDB joins stay on one thread.
+    """
+    if promoted_model == "lightgbm":
+        from clash_sos.application.model_train_lgbm import train_lightgbm_model
+
+        resolved_version = model_version or DEFAULT_LIGHTGBM_MODEL_VERSION
+        resolved_destination = destination or Path("models") / resolved_version
+        published = train_lightgbm_model(
+            dataset,
+            resolved_destination,
+            output_workspace=output_workspace,
+            temp_directory=temp_directory,
+            config=StagingConfig(
+                memory_limit=memory_limit,
+                threads=1,
+                chunk_size=chunk_size,
+            ),
+            smoothing_alpha=smoothing_alpha,
+            mirror_seed=mirror_seed,
+            model_version=resolved_version,
+            num_threads=threads,
+            progress=lambda message: typer.echo(message, err=True),
+        )
+    else:
+        resolved_version = model_version or (
+            DEFAULT_PAIR_MODEL_VERSION if promoted_model == "card_pair" else DEFAULT_MODEL_VERSION
+        )
+        resolved_destination = destination or Path("models") / resolved_version
+        trainer = train_card_pair_model if promoted_model == "card_pair" else train_matchup_baseline
+        published = trainer(
+            dataset,
+            resolved_destination,
+            output_workspace=output_workspace,
+            temp_directory=temp_directory,
+            config=StagingConfig(
+                memory_limit=memory_limit,
+                threads=threads,
+                chunk_size=chunk_size,
+            ),
+            smoothing_alpha=smoothing_alpha,
+            mirror_seed=mirror_seed,
+            model_version=resolved_version,
+            progress=lambda message: typer.echo(message, err=True),
+        )
     typer.echo(published)
 
 
