@@ -91,6 +91,52 @@ class ProbabilityMetrics(ManifestModel):
     row_count: int = Field(ge=0)
 
 
+class ProbabilityMetricAccumulator:
+    """Online log-loss, Brier, and ECE so scoring need not retain every row."""
+
+    def __init__(self, *, bins: int = 10) -> None:
+        if bins < 1:
+            raise ValueError("bins must be positive")
+        self._bins = bins
+        self._log_loss_total = 0.0
+        self._brier_total = 0.0
+        self._count = 0
+        self._bin_totals = [0] * bins
+        self._bin_labels = [0.0] * bins
+        self._bin_probabilities = [0.0] * bins
+
+    def update(self, label: int, probability: float) -> None:
+        """Add one labeled probability. Labels must be 0 or 1."""
+        if label not in (0, 1):
+            raise ValueError("labels must be 0 or 1")
+        clipped = min(max(probability, PROBABILITY_FLOOR), 1.0 - PROBABILITY_FLOOR)
+        self._log_loss_total += -(label * log(clipped) + (1 - label) * log(1.0 - clipped))
+        self._brier_total += (probability - label) ** 2
+        index = min(self._bins - 1, max(0, int(probability * self._bins)))
+        self._bin_totals[index] += 1
+        self._bin_labels[index] += label
+        self._bin_probabilities[index] += probability
+        self._count += 1
+
+    def finalize(self) -> ProbabilityMetrics:
+        """Return mean metrics. Raises if no observations were added."""
+        if self._count == 0:
+            raise ValueError("metrics require at least one observation")
+        error = 0.0
+        for index, total in enumerate(self._bin_totals):
+            if total == 0:
+                continue
+            accuracy = self._bin_labels[index] / total
+            confidence = self._bin_probabilities[index] / total
+            error += abs(accuracy - confidence) * (total / self._count)
+        return ProbabilityMetrics(
+            log_loss=self._log_loss_total / self._count,
+            brier_score=self._brier_total / self._count,
+            expected_calibration_error=error,
+            row_count=self._count,
+        )
+
+
 class SplitEvaluation(ManifestModel):
     """Prior, exact-matchup, and card-log-odds metrics for one evaluation slice."""
 

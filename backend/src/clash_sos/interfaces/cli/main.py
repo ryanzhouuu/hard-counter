@@ -185,5 +185,6 @@ def train(
         smoothing_alpha=smoothing_alpha,
         mirror_seed=mirror_seed,
         model_version=model_version,
+        progress=lambda message: typer.echo(message, err=True),
     )
     typer.echo(published)

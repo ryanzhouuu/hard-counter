@@ -10,6 +10,7 @@ from clash_sos.domain.model_artifact import (
     EvaluationReport,
     ModelArtifactManifest,
     ModelOutputFile,
+    ProbabilityMetricAccumulator,
     ProbabilityMetrics,
     SplitEvaluation,
     brier_score,
@@ -54,6 +55,21 @@ def test_expected_calibration_error_is_zero_when_perfect() -> None:
 def test_metrics_reject_mismatched_lengths() -> None:
     with pytest.raises(ValueError, match="same length"):
         log_loss((1,), (0.5, 0.5))
+
+
+def test_accumulator_matches_batch_metrics() -> None:
+    labels = (1, 0, 1, 0, 1)
+    probabilities = (0.0, 1.0, 0.5, 0.25, 0.9)
+    accumulator = ProbabilityMetricAccumulator()
+    for label, probability in zip(labels, probabilities, strict=True):
+        accumulator.update(label, probability)
+    metrics = accumulator.finalize()
+    assert metrics.log_loss == pytest.approx(log_loss(labels, probabilities))
+    assert metrics.brier_score == pytest.approx(brier_score(labels, probabilities))
+    assert metrics.expected_calibration_error == pytest.approx(
+        expected_calibration_error(labels, probabilities)
+    )
+    assert metrics.row_count == len(labels)
 
 
 def test_default_model_literals() -> None:

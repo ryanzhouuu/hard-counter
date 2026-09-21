@@ -11,6 +11,7 @@ from clash_sos.infrastructure.kaggle_v6.train_io import (
     aggregate_card_counts,
     aggregate_matchup_counts,
     iter_oriented_examples,
+    require_partition_rows,
 )
 
 KEEP_FP = next(
@@ -194,12 +195,37 @@ def test_train_io_rejects_empty_partition(tmp_path: Path) -> None:
     connection = connect(tmp_path)
     try:
         with pytest.raises(KaggleV6TrainError, match="empty"):
-            aggregate_card_counts(
+            require_partition_rows(
                 connection,
                 canonical_path=canonical,
                 split_path=split,
+                split="temporal",
                 partition="train",
                 seed=0,
+                expected_rows=1,
+            )
+    finally:
+        connection.close()
+
+
+def test_train_io_rejects_join_count_mismatch(tmp_path: Path) -> None:
+    canonical = tmp_path / "canonical.parquet"
+    split = tmp_path / "splits-temporal.parquet"
+    write_battle_parquet(
+        canonical,
+        (("fp-keep", "a.parquet", 0, "train", WIN_IDS, LOSE_IDS, "win-hash", "lose-hash"),),
+    )
+    connection = connect(tmp_path)
+    try:
+        with pytest.raises(KaggleV6TrainError, match="join count 1 != 2"):
+            require_partition_rows(
+                connection,
+                canonical_path=canonical,
+                split_path=split,
+                split="temporal",
+                partition="train",
+                seed=0,
+                expected_rows=2,
             )
     finally:
         connection.close()
