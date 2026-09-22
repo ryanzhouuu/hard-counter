@@ -2,8 +2,15 @@ from collections.abc import Sequence
 
 import pytest
 
-from clash_sos.domain.card_attributes import SUMMARY_COLUMNS, CardAttribute, CardAttributeTable
+from clash_sos.domain.card_attributes import (
+    CARD_ATTRIBUTES,
+    SUMMARY_COLUMNS,
+    CardAttribute,
+    CardAttributeTable,
+)
+from clash_sos.domain.matchup_clusters import ClusterMatchupTable
 from clash_sos.domain.matchup_lgbm import (
+    LIGHTGBM_CLUSTER_SCHEMA_VERSION,
     PresenceRow,
     PresenceSchema,
     lightgbm_training_params,
@@ -13,6 +20,7 @@ from clash_sos.domain.matchup_lgbm import (
     watch_row_count,
 )
 from clash_sos.domain.player_skill import PlayerSkillTracker
+from clash_sos.infrastructure.kaggle_v6.catalog import KAGGLE_V6_CARDS
 
 IDENTITIES = ("archers:base", "knight:base")
 
@@ -128,3 +136,68 @@ def test_summary_schema_rejects_an_unattributed_identity() -> None:
 def test_training_params_leave_summary_columns_unconstrained() -> None:
     params = lightgbm_training_params(identity_count=176, summary_count=7)
     assert params["monotone_constraints"] == [0] * 366 + [1]
+
+
+def _two_cluster_table() -> ClusterMatchupTable:
+    return ClusterMatchupTable.from_payload(
+        {
+            "alpha": 1.0,
+            "batch_size": 8,
+            "centroids": [[0.0, 1.0], [1.0, 0.0]],
+            "cluster_count": 2,
+            "max_iter": 10,
+            "n_init": 1,
+            "seed": 0,
+            "wins": [[0, 3], [1, 0]],
+        },
+        ("fireball:base", "knight:base"),
+    )
+
+
+def test_cluster_column_sits_between_summaries_and_skill() -> None:
+    table = _two_cluster_table()
+    schema = PresenceSchema(("fireball:base", "knight:base"), TINY_ATTRIBUTES, table)
+    assert schema.cluster_column == schema.summary_column + 2 * len(SUMMARY_COLUMNS)
+    assert schema.skill_column == schema.cluster_column + 1
+    forward = schema.row(("knight:base",), ("fireball:base",), skill_diff=1.5)
+    backward = schema.row(("fireball:base",), ("knight:base",), skill_diff=1.5)
+    assert forward.indices[-2] == schema.cluster_column
+    assert forward.indices[-1] == schema.skill_column
+    assert forward.values[-1] == 1.5
+    assert forward.values[-2] == pytest.approx(-backward.values[-2])
+    assert forward.values[-2] != 0.0
+    equal = schema.row(("knight:base",), ("knight:base",), skill_diff=0.0)
+    assert equal.values[-2] == 0.0
+
+
+def test_cluster_schema_requires_attributes() -> None:
+    with pytest.raises(ValueError, match="cluster matchup requires deck summaries"):
+        PresenceSchema(("knight:base",), clusters=_two_cluster_table())
+
+
+def test_catalog_cluster_layout_puts_skill_at_367() -> None:
+    identities = tuple(sorted(entry.card.identity_key for entry in KAGGLE_V6_CARDS.entries))
+    zeros = [[0.0] * len(identities), [0.0] * len(identities)]
+    table = ClusterMatchupTable.from_payload(
+        {
+            "alpha": 1.0,
+            "batch_size": 4096,
+            "centroids": zeros,
+            "cluster_count": 2,
+            "max_iter": 100,
+            "n_init": 1,
+            "seed": 0,
+            "wins": [[0, 0], [0, 0]],
+        },
+        identities,
+    )
+    schema = PresenceSchema(identities, CARD_ATTRIBUTES, table)
+    assert LIGHTGBM_CLUSTER_SCHEMA_VERSION == "lightgbm-cluster-matchup:v1"
+    assert schema.cluster_column == 366
+    assert schema.skill_column == 367
+    assert schema.feature_count == 368
+
+
+def test_training_params_leave_the_matchup_column_unconstrained() -> None:
+    params = lightgbm_training_params(identity_count=176, summary_count=7, cluster_column=True)
+    assert params["monotone_constraints"] == [0] * 367 + [1]

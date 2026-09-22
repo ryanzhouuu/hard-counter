@@ -1,21 +1,28 @@
 """Card-presence features for a side-symmetric LightGBM matchup probability.
 
 Each deck keeps its own presence bits so a card played on both sides stays visible.
-An attached attribute table adds seven deck summaries per side. The skill column
-is a training control. Published probabilities set it to zero and average the two
-orientations, so swapping decks inverts the probability.
+An attached attribute table adds seven deck summaries per side. A cluster table
+adds one matchup log-odds between those summaries and the skill column. The skill
+column is a training control. Published probabilities set it to zero and average
+the two orientations, so swapping decks inverts the probability.
 """
 
 from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass
 
 from clash_sos.domain.card_attributes import SUMMARY_COLUMNS, CardAttributeTable
+from clash_sos.domain.matchup_clusters import ClusterMatchupTable
 from clash_sos.domain.player_skill import PlayerSkillTracker
 
 LIGHTGBM_PRESENCE_SCHEMA_VERSION = "lightgbm-presence:v1"
 LIGHTGBM_FEATURE_SCHEMA_VERSION = "lightgbm-summaries:v1"
+LIGHTGBM_CLUSTER_SCHEMA_VERSION = "lightgbm-cluster-matchup:v1"
 LIGHTGBM_SCHEMA_VERSIONS = frozenset(
-    {LIGHTGBM_PRESENCE_SCHEMA_VERSION, LIGHTGBM_FEATURE_SCHEMA_VERSION}
+    {
+        LIGHTGBM_PRESENCE_SCHEMA_VERSION,
+        LIGHTGBM_FEATURE_SCHEMA_VERSION,
+        LIGHTGBM_CLUSTER_SCHEMA_VERSION,
+    }
 )
 DEFAULT_WATCH_FRACTION = 0.1
 DEFAULT_NUM_THREADS = 4
@@ -42,25 +49,34 @@ class PresenceRow:
 
 
 class PresenceSchema:
-    """Column layout: side A, side B, optional deck summaries, then skill."""
+    """Column layout: side A, side B, optional summaries, optional matchup, then skill."""
 
     def __init__(
-        self, identities: Sequence[str], attributes: CardAttributeTable | None = None
+        self,
+        identities: Sequence[str],
+        attributes: CardAttributeTable | None = None,
+        clusters: ClusterMatchupTable | None = None,
     ) -> None:
         keys = tuple(identities)
         if not keys:
             raise ValueError("identities are required")
         if len(keys) != len(set(keys)):
             raise ValueError("identities must be unique")
+        if clusters is not None and attributes is None:
+            raise ValueError("cluster matchup requires deck summaries")
         if attributes is not None:
             for key in keys:
                 attributes.for_identity(key)
+        if clusters is not None and clusters.identities != keys:
+            raise ValueError("cluster identities must match the schema")
         self.identities = keys
         self.attributes = attributes
+        self.clusters = clusters
         self._index = {key: index for index, key in enumerate(keys)}
         self.summary_width = 0 if attributes is None else len(SUMMARY_COLUMNS)
         self.summary_column = len(keys) * 2
-        self.skill_column = self.summary_column + self.summary_width * 2
+        self.cluster_column = self.summary_column + self.summary_width * 2
+        self.skill_column = self.cluster_column + (1 if clusters is not None else 0)
         self.feature_count = self.skill_column + 1
 
     def row(
@@ -70,8 +86,8 @@ class PresenceSchema:
 
         Unknown identities and repeated cards on one side are omitted. When an
         attribute table is attached, each side also stores its seven summaries,
-        including zeros. The skill column is always stored, including when the
-        gap is zero.
+        including zeros. A cluster table stores the matchup log-odds, including
+        zero. The skill column is always stored, including when the gap is zero.
         """
         columns: list[tuple[int, float]] = []
         included_a = self._append_presence(side_a, columns, offset=0, seen=set())
@@ -79,6 +95,8 @@ class PresenceSchema:
         if self.attributes is not None:
             self._append_summaries(columns, self.summary_column, included_a)
             self._append_summaries(columns, self.summary_column + self.summary_width, included_b)
+        if self.clusters is not None:
+            columns.append((self.cluster_column, self.clusters.log_odds(included_a, included_b)))
         columns.append((self.skill_column, float(skill_diff)))
         columns.sort()
         return PresenceRow(
@@ -187,22 +205,27 @@ def watch_row_count(row_count: int, fraction: float = DEFAULT_WATCH_FRACTION) ->
     return watch
 
 
-def monotone_constraints(identity_count: int, summary_count: int = 0) -> list[int]:
-    """Return LightGBM constraints. Card and summary columns are free.
+def monotone_constraints(
+    identity_count: int, summary_count: int = 0, *, cluster_column: bool = False
+) -> list[int]:
+    """Return LightGBM constraints. The skill gap is the last column.
 
-    The skill gap is the last column and is nondecreasing.
+    Card, summary, and cluster-matchup columns are free. The skill gap is
+    nondecreasing.
     """
     if identity_count < 1:
         raise ValueError("identity count must be positive")
     if summary_count < 0:
         raise ValueError("summary count must be non-negative")
-    return [0] * (identity_count * 2 + summary_count * 2) + [1]
+    matchup = 1 if cluster_column else 0
+    return [0] * (identity_count * 2 + summary_count * 2 + matchup) + [1]
 
 
 def lightgbm_training_params(
     *,
     identity_count: int,
     summary_count: int = 0,
+    cluster_column: bool = False,
     learning_rate: float = DEFAULT_LEARNING_RATE,
     num_leaves: int = DEFAULT_NUM_LEAVES,
     min_data_in_leaf: int = DEFAULT_MIN_DATA_IN_LEAF,
@@ -241,7 +264,9 @@ def lightgbm_training_params(
         "learning_rate": learning_rate,
         "metric": "binary_logloss",
         "min_data_in_leaf": min_data_in_leaf,
-        "monotone_constraints": monotone_constraints(identity_count, summary_count),
+        "monotone_constraints": monotone_constraints(
+            identity_count, summary_count, cluster_column=cluster_column
+        ),
         "num_leaves": num_leaves,
         "num_threads": num_threads,
         "objective": "binary",
