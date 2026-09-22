@@ -26,6 +26,16 @@ docker compose up -d postgres
 
 The PostgreSQL service is available at `localhost:5432`. The example environment file contains the matching local database URL.
 
+For neural-model development, install the optional ML dependencies as well:
+
+```bash
+uv sync --locked --dev --extra ml
+```
+
+Linux installs the CPU-only PyTorch build used by CI. macOS installs the standard
+build with MPS support when the host makes it available. The default setup remains
+torch-free so the API, CLI, and existing predictors do not require PyTorch.
+
 ## Run locally
 
 Use separate terminals for the API and web application:
@@ -100,8 +110,8 @@ Run the same checks used by GitHub Actions:
 ```bash
 uv run ruff check .
 uv run ruff format --check .
-uv run pyright
-uv run pytest
+uv run --extra ml pyright
+uv run --extra ml pytest
 pnpm web:lint
 pnpm web:format:check
 pnpm web:typecheck

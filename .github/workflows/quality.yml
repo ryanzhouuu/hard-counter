@@ -22,15 +22,15 @@ jobs:
       - name: Set up Python
         run: uv python install 3.12
       - name: Install Python dependencies
-        run: uv sync --locked --dev
+        run: uv sync --locked --dev --extra ml
       - name: Run Ruff lint
-        run: uv run ruff check .
+        run: uv run --extra ml ruff check .
       - name: Check Ruff formatting
-        run: uv run ruff format --check .
+        run: uv run --extra ml ruff format --check .
       - name: Run Pyright
-        run: uv run pyright
+        run: uv run --extra ml pyright
       - name: Run pytest
-        run: uv run pytest
+        run: uv run --extra ml pytest
 
   frontend:
     name: Frontend quality
