@@ -9,8 +9,8 @@ from pathlib import Path
 from shutil import rmtree
 
 from clash_sos.application.dataset_staging import StagingConfig
+from clash_sos.application.model_errors import KaggleV6ModelTrainError
 from clash_sos.application.model_train import (
-    KaggleV6ModelTrainError,
     SplitName,
     finalize_model_artifact,
     partition_row_count,

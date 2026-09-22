@@ -4,17 +4,17 @@ Fits only the temporal train partition. Evaluation scores temporal and
 player-disjoint partitions. Destination versions are never overwritten.
 """
 
-from collections.abc import Callable, Iterator, Mapping, Sequence
+from collections.abc import Callable, Iterator, Mapping
 from dataclasses import dataclass
-from json import loads
 from pathlib import Path
 from shutil import rmtree
-from typing import Literal, cast
+from typing import Literal
 
 from pydantic import ValidationError
 
 from clash_sos.application.dataset_staging import StagingConfig
-from clash_sos.domain.analytics import MatchupPrediction, PredictionProvenance, PredictionState
+from clash_sos.application.model_errors import KaggleV6ModelTrainError as KaggleV6ModelTrainError
+from clash_sos.application.model_predict import predict_matchup as predict_matchup
 from clash_sos.domain.canonical_dataset import canonical_json_bytes
 from clash_sos.domain.matchup_baseline import (
     DEFAULT_MIRROR_SEED,
@@ -23,8 +23,7 @@ from clash_sos.domain.matchup_baseline import (
     exact_matchup_probability,
     predict_card_log_odds,
 )
-from clash_sos.domain.matchup_lgbm import LIGHTGBM_SCHEMA_VERSIONS
-from clash_sos.domain.matchup_pair import PAIR_FEATURE_SCHEMA_VERSION, CardPairPredictor
+from clash_sos.domain.matchup_pair import CardPairPredictor
 from clash_sos.domain.model_artifact import (
     DEFAULT_MODEL_VERSION,
     EVALUATION_PARTITIONS,
@@ -58,11 +57,6 @@ from clash_sos.infrastructure.kaggle_v6.train_io import (
     iter_oriented_examples,
     require_partition_rows,
 )
-
-
-class KaggleV6ModelTrainError(ValueError):
-    pass
-
 
 FileKind = Literal["card_catalog", "evaluation", "feature_schema", "predictor"]
 SplitName = Literal["temporal", "player_disjoint"]
@@ -260,71 +254,6 @@ def load_processed_dataset(dataset: Path) -> ProcessedDatasetManifest:
         )
     except ValidationError as error:
         raise KaggleV6ModelTrainError("processed manifest is invalid") from error
-
-
-def _json_object(path: Path) -> dict[str, object]:
-    """Load a predictor JSON object. Raises KaggleV6ModelTrainError when malformed."""
-    payload = loads(path.read_text(encoding="utf-8"))
-    if not isinstance(payload, dict):
-        raise KaggleV6ModelTrainError("model artifact is invalid")
-    return cast(dict[str, object], payload)
-
-
-def predict_matchup(
-    artifact: Path, side_a: Sequence[str], side_b: Sequence[str]
-) -> MatchupPrediction:
-    """Load a published artifact and predict P(side A wins) from identity keys."""
-    manifest_path = artifact / "manifest.json"
-    schema_path = artifact / "feature-schema.json"
-    if not manifest_path.is_file() or not schema_path.is_file():
-        raise KaggleV6ModelTrainError("model artifact is incomplete")
-    manifest = ModelArtifactManifest.model_validate_json(manifest_path.read_text(encoding="utf-8"))
-    schema_payload = loads(schema_path.read_text(encoding="utf-8"))
-    if not isinstance(schema_payload, dict):
-        raise KaggleV6ModelTrainError("model artifact is invalid")
-    schema = cast(dict[str, object], schema_payload)
-    predictor_path = artifact / next(
-        file.path for file in manifest.files if file.kind == "predictor"
-    )
-    if not predictor_path.is_file():
-        raise KaggleV6ModelTrainError("model artifact is incomplete")
-    if schema.get("feature_schema_version") in LIGHTGBM_SCHEMA_VERSIONS:
-        from clash_sos.application.model_train_lgbm import predict_lightgbm_artifact
-
-        try:
-            probability = predict_lightgbm_artifact(predictor_path, schema, side_a, side_b)
-        except ValueError as error:
-            raise KaggleV6ModelTrainError(str(error)) from error
-    elif schema.get("feature_schema_version") == PAIR_FEATURE_SCHEMA_VERSION:
-        predictor_body = _json_object(predictor_path)
-        try:
-            pair_model = CardPairPredictor.from_payload(predictor_body)
-        except ValueError as error:
-            raise KaggleV6ModelTrainError(str(error)) from error
-        probability = pair_model.predict(side_a, side_b)
-    else:
-        predictor_body = _json_object(predictor_path)
-        raw_effects = predictor_body.get("effects")
-        if not isinstance(raw_effects, dict):
-            raise KaggleV6ModelTrainError("predictor effects must be an object")
-        effects: dict[str, float] = {}
-        for key, value in cast(dict[object, object], raw_effects).items():
-            if not isinstance(key, str) or isinstance(value, bool):
-                raise KaggleV6ModelTrainError("predictor effects must map identities to numbers")
-            if not isinstance(value, int | float):
-                raise KaggleV6ModelTrainError("predictor effects must map identities to numbers")
-            effects[key] = float(value)
-        probability = predict_card_log_odds(side_a, side_b, effects)
-    return MatchupPrediction(
-        state=PredictionState.AVAILABLE,
-        side_a_win_probability=probability,
-        provenance=PredictionProvenance(
-            model_version=manifest.model_version,
-            dataset_version=manifest.dataset_version,
-            card_catalog_version=manifest.catalog_version,
-            balance_era_id=manifest.balance_era_id,
-        ),
-    )
 
 
 def train_matchup_baseline(

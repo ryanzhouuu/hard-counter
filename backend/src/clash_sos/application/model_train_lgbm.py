@@ -14,8 +14,8 @@ import numpy as np
 from scipy.sparse import csr_matrix
 
 from clash_sos.application.dataset_staging import StagingConfig
+from clash_sos.application.model_errors import KaggleV6ModelTrainError
 from clash_sos.application.model_train import (
-    KaggleV6ModelTrainError,
     SplitName,
     finalize_model_artifact,
     partition_row_count,
