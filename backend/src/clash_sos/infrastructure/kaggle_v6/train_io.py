@@ -6,6 +6,7 @@ with the same SHA-256 rule as `should_mirror_sides` so labels are not constantly
 
 from collections.abc import Iterator
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 from typing import cast
 
@@ -31,7 +32,29 @@ class OrientedExample:
     side_b_player_id: str = ""
 
 
-_ORIENTED_SQL = """
+@dataclass(frozen=True)
+class OrientedCacheRow:
+    """Keep canonical identity and validated levels beside the legacy orientation."""
+
+    timestamp: datetime
+    fingerprint: str
+    archive_member: str
+    row_number: int
+    example: OrientedExample
+    side_a_levels: tuple[int, ...]
+    side_b_levels: tuple[int, ...]
+
+
+def _oriented_sql(*, include_levels: bool) -> str:
+    """Keep one mirror rule while legacy fixtures retain their narrow projection."""
+    joined_levels = "c.side_a_card_levels, c.side_b_card_levels," if include_levels else ""
+    oriented_levels = (
+        "CASE WHEN mirrored THEN side_b_card_levels ELSE side_a_card_levels END AS side_a_levels,"
+        "CASE WHEN mirrored THEN side_a_card_levels ELSE side_b_card_levels END AS side_b_levels,"
+        if include_levels
+        else ""
+    )
+    return f"""
 WITH joined AS (
     SELECT
         c.timestamp,
@@ -44,6 +67,7 @@ WITH joined AS (
         c.side_a_card_forms,
         c.side_b_card_ids,
         c.side_b_card_forms,
+        {joined_levels}
         c.side_a_deck_hash,
         c.side_b_deck_hash,
         (
@@ -83,11 +107,16 @@ oriented AS (
             ),
             x -> x[1] || ':' || x[2]
         ) AS side_b_keys,
+        {oriented_levels}
         CASE WHEN mirrored THEN side_b_deck_hash ELSE side_a_deck_hash END AS deck_a_hash,
         CASE WHEN mirrored THEN side_a_deck_hash ELSE side_b_deck_hash END AS deck_b_hash
     FROM joined
 )
 """
+
+
+_ORIENTED_SQL = _oriented_sql(include_levels=False)
+_CACHE_ORIENTED_SQL = _oriented_sql(include_levels=True)
 
 
 def _as_int(value: object) -> int:
@@ -108,6 +137,13 @@ def _as_keys(value: object) -> tuple[str, ...]:
     if not isinstance(value, list):
         raise KaggleV6TrainError("card identities must be a list")
     return tuple(_as_str(item) for item in cast(list[object], value))
+
+
+def _as_levels(value: object) -> tuple[int, ...]:
+    """Reject malformed level lists before the attention encoder sees them."""
+    if not isinstance(value, list):
+        raise KaggleV6TrainError("card levels must be a list")
+    return tuple(_as_int(item) for item in cast(list[object], value))
 
 
 def _require_paths(canonical_path: Path, split_path: Path) -> None:
@@ -244,4 +280,52 @@ def iter_oriented_examples(
                 deck_b_hash=_as_str(deck_b),
                 side_a_player_id=_as_str(player_a),
                 side_b_player_id=_as_str(player_b),
+            )
+
+
+def iter_oriented_cache_rows(
+    connection: duckdb.DuckDBPyConnection,
+    *,
+    canonical_path: Path,
+    split_path: Path,
+    partition: str,
+    seed: int,
+    batch_rows: int = 10_000,
+) -> Iterator[OrientedCacheRow]:
+    """Stream ordered cache rows using the same mirror projection as legacy readers."""
+    if batch_rows < 1:
+        raise KaggleV6TrainError("batch_rows must be positive")
+    _require_paths(canonical_path, split_path)
+    result = connection.execute(
+        f"""
+        {_CACHE_ORIENTED_SQL}
+        SELECT timestamp, fingerprint, archive_member, row_number, label,
+               side_a_keys, side_b_keys, side_a_levels, side_b_levels,
+               deck_a_hash, deck_b_hash, side_a_player_id, side_b_player_id
+        FROM oriented
+        ORDER BY timestamp, fingerprint, archive_member, row_number
+        """,
+        _oriented_params(canonical_path, split_path, partition=partition, seed=seed),
+    )
+    while batch := result.fetchmany(batch_rows):
+        for row in batch:
+            timestamp = python_cell(row[0])
+            if not isinstance(timestamp, datetime) or timestamp.tzinfo is None:
+                raise KaggleV6TrainError("cache row timestamp must be timezone-aware")
+            yield OrientedCacheRow(
+                timestamp=timestamp,
+                fingerprint=_as_str(row[1]),
+                archive_member=_as_str(row[2]),
+                row_number=_as_int(row[3]),
+                example=OrientedExample(
+                    label=_as_int(row[4]),
+                    side_a_keys=_as_keys(row[5]),
+                    side_b_keys=_as_keys(row[6]),
+                    deck_a_hash=_as_str(row[9]),
+                    deck_b_hash=_as_str(row[10]),
+                    side_a_player_id=_as_str(row[11]),
+                    side_b_player_id=_as_str(row[12]),
+                ),
+                side_a_levels=_as_levels(row[7]),
+                side_b_levels=_as_levels(row[8]),
             )

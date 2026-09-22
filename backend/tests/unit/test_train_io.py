@@ -10,6 +10,7 @@ from clash_sos.infrastructure.kaggle_v6.train_io import (
     KaggleV6TrainError,
     aggregate_card_counts,
     aggregate_matchup_counts,
+    iter_oriented_cache_rows,
     iter_oriented_examples,
     require_partition_rows,
 )
@@ -51,8 +52,10 @@ def write_battle_parquet(
                 partition VARCHAR,
                 side_a_card_ids VARCHAR[],
                 side_a_card_forms VARCHAR[],
+                side_a_card_levels UTINYINT[],
                 side_b_card_ids VARCHAR[],
                 side_b_card_forms VARCHAR[],
+                side_b_card_levels UTINYINT[],
                 side_a_deck_hash VARCHAR,
                 side_b_deck_hash VARCHAR,
                 side_a_player_id VARCHAR,
@@ -72,7 +75,7 @@ def write_battle_parquet(
         ) in enumerate(rows):
             connection.execute(
                 """
-                INSERT INTO battles VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO battles VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 [
                     STAMP if stamps is None else stamps[index],
@@ -82,8 +85,10 @@ def write_battle_parquet(
                     partition,
                     a_ids,
                     FORMS,
+                    [16] * 8,
                     b_ids,
                     FORMS,
+                    [16] * 8,
                     a_hash,
                     b_hash,
                     "#WINNER",
@@ -94,8 +99,9 @@ def write_battle_parquet(
             """
             COPY (
                 SELECT timestamp, fingerprint, archive_member, row_number,
-                       side_a_card_ids, side_a_card_forms, side_b_card_ids,
-                       side_b_card_forms, side_a_deck_hash, side_b_deck_hash,
+                       side_a_card_ids, side_a_card_forms, side_a_card_levels,
+                       side_b_card_ids, side_b_card_forms, side_b_card_levels,
+                       side_a_deck_hash, side_b_deck_hash,
                        side_a_player_id, side_b_player_id
                 FROM battles
             ) TO ? (FORMAT PARQUET)
@@ -153,6 +159,41 @@ def test_iter_oriented_examples_mirrors_winner_first_rows(tmp_path: Path) -> Non
     assert keep.deck_a_hash == "win-hash"
     assert swap.side_a_keys[0] == card_identity_key("archers", "base")
     assert swap.deck_a_hash == "lose-hash"
+
+
+def test_cache_projection_keeps_identity_levels_and_oriented_metadata(tmp_path: Path) -> None:
+    canonical = tmp_path / "canonical.parquet"
+    split = tmp_path / "splits-temporal.parquet"
+    write_battle_parquet(
+        canonical,
+        (
+            (KEEP_FP, "a.parquet", 0, "train", WIN_IDS, LOSE_IDS, "win-hash", "lose-hash"),
+            (SWAP_FP, "a.parquet", 1, "train", WIN_IDS, LOSE_IDS, "win-hash", "lose-hash"),
+        ),
+    )
+    connection = connect(tmp_path)
+    try:
+        rows = tuple(
+            iter_oriented_cache_rows(
+                connection,
+                canonical_path=canonical,
+                split_path=split,
+                partition="train",
+                seed=0,
+                batch_rows=1,
+            )
+        )
+    finally:
+        connection.close()
+    assert [(row.fingerprint, row.row_number) for row in rows] == [(KEEP_FP, 0), (SWAP_FP, 1)]
+    assert all(row.timestamp == STAMP for row in rows)
+    assert all(row.side_a_levels == (16,) * 8 for row in rows)
+    assert all(row.side_b_levels == (16,) * 8 for row in rows)
+    assert rows[0].example.label == 1
+    assert rows[0].example.side_a_player_id == "#WINNER"
+    assert rows[1].example.label == 0
+    assert rows[1].example.side_a_player_id == "#LOSER"
+    assert rows[1].example.deck_a_hash == "lose-hash"
 
 
 def test_aggregate_card_counts_credits_original_winners(tmp_path: Path) -> None:
