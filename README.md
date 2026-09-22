@@ -79,7 +79,8 @@ uv run clash-sos dataset verify-kaggle-v6
 ```
 
 Train a matchup model on the published processed dataset and write a versioned
-artifact. The default promoted model is the LightGBM card-presence booster.
+artifact. The default promoted model is the LightGBM booster with card presence
+and deck summaries.
 The command fits temporal train only, scores temporal and player-disjoint
 splits, and fails if the destination already exists:
 
@@ -87,7 +88,7 @@ splits, and fails if the destination already exists:
 uv run clash-sos model train
 ```
 
-The default artifact path is `models/kaggle-v6-ranked16-lightgbm-v1`.
+The default artifact path is `models/kaggle-v6-ranked16-lightgbm-v2`.
 `model train-lgbm` runs that same fit. Retrain a frozen baseline with
 `--promoted-model card_pair` or `--promoted-model card_log_odds` and a new
 `--destination`.

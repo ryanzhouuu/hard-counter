@@ -23,7 +23,7 @@ from clash_sos.domain.matchup_baseline import (
     exact_matchup_probability,
     predict_card_log_odds,
 )
-from clash_sos.domain.matchup_lgbm import LIGHTGBM_FEATURE_SCHEMA_VERSION
+from clash_sos.domain.matchup_lgbm import LIGHTGBM_SCHEMA_VERSIONS
 from clash_sos.domain.matchup_pair import PAIR_FEATURE_SCHEMA_VERSION, CardPairPredictor
 from clash_sos.domain.model_artifact import (
     DEFAULT_MODEL_VERSION,
@@ -288,7 +288,7 @@ def predict_matchup(
     )
     if not predictor_path.is_file():
         raise KaggleV6ModelTrainError("model artifact is incomplete")
-    if schema.get("feature_schema_version") == LIGHTGBM_FEATURE_SCHEMA_VERSION:
+    if schema.get("feature_schema_version") in LIGHTGBM_SCHEMA_VERSIONS:
         from clash_sos.application.model_train_lgbm import predict_lightgbm_artifact
 
         try:

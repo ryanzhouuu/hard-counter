@@ -1,4 +1,4 @@
-"""Train and publish a LightGBM card-presence matchup artifact.
+"""Train and publish a LightGBM deck-summary matchup artifact.
 
 Fits temporal train only. The latest slice of that partition chooses the round
 count, then the booster is refit on the full partition. Published probabilities
@@ -23,6 +23,7 @@ from clash_sos.application.model_train import (
     require_publish_paths,
     write_canonical_json,
 )
+from clash_sos.domain.card_attributes import CARD_ATTRIBUTES, SUMMARY_COLUMNS, CardAttributeTable
 from clash_sos.domain.matchup_baseline import (
     DEFAULT_MIRROR_SEED,
     DEFAULT_SMOOTHING_ALPHA,
@@ -45,6 +46,7 @@ from clash_sos.domain.matchup_lgbm import (
     DEFAULT_SEED,
     DEFAULT_WATCH_FRACTION,
     LIGHTGBM_FEATURE_SCHEMA_VERSION,
+    LIGHTGBM_PRESENCE_SCHEMA_VERSION,
     PresenceRow,
     PresenceSchema,
     lightgbm_training_params,
@@ -77,8 +79,16 @@ from clash_sos.infrastructure.kaggle_v6.train_io import (
 )
 
 PREDICTOR_NAME = "predictor.txt"
-PRESENCE_NONZEROS = CARDS_PER_SIDE * 2 + 1
 SCORE_BATCH_ROWS = 8192
+
+
+def _row_nonzero_budget(schema: PresenceSchema) -> int:
+    """Return the most values one legal row stores.
+
+    That is eight cards on each side, both summary blocks when the schema has
+    them, and the skill gap.
+    """
+    return CARDS_PER_SIDE * 2 + schema.summary_width * 2 + 1
 
 
 class _Booster(Protocol):
@@ -119,12 +129,14 @@ def stream_presence_matrix(
 ) -> tuple[csr_matrix, np.ndarray]:
     """Fill a CSR matrix in example order without retaining the example objects.
 
-    Each row stores at most eight cards per side plus the skill gap. The gap is
-    recorded before that battle updates the tracker.
+    Each row stores at most eight cards per side, the deck summaries when the
+    schema has them, and the skill gap. The gap is recorded before that battle
+    updates the tracker.
     """
     if row_count < 1:
         raise KaggleV6ModelTrainError("training rows are required")
-    capacity = row_count * PRESENCE_NONZEROS
+    budget = _row_nonzero_budget(schema)
+    capacity = row_count * budget
     indices = np.empty(capacity, dtype=np.int32)
     data = np.empty(capacity, dtype=np.float32)
     indptr = np.zeros(row_count + 1, dtype=np.int64)
@@ -143,7 +155,7 @@ def stream_presence_matrix(
             ),
         )
         width = len(row.indices)
-        if width > PRESENCE_NONZEROS or cursor + width > capacity:
+        if width > budget or cursor + width > capacity:
             raise KaggleV6ModelTrainError("training row exceeds the presence budget")
         indices[cursor : cursor + width] = row.indices
         data[cursor : cursor + width] = row.values
@@ -216,7 +228,7 @@ def predict_lightgbm_artifact(
     side_b: Sequence[str],
 ) -> float:
     """Load predictor.txt and return the equal-skill symmetrized probability."""
-    schema = PresenceSchema(_identity_list(schema_payload.get("identities")))
+    schema = _schema_from_payload(schema_payload)
     booster = _as_booster(_lightgbm().Booster(model_file=str(predictor_path)))  # type: ignore[attr-defined]
     return LightGBMPresencePredictor(schema, booster).predict(side_a, side_b)
 
@@ -232,6 +244,19 @@ def _identity_list(value: object) -> tuple[str, ...]:
     if not items:
         raise ValueError("feature schema identities are required")
     return tuple(items)
+
+
+def _schema_from_payload(schema_payload: Mapping[str, object]) -> PresenceSchema:
+    """Build the column layout stored in a presence or deck-summary artifact."""
+    identities = _identity_list(schema_payload.get("identities"))
+    version = schema_payload.get("feature_schema_version")
+    if version == LIGHTGBM_FEATURE_SCHEMA_VERSION:
+        return PresenceSchema(
+            identities, CardAttributeTable.from_payload(schema_payload.get("attributes"))
+        )
+    if version == LIGHTGBM_PRESENCE_SCHEMA_VERSION:
+        return PresenceSchema(identities)
+    raise ValueError("unsupported lightgbm feature schema")
 
 
 def _fit_booster(
@@ -362,7 +387,7 @@ def train_lightgbm_model(
     skill_alpha: float = DEFAULT_SKILL_ALPHA,
     progress: Callable[[str], None] | None = None,
 ) -> Path:
-    """Fit the presence booster, evaluate splits, and publish one artifact version.
+    """Fit the deck-summary booster, evaluate splits, and publish one artifact version.
 
     DuckDB stays on one thread. num_threads applies only to LightGBM. progress,
     when set, receives dataset counts, the chosen round count, and scoring lines.
@@ -377,11 +402,12 @@ def train_lightgbm_model(
     processed, canonical, temporal, player = processed_training_paths(dataset)
     train_rows = partition_row_count(processed.temporal_split, "train")
     identities = tuple(sorted(entry.card.identity_key for entry in KAGGLE_V6_CARDS.entries))
-    schema = PresenceSchema(identities)
+    schema = PresenceSchema(identities, CARD_ATTRIBUTES)
     try:
         watch_rows = watch_row_count(train_rows, watch_fraction)
         params = lightgbm_training_params(
             identity_count=len(identities),
+            summary_count=len(SUMMARY_COLUMNS),
             learning_rate=learning_rate,
             num_leaves=num_leaves,
             min_data_in_leaf=min_data_in_leaf,
@@ -514,6 +540,8 @@ def train_lightgbm_model(
                     "best_iteration": best_iteration,
                     "early_stopping_rounds": early_stopping_rounds,
                     "feature_fraction": feature_fraction,
+                    "attribute_version": CARD_ATTRIBUTES.version,
+                    "attributes": CARD_ATTRIBUTES.to_payload(),
                     "feature_schema_version": LIGHTGBM_FEATURE_SCHEMA_VERSION,
                     "identities": list(identities),
                     "lambda_l2": lambda_l2,

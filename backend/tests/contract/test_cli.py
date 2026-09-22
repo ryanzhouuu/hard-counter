@@ -314,7 +314,7 @@ def test_model_train_defaults_to_lightgbm(tmp_path: Path) -> None:
     assert result.exit_code == 0
     assert result.stdout == f"{destination}\n"
     train.assert_called_once()
-    assert train.call_args.kwargs["model_version"] == "kaggle-v6-ranked16-lightgbm-v1"
+    assert train.call_args.kwargs["model_version"] == "kaggle-v6-ranked16-lightgbm-v2"
     assert train.call_args.kwargs["num_threads"] == 4
     assert train.call_args.kwargs["config"] == StagingConfig(
         memory_limit="1GB", threads=1, chunk_size=8 * 1024 * 1024

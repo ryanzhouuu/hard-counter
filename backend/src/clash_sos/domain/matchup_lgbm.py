@@ -12,7 +12,11 @@ from dataclasses import dataclass
 from clash_sos.domain.card_attributes import SUMMARY_COLUMNS, CardAttributeTable
 from clash_sos.domain.player_skill import PlayerSkillTracker
 
-LIGHTGBM_FEATURE_SCHEMA_VERSION = "lightgbm-presence:v1"
+LIGHTGBM_PRESENCE_SCHEMA_VERSION = "lightgbm-presence:v1"
+LIGHTGBM_FEATURE_SCHEMA_VERSION = "lightgbm-summaries:v1"
+LIGHTGBM_SCHEMA_VERSIONS = frozenset(
+    {LIGHTGBM_PRESENCE_SCHEMA_VERSION, LIGHTGBM_FEATURE_SCHEMA_VERSION}
+)
 DEFAULT_WATCH_FRACTION = 0.1
 DEFAULT_NUM_THREADS = 4
 DEFAULT_MAX_ROUNDS = 500

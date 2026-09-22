@@ -150,6 +150,13 @@ def write_contrast_dataset(path: Path) -> Path:
     return path
 
 
+def test_presence_artifact_schema_still_loads() -> None:
+    schema = PresenceSchema(("archers:base", "knight:base"))
+    row = schema.row(("knight:base",), ("archers:base",), skill_diff=0.0)
+    assert schema.skill_column == 4
+    assert row.indices[-1] == 4
+
+
 def test_stream_presence_matrix_excludes_the_current_outcome() -> None:
     schema = PresenceSchema(("archers:base", "knight:base"))
     examples = (
@@ -200,15 +207,22 @@ def test_train_lightgbm_writes_reloadable_symmetric_artifact(tmp_path: Path) -> 
     manifest = ModelArtifactManifest.model_validate_json(
         (destination / "manifest.json").read_text(encoding="utf-8")
     )
-    assert manifest.model_version == "kaggle-v6-ranked16-lightgbm-v1"
+    assert manifest.model_version == "kaggle-v6-ranked16-lightgbm-v2"
     report = EvaluationReport.model_validate_json(
         (destination / "evaluation.json").read_text(encoding="utf-8")
     )
     assert report.promoted_model == "lightgbm"
     feature_schema = loads((destination / "feature-schema.json").read_text(encoding="utf-8"))
-    assert feature_schema["feature_schema_version"] == "lightgbm-presence:v1"
+    assert feature_schema["feature_schema_version"] == "lightgbm-summaries:v1"
     assert feature_schema["skill_control"] == "past_laplace"
-    assert feature_schema["skill_column"] == 352
+    assert feature_schema["skill_column"] == 366
+    assert feature_schema["attribute_version"] == "card-attributes:2026-06"
+    attributes = feature_schema["attributes"]
+    assert isinstance(attributes, dict)
+    cards = attributes["cards"]
+    assert isinstance(cards, dict)
+    assert cards["goblin-hut"]["elixir"] == 4
+    assert cards["mirror"]["elixir"] is None
     assert feature_schema["best_iteration"] >= 1
     assert feature_schema["watch_fraction"] == 0.1
     knight = tuple(card_identity_key(card, "base") for card in WIN_IDS)
