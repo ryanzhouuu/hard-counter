@@ -77,7 +77,7 @@ def test_accumulator_matches_batch_metrics() -> None:
 def test_default_model_literals() -> None:
     assert DEFAULT_MODEL_VERSION == "kaggle-v6-ranked16-card-logodds-v1"
     assert DEFAULT_PAIR_MODEL_VERSION == "kaggle-v6-ranked16-card-pair-v3"
-    assert DEFAULT_LIGHTGBM_MODEL_VERSION == "kaggle-v6-ranked16-lightgbm-v2"
+    assert DEFAULT_LIGHTGBM_MODEL_VERSION == "kaggle-v6-ranked16-lightgbm-v3"
     assert DEFAULT_SMOOTHING_ALPHA == 1.0
     assert DEFAULT_MIRROR_SEED == 0
 

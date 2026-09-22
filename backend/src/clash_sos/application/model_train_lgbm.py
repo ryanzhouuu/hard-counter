@@ -1,4 +1,4 @@
-"""Train and publish a LightGBM deck-summary matchup artifact.
+"""Train and publish a LightGBM cluster-matchup artifact.
 
 Fits temporal train only. The latest slice of that partition chooses the round
 count, then the booster is refit on the full partition. Published probabilities
@@ -31,6 +31,15 @@ from clash_sos.domain.matchup_baseline import (
     exact_matchup_probability,
     predict_card_log_odds,
 )
+from clash_sos.domain.matchup_clusters import (
+    CLUSTER_BATCH_SIZE,
+    CLUSTER_COUNT,
+    CLUSTER_MAX_ITER,
+    CLUSTER_N_INIT,
+    ClusterBattle,
+    ClusterMatchupTable,
+    fit_prefix_matchups,
+)
 from clash_sos.domain.matchup_lgbm import (
     CARDS_PER_SIDE,
     DEFAULT_BAGGING_FRACTION,
@@ -45,6 +54,7 @@ from clash_sos.domain.matchup_lgbm import (
     DEFAULT_NUM_THREADS,
     DEFAULT_SEED,
     DEFAULT_WATCH_FRACTION,
+    LIGHTGBM_CLUSTER_SCHEMA_VERSION,
     LIGHTGBM_FEATURE_SCHEMA_VERSION,
     LIGHTGBM_PRESENCE_SCHEMA_VERSION,
     PresenceRow,
@@ -86,9 +96,10 @@ def _row_nonzero_budget(schema: PresenceSchema) -> int:
     """Return the most values one legal row stores.
 
     That is eight cards on each side, both summary blocks when the schema has
-    them, and the skill gap.
+    them, the cluster matchup when the schema has it, and the skill gap.
     """
-    return CARDS_PER_SIDE * 2 + schema.summary_width * 2 + 1
+    matchup = 1 if schema.clusters is not None else 0
+    return CARDS_PER_SIDE * 2 + schema.summary_width * 2 + matchup + 1
 
 
 class _Booster(Protocol):
@@ -247,9 +258,15 @@ def _identity_list(value: object) -> tuple[str, ...]:
 
 
 def _schema_from_payload(schema_payload: Mapping[str, object]) -> PresenceSchema:
-    """Build the column layout stored in a presence or deck-summary artifact."""
+    """Build the column layout stored in a presence, summary, or cluster artifact."""
     identities = _identity_list(schema_payload.get("identities"))
     version = schema_payload.get("feature_schema_version")
+    if version == LIGHTGBM_CLUSTER_SCHEMA_VERSION:
+        return PresenceSchema(
+            identities,
+            CardAttributeTable.from_payload(schema_payload.get("attributes")),
+            ClusterMatchupTable.from_payload(schema_payload.get("clusters"), identities),
+        )
     if version == LIGHTGBM_FEATURE_SCHEMA_VERSION:
         return PresenceSchema(
             identities, CardAttributeTable.from_payload(schema_payload.get("attributes"))
@@ -385,9 +402,10 @@ def train_lightgbm_model(
     watch_fraction: float = DEFAULT_WATCH_FRACTION,
     seed: int = DEFAULT_SEED,
     skill_alpha: float = DEFAULT_SKILL_ALPHA,
+    cluster_count: int = CLUSTER_COUNT,
     progress: Callable[[str], None] | None = None,
 ) -> Path:
-    """Fit the deck-summary booster, evaluate splits, and publish one artifact version.
+    """Fit the cluster-matchup booster, evaluate splits, and publish one artifact version.
 
     DuckDB stays on one thread. num_threads applies only to LightGBM. progress,
     when set, receives dataset counts, the chosen round count, and scoring lines.
@@ -398,16 +416,18 @@ def train_lightgbm_model(
         raise KaggleV6ModelTrainError("max rounds must be positive")
     if early_stopping_rounds < 1:
         raise KaggleV6ModelTrainError("early stopping rounds must be positive")
+    if cluster_count < 1:
+        raise KaggleV6ModelTrainError("cluster count must be positive")
     require_publish_paths(destination, output_workspace)
     processed, canonical, temporal, player = processed_training_paths(dataset)
     train_rows = partition_row_count(processed.temporal_split, "train")
     identities = tuple(sorted(entry.card.identity_key for entry in KAGGLE_V6_CARDS.entries))
-    schema = PresenceSchema(identities, CARD_ATTRIBUTES)
     try:
         watch_rows = watch_row_count(train_rows, watch_fraction)
         params = lightgbm_training_params(
             identity_count=len(identities),
             summary_count=len(SUMMARY_COLUMNS),
+            cluster_column=True,
             learning_rate=learning_rate,
             num_leaves=num_leaves,
             min_data_in_leaf=min_data_in_leaf,
@@ -461,7 +481,42 @@ def train_lightgbm_model(
                 identity: card_log_odds(wins, trials, alpha=smoothing_alpha)
                 for identity, (wins, trials) in card_counts.items()
             }
+            prefix_rows = train_rows - watch_rows
+
+            def prefix_battles() -> Iterator[ClusterBattle]:
+                for example in iter_oriented_examples(
+                    connection,
+                    canonical_path=canonical,
+                    split_path=temporal,
+                    partition="train",
+                    seed=mirror_seed,
+                    order_by_time=True,
+                ):
+                    yield ClusterBattle(
+                        example.deck_a_hash,
+                        example.deck_b_hash,
+                        example.side_a_keys,
+                        example.side_b_keys,
+                        example.label,
+                    )
+
+            try:
+                clusters = fit_prefix_matchups(
+                    prefix_battles,
+                    prefix_rows=prefix_rows,
+                    identities=identities,
+                    cluster_count=cluster_count,
+                    alpha=smoothing_alpha,
+                    seed=seed,
+                    batch_size=CLUSTER_BATCH_SIZE,
+                    max_iter=CLUSTER_MAX_ITER,
+                    n_init=CLUSTER_N_INIT,
+                )
+            except ValueError as error:
+                raise KaggleV6ModelTrainError(str(error)) from error
+            schema = PresenceSchema(identities, CARD_ATTRIBUTES, clusters)
             if progress is not None:
+                progress(f"clusters k={cluster_count} prefix_rows={prefix_rows}")
                 progress(f"presence matrix {train_rows} rows")
             matrix, labels = stream_presence_matrix(
                 iter_oriented_examples(
@@ -542,7 +597,8 @@ def train_lightgbm_model(
                     "feature_fraction": feature_fraction,
                     "attribute_version": CARD_ATTRIBUTES.version,
                     "attributes": CARD_ATTRIBUTES.to_payload(),
-                    "feature_schema_version": LIGHTGBM_FEATURE_SCHEMA_VERSION,
+                    "clusters": clusters.to_payload(),
+                    "feature_schema_version": LIGHTGBM_CLUSTER_SCHEMA_VERSION,
                     "identities": list(identities),
                     "lambda_l2": lambda_l2,
                     "learning_rate": learning_rate,

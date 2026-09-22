@@ -180,7 +180,7 @@ def train(
 ) -> None:
     """Fit a matchup model, evaluate splits, and write one artifact version.
 
-    The default model is the LightGBM deck-summary booster. threads applies to that
+    The default model is the LightGBM cluster-matchup booster. threads applies to that
     booster, while DuckDB joins stay on one thread.
     """
     if promoted_model == "lightgbm":
@@ -241,7 +241,7 @@ def train_lgbm(
     mirror_seed: int = DEFAULT_MIRROR_SEED,
     model_version: str = DEFAULT_LIGHTGBM_MODEL_VERSION,
 ) -> None:
-    """Fit the LightGBM deck-summary model and write one artifact version.
+    """Fit the LightGBM cluster-matchup model and write one artifact version.
 
     threads applies to LightGBM. DuckDB joins stay on one thread. This command
     does not change the card-pair model published by model train.

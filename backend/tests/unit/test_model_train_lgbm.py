@@ -2,6 +2,7 @@ from datetime import UTC, datetime
 from json import loads
 from math import log
 from pathlib import Path
+from typing import cast
 
 import duckdb
 import pytest
@@ -150,6 +151,28 @@ def write_contrast_dataset(path: Path) -> Path:
     return path
 
 
+def test_summary_and_presence_payloads_keep_their_layouts() -> None:
+    from clash_sos.application import model_train_lgbm
+    from clash_sos.domain.card_attributes import CARD_ATTRIBUTES
+
+    schema_from_payload = model_train_lgbm._schema_from_payload  # type: ignore[reportPrivateUsage]
+    identities = ["archers:base", "knight:base"]
+    presence = schema_from_payload(
+        {"feature_schema_version": "lightgbm-presence:v1", "identities": identities}
+    )
+    summary = schema_from_payload(
+        {
+            "feature_schema_version": "lightgbm-summaries:v1",
+            "identities": identities,
+            "attributes": CARD_ATTRIBUTES.to_payload(),
+        }
+    )
+    assert presence.skill_column == 4
+    assert presence.clusters is None
+    assert summary.clusters is None
+    assert summary.skill_column == 4 + 14
+
+
 def test_presence_artifact_schema_still_loads() -> None:
     schema = PresenceSchema(("archers:base", "knight:base"))
     row = schema.row(("knight:base",), ("archers:base",), skill_diff=0.0)
@@ -200,6 +223,7 @@ def test_train_lightgbm_writes_reloadable_symmetric_artifact(tmp_path: Path) -> 
         num_threads=1,
         max_rounds=30,
         early_stopping_rounds=5,
+        cluster_count=2,
     )
     assert published == destination
     assert (destination / "predictor.txt").is_file()
@@ -207,20 +231,24 @@ def test_train_lightgbm_writes_reloadable_symmetric_artifact(tmp_path: Path) -> 
     manifest = ModelArtifactManifest.model_validate_json(
         (destination / "manifest.json").read_text(encoding="utf-8")
     )
-    assert manifest.model_version == "kaggle-v6-ranked16-lightgbm-v2"
+    assert manifest.model_version == "kaggle-v6-ranked16-lightgbm-v3"
     report = EvaluationReport.model_validate_json(
         (destination / "evaluation.json").read_text(encoding="utf-8")
     )
     assert report.promoted_model == "lightgbm"
     feature_schema = loads((destination / "feature-schema.json").read_text(encoding="utf-8"))
-    assert feature_schema["feature_schema_version"] == "lightgbm-summaries:v1"
+    assert feature_schema["feature_schema_version"] == "lightgbm-cluster-matchup:v1"
     assert feature_schema["skill_control"] == "past_laplace"
-    assert feature_schema["skill_column"] == 366
+    assert feature_schema["skill_column"] == 367
+    clusters = cast(dict[str, object], feature_schema["clusters"])
+    assert clusters["cluster_count"] == 2
+    assert clusters["seed"] == 0
+    win_rows = cast(list[list[int]], clusters["wins"])
+    assert sum(sum(row) for row in win_rows) == 6
     assert feature_schema["attribute_version"] == "card-attributes:2026-06"
     attributes = feature_schema["attributes"]
     assert isinstance(attributes, dict)
-    cards = attributes["cards"]
-    assert isinstance(cards, dict)
+    cards = cast(dict[str, dict[str, object]], feature_schema["attributes"]["cards"])
     assert cards["goblin-hut"]["elixir"] == 4
     assert cards["mirror"]["elixir"] is None
     assert feature_schema["best_iteration"] >= 1
