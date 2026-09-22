@@ -23,6 +23,7 @@ dependencies = [
 [project.optional-dependencies]
 ml = [
   "lightgbm>=4.6,<5",
+  "numpy>=2,<3",
   "scikit-learn>=1.7,<2",
   "torch>=2.13,<2.14",
 ]

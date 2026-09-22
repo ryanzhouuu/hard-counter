@@ -25,8 +25,17 @@ from clash_sos.domain.processed_manifest import (
 from clash_sos.infrastructure.kaggle_v6.audit_io import hash_file
 from clash_sos.infrastructure.kaggle_v6.catalog import KAGGLE_V6_CARDS
 
-WIN = ("knight", "mini-pekka", "musketeer", "valkyrie", "hog", "fireball", "log", "cannon")
-LOSE = ("archers", "goblins", "bomber", "skeletons", "tombstone", "zap", "arrows", "tesla")
+WIN = ("knight", "archers", "goblins", "giant", "pekka", "minions", "balloon", "witch")
+LOSE = (
+    "barbarians",
+    "golem",
+    "skeletons",
+    "valkyrie",
+    "skeleton-army",
+    "bomber",
+    "musketeer",
+    "baby-dragon",
+)
 FORMS = ("base",) * 8
 LEVELS = (16,) * 8
 
