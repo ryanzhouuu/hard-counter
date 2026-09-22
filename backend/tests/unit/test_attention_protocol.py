@@ -95,6 +95,13 @@ def test_player_protocol_allows_time_overlap_across_disjoint_partitions() -> Non
             },
             "calibration must precede",
         ),
+        (
+            {
+                "calibration": slice_at("validation", 10, 12, 2),
+                "development": slice_at("validation", 12, 15, 6),
+            },
+            "temporal calibration must follow refit",
+        ),
     ],
 )
 def test_protocol_rejects_invalid_boundaries_and_roles(

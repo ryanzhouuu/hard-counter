@@ -111,8 +111,8 @@ class AttentionProtocol(ManifestModel):
                 raise ValueError("calibration and development must share a partition")
             if self.calibration.end > self.development.start:
                 raise ValueError("calibration must precede development")
-            if self.calibration.partition == "train" and self.calibration.start < refit.end:
-                raise ValueError("calibration cannot overlap refit")
+            if self.family == "temporal" and self.calibration.start < refit.end:
+                raise ValueError("temporal calibration must follow refit")
         if self.reporting is not None:
             if self.reporting.partition != "test":
                 raise ValueError("reporting must use the test partition")
