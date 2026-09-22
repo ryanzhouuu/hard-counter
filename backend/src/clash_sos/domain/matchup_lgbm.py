@@ -1,13 +1,15 @@
 """Card-presence features for a side-symmetric LightGBM matchup probability.
 
 Each deck keeps its own presence bits so a card played on both sides stays visible.
-The skill column is a training control. Published probabilities set it to zero and
-average the two orientations, so swapping decks inverts the probability.
+An attached attribute table adds seven deck summaries per side. The skill column
+is a training control. Published probabilities set it to zero and average the two
+orientations, so swapping decks inverts the probability.
 """
 
 from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass
 
+from clash_sos.domain.card_attributes import SUMMARY_COLUMNS, CardAttributeTable
 from clash_sos.domain.player_skill import PlayerSkillTracker
 
 LIGHTGBM_FEATURE_SCHEMA_VERSION = "lightgbm-presence:v1"
@@ -36,17 +38,25 @@ class PresenceRow:
 
 
 class PresenceSchema:
-    """Column layout for one identity catalog: side A, side B, then skill."""
+    """Column layout: side A, side B, optional deck summaries, then skill."""
 
-    def __init__(self, identities: Sequence[str]) -> None:
+    def __init__(
+        self, identities: Sequence[str], attributes: CardAttributeTable | None = None
+    ) -> None:
         keys = tuple(identities)
         if not keys:
             raise ValueError("identities are required")
         if len(keys) != len(set(keys)):
             raise ValueError("identities must be unique")
+        if attributes is not None:
+            for key in keys:
+                attributes.for_identity(key)
         self.identities = keys
+        self.attributes = attributes
         self._index = {key: index for index, key in enumerate(keys)}
-        self.skill_column = len(keys) * 2
+        self.summary_width = 0 if attributes is None else len(SUMMARY_COLUMNS)
+        self.summary_column = len(keys) * 2
+        self.skill_column = self.summary_column + self.summary_width * 2
         self.feature_count = self.skill_column + 1
 
     def row(
@@ -54,19 +64,35 @@ class PresenceSchema:
     ) -> PresenceRow:
         """Return presence bits for known identities plus the skill column.
 
-        Unknown identities and repeated cards on one side are omitted. The skill
-        column is always stored, including when the gap is zero.
+        Unknown identities and repeated cards on one side are omitted. When an
+        attribute table is attached, each side also stores its seven summaries,
+        including zeros. The skill column is always stored, including when the
+        gap is zero.
         """
         columns: list[tuple[int, float]] = []
-        seen: set[int] = set()
-        for key in side_a:
-            index = self._index.get(key)
-            if index is None or index in seen:
-                continue
-            seen.add(index)
-            columns.append((index, 1.0))
-        offset = len(self.identities)
-        for key in side_b:
+        included_a = self._append_presence(side_a, columns, offset=0, seen=set())
+        included_b = self._append_presence(side_b, columns, offset=len(self.identities), seen=set())
+        if self.attributes is not None:
+            self._append_summaries(columns, self.summary_column, included_a)
+            self._append_summaries(columns, self.summary_column + self.summary_width, included_b)
+        columns.append((self.skill_column, float(skill_diff)))
+        columns.sort()
+        return PresenceRow(
+            indices=tuple(column for column, _value in columns),
+            values=tuple(value for _column, value in columns),
+        )
+
+    def _append_presence(
+        self,
+        identities: Sequence[str],
+        columns: list[tuple[int, float]],
+        *,
+        offset: int,
+        seen: set[int],
+    ) -> tuple[str, ...]:
+        """Add presence bits and return the identities that were stored."""
+        included: list[str] = []
+        for key in identities:
             index = self._index.get(key)
             if index is None:
                 continue
@@ -74,13 +100,18 @@ class PresenceSchema:
             if column in seen:
                 continue
             seen.add(column)
+            included.append(key)
             columns.append((column, 1.0))
-        columns.append((self.skill_column, float(skill_diff)))
-        columns.sort()
-        return PresenceRow(
-            indices=tuple(column for column, _value in columns),
-            values=tuple(value for _column, value in columns),
-        )
+        return tuple(included)
+
+    def _append_summaries(
+        self, columns: list[tuple[int, float]], start: int, identities: Sequence[str]
+    ) -> None:
+        """Store one summary block, including explicit zeros."""
+        if self.attributes is None:
+            return
+        for slot, value in enumerate(self.attributes.summaries(identities)):
+            columns.append((start + slot, value))
 
 
 def symmetrized_probability(probability_ab: float, probability_ba: float) -> float:
@@ -152,16 +183,22 @@ def watch_row_count(row_count: int, fraction: float = DEFAULT_WATCH_FRACTION) ->
     return watch
 
 
-def monotone_constraints(identity_count: int) -> list[int]:
-    """Return LightGBM constraints: card bits are free and the skill gap is nondecreasing."""
+def monotone_constraints(identity_count: int, summary_count: int = 0) -> list[int]:
+    """Return LightGBM constraints. Card and summary columns are free.
+
+    The skill gap is the last column and is nondecreasing.
+    """
     if identity_count < 1:
         raise ValueError("identity count must be positive")
-    return [0] * (identity_count * 2) + [1]
+    if summary_count < 0:
+        raise ValueError("summary count must be non-negative")
+    return [0] * (identity_count * 2 + summary_count * 2) + [1]
 
 
 def lightgbm_training_params(
     *,
     identity_count: int,
+    summary_count: int = 0,
     learning_rate: float = DEFAULT_LEARNING_RATE,
     num_leaves: int = DEFAULT_NUM_LEAVES,
     min_data_in_leaf: int = DEFAULT_MIN_DATA_IN_LEAF,
@@ -200,7 +237,7 @@ def lightgbm_training_params(
         "learning_rate": learning_rate,
         "metric": "binary_logloss",
         "min_data_in_leaf": min_data_in_leaf,
-        "monotone_constraints": monotone_constraints(identity_count),
+        "monotone_constraints": monotone_constraints(identity_count, summary_count),
         "num_leaves": num_leaves,
         "num_threads": num_threads,
         "objective": "binary",

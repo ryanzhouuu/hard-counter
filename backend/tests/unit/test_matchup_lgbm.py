@@ -2,6 +2,7 @@ from collections.abc import Sequence
 
 import pytest
 
+from clash_sos.domain.card_attributes import SUMMARY_COLUMNS, CardAttribute, CardAttributeTable
 from clash_sos.domain.matchup_lgbm import (
     PresenceRow,
     PresenceSchema,
@@ -91,3 +92,39 @@ def test_training_params_constrain_only_the_skill_column() -> None:
     assert params["num_threads"] == 4
     assert isinstance(constraints, list)
     assert constraints == [0] * 352 + [1]
+
+
+TINY_ATTRIBUTES = CardAttributeTable(
+    "card-attributes:2026-06",
+    {
+        "fireball": CardAttribute(4, frozenset({"spell", "air_defense"})),
+        "knight": CardAttribute(3, frozenset()),
+        "mirror": CardAttribute(None, frozenset({"spell"})),
+    },
+)
+
+
+def test_summary_blocks_follow_presence_and_swap_with_the_decks() -> None:
+    schema = PresenceSchema(("fireball:base", "knight:base"), TINY_ATTRIBUTES)
+    assert schema.summary_column == 4
+    assert schema.skill_column == 4 + 2 * len(SUMMARY_COLUMNS)
+    assert schema.feature_count == schema.skill_column + 1
+    forward = schema.row(("knight:base",), ("fireball:base",), skill_diff=0.0)
+    backward = schema.row(("fireball:base",), ("knight:base",), skill_diff=0.0)
+    assert forward.values[-1] == 0.0
+    knight_block = (3.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
+    fireball_block = (4.0, 0.0, 0.0, 1.0, 0.0, 1.0, 0.0)
+    assert forward.values[2:9] == knight_block
+    assert forward.values[9:16] == fireball_block
+    assert backward.values[2:9] == fireball_block
+    assert backward.values[9:16] == knight_block
+
+
+def test_summary_schema_rejects_an_unattributed_identity() -> None:
+    with pytest.raises(ValueError, match="missing card attributes"):
+        PresenceSchema(("knight:base", "archers:base"), TINY_ATTRIBUTES)
+
+
+def test_training_params_leave_summary_columns_unconstrained() -> None:
+    params = lightgbm_training_params(identity_count=176, summary_count=7)
+    assert params["monotone_constraints"] == [0] * 366 + [1]
