@@ -21,21 +21,37 @@ Partition = Literal["train", "validation", "test"]
 
 def digest_row_keys(rows: Iterable[RowKey]) -> str:
     """Hash sorted, unique canonical row keys as a canonical JSON array."""
-    digest = sha256()
-    digest.update(b"[")
-    previous: RowKey | None = None
+    digest = RowKeyDigest()
     for row in rows:
+        digest.update(row)
+    return digest.hexdigest()
+
+
+class RowKeyDigest:
+    """Incrementally hash sorted canonical identities without retaining the rows."""
+
+    def __init__(self) -> None:
+        self._digest = sha256()
+        self._digest.update(b"[")
+        self._previous: RowKey | None = None
+
+    def update(self, row: RowKey) -> None:
+        """Reject duplicate or out-of-order identities as the stream advances."""
         if row[0].tzinfo is None or row[0].utcoffset() is None:
             raise ValueError("row key timestamp must be timezone-aware")
         normalized = (row[0].astimezone(UTC), row[1], row[2], row[3])
-        if previous is not None and normalized <= previous:
+        if self._previous is not None and normalized <= self._previous:
             raise ValueError("row keys must be unique and sorted")
-        if previous is not None:
-            digest.update(b",")
-        digest.update(canonical_json_bytes(normalized))
-        previous = normalized
-    digest.update(b"]")
-    return digest.hexdigest()
+        if self._previous is not None:
+            self._digest.update(b",")
+        self._digest.update(canonical_json_bytes(normalized))
+        self._previous = normalized
+
+    def hexdigest(self) -> str:
+        """Finalize the JSON-array framing once after the last row."""
+        final = self._digest.copy()
+        final.update(b"]")
+        return final.hexdigest()
 
 
 class AttentionSlice(ManifestModel):

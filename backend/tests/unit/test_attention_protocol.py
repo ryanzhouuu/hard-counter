@@ -8,6 +8,7 @@ from pydantic import ValidationError
 from clash_sos.domain.attention_protocol import (
     AttentionProtocol,
     AttentionSlice,
+    RowKeyDigest,
     digest_row_keys,
     require_matching_fit,
 )
@@ -142,3 +143,15 @@ def test_row_digest_is_timezone_invariant_and_requires_sorted_unique_keys() -> N
         digest_row_keys((first, first))
     with pytest.raises(ValueError, match="timezone-aware"):
         digest_row_keys(((datetime(2026, 6, 12), "a", "file.parquet", 1),))
+
+
+def test_incremental_row_digest_matches_iterable_and_rejects_duplicates() -> None:
+    rows = ((day(12), "a", "file.parquet", 1), (day(13), "b", "file.parquet", 2))
+    digest = RowKeyDigest()
+    digest.update(rows[0])
+    first = digest.hexdigest()
+    digest.update(rows[1])
+    assert digest.hexdigest() == digest_row_keys(rows)
+    assert digest.hexdigest() != first
+    with pytest.raises(ValueError, match="unique and sorted"):
+        digest.update(rows[1])
