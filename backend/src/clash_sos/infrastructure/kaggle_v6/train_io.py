@@ -45,7 +45,7 @@ class OrientedCacheRow:
     side_b_levels: tuple[int, ...]
 
 
-def _oriented_sql(*, include_levels: bool) -> str:
+def _oriented_sql(*, include_levels: bool, windowed: bool = False) -> str:
     """Keep one mirror rule while legacy fixtures retain their narrow projection."""
     joined_levels = "c.side_a_card_levels, c.side_b_card_levels," if include_levels else ""
     oriented_levels = (
@@ -54,6 +54,7 @@ def _oriented_sql(*, include_levels: bool) -> str:
         if include_levels
         else ""
     )
+    window_filter = "AND c.timestamp >= ? AND c.timestamp < ?" if windowed else ""
     return f"""
 WITH joined AS (
     SELECT
@@ -82,7 +83,7 @@ WITH joined AS (
         AND c.fingerprint = s.fingerprint
         AND c.archive_member = s.archive_member
         AND c.row_number = s.row_number
-    WHERE s.partition = ?
+    WHERE s.partition = ? {window_filter}
 ),
 oriented AS (
     SELECT
@@ -117,6 +118,7 @@ oriented AS (
 
 _ORIENTED_SQL = _oriented_sql(include_levels=False)
 _CACHE_ORIENTED_SQL = _oriented_sql(include_levels=True)
+_CACHE_WINDOWED_SQL = _oriented_sql(include_levels=True, windowed=True)
 
 
 def _as_int(value: object) -> int:
@@ -291,21 +293,31 @@ def iter_oriented_cache_rows(
     partition: str,
     seed: int,
     batch_rows: int = 10_000,
+    start: datetime | None = None,
+    end: datetime | None = None,
 ) -> Iterator[OrientedCacheRow]:
-    """Stream ordered cache rows using the same mirror projection as legacy readers."""
+    """Stream ordered cache rows; optional half-open windows bound DuckDB memory."""
     if batch_rows < 1:
         raise KaggleV6TrainError("batch_rows must be positive")
+    if (start is None) != (end is None):
+        raise KaggleV6TrainError("cache window requires both bounds")
+    if start is not None and end is not None and start >= end:
+        raise KaggleV6TrainError("cache window must be nonempty")
     _require_paths(canonical_path, split_path)
+    sql = _CACHE_WINDOWED_SQL if start is not None else _CACHE_ORIENTED_SQL
+    params = _oriented_params(canonical_path, split_path, partition=partition, seed=seed)
+    if start is not None and end is not None:
+        params.extend((start, end))
     result = connection.execute(
         f"""
-        {_CACHE_ORIENTED_SQL}
+        {sql}
         SELECT timestamp, fingerprint, archive_member, row_number, label,
                side_a_keys, side_b_keys, side_a_levels, side_b_levels,
                deck_a_hash, deck_b_hash, side_a_player_id, side_b_player_id
         FROM oriented
         ORDER BY timestamp, fingerprint, archive_member, row_number
         """,
-        _oriented_params(canonical_path, split_path, partition=partition, seed=seed),
+        params,
     )
     while batch := result.fetchmany(batch_rows):
         for row in batch:

@@ -4,6 +4,8 @@ The caller owns the unpublished workspace and removes it after any failure.
 """
 
 from dataclasses import dataclass, field
+from datetime import UTC, datetime, timedelta
+from itertools import chain
 from pathlib import Path
 
 import duckdb
@@ -13,6 +15,7 @@ import polars as pl
 from clash_sos.domain.attention_cache import CachePartition, CacheSliceRange, SliceRole
 from clash_sos.domain.attention_protocol import AttentionSlice, Partition, RowKey, RowKeyDigest
 from clash_sos.domain.attention_schema import AttentionCardSchema
+from clash_sos.infrastructure.kaggle_v6.staging_io import python_cell
 from clash_sos.infrastructure.kaggle_v6.train_io import iter_oriented_cache_rows
 
 
@@ -60,6 +63,30 @@ def _write_sidecar(rows: list[dict[str, object]], path: Path) -> None:
     pl.DataFrame(rows).write_parquet(path, compression="zstd")
 
 
+def _partition_windows(
+    connection: duckdb.DuckDBPyConnection, split_path: Path, partition: Partition
+) -> tuple[tuple[datetime, datetime], ...]:
+    """Keep the ordered join below DuckDB's 1 GB working-memory limit."""
+    row = connection.execute(
+        "SELECT MIN(timestamp), MAX(timestamp) FROM read_parquet(?) WHERE partition = ?",
+        [str(split_path), partition],
+    ).fetchone()
+    if row is None:
+        raise AttentionCacheWriteError("split partition is empty")
+    minimum, maximum = python_cell(row[0]), python_cell(row[1])
+    if not isinstance(minimum, datetime) or not isinstance(maximum, datetime):
+        raise AttentionCacheWriteError("split partition timestamps are invalid")
+    minimum = minimum.astimezone(UTC)
+    maximum = maximum.astimezone(UTC)
+    current = minimum.replace(hour=minimum.hour // 6 * 6, minute=0, second=0, microsecond=0)
+    step = timedelta(hours=6)
+    windows: list[tuple[datetime, datetime]] = []
+    while current <= maximum:
+        windows.append((current, current + step))
+        current += step
+    return tuple(windows)
+
+
 def write_attention_partition(
     connection: duckdb.DuckDBPyConnection,
     *,
@@ -94,14 +121,20 @@ def write_attention_partition(
     sidecar_paths: list[str] = []
     previous: RowKey | None = None
     count = 0
-    for row in iter_oriented_cache_rows(
-        connection,
-        canonical_path=canonical_path,
-        split_path=split_path,
-        partition=partition,
-        seed=mirror_seed,
-        batch_rows=batch_rows,
-    ):
+    rows = chain.from_iterable(
+        iter_oriented_cache_rows(
+            connection,
+            canonical_path=canonical_path,
+            split_path=split_path,
+            partition=partition,
+            seed=mirror_seed,
+            batch_rows=batch_rows,
+            start=start,
+            end=end,
+        )
+        for start, end in _partition_windows(connection, split_path, partition)
+    )
+    for row in rows:
         key: RowKey = (row.timestamp, row.fingerprint, row.archive_member, row.row_number)
         if previous is not None and key <= previous:
             raise AttentionCacheWriteError("joined row keys must be unique and sorted")

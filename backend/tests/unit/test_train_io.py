@@ -196,6 +196,36 @@ def test_cache_projection_keeps_identity_levels_and_oriented_metadata(tmp_path: 
     assert rows[1].example.deck_a_hash == "lose-hash"
 
 
+def test_cache_projection_uses_half_open_timestamp_windows(tmp_path: Path) -> None:
+    canonical = tmp_path / "canonical.parquet"
+    split = tmp_path / "splits-temporal.parquet"
+    later = STAMP.replace(hour=6)
+    write_battle_parquet(
+        canonical,
+        (
+            (KEEP_FP, "a.parquet", 0, "train", WIN_IDS, LOSE_IDS, "win-hash", "lose-hash"),
+            (SWAP_FP, "a.parquet", 1, "train", WIN_IDS, LOSE_IDS, "win-hash", "lose-hash"),
+        ),
+        stamps=(STAMP, later),
+    )
+    connection = connect(tmp_path)
+    try:
+        rows = tuple(
+            iter_oriented_cache_rows(
+                connection,
+                canonical_path=canonical,
+                split_path=split,
+                partition="train",
+                seed=0,
+                start=STAMP,
+                end=later,
+            )
+        )
+    finally:
+        connection.close()
+    assert [row.fingerprint for row in rows] == [KEEP_FP]
+
+
 def test_aggregate_card_counts_credits_original_winners(tmp_path: Path) -> None:
     canonical = tmp_path / "canonical.parquet"
     split = tmp_path / "splits-temporal.parquet"

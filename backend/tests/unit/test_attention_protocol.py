@@ -1,6 +1,7 @@
 """Contract checks for declared attention fit and evaluation populations."""
 
 from datetime import UTC, datetime, timedelta, timezone
+from hashlib import sha256
 
 import pytest
 from pydantic import ValidationError
@@ -12,6 +13,7 @@ from clash_sos.domain.attention_protocol import (
     digest_row_keys,
     require_matching_fit,
 )
+from clash_sos.domain.canonical_dataset import canonical_json_bytes
 
 H = "a" * 64
 
@@ -155,3 +157,9 @@ def test_incremental_row_digest_matches_iterable_and_rejects_duplicates() -> Non
     assert digest.hexdigest() != first
     with pytest.raises(ValueError, match="unique and sorted"):
         digest.update(rows[1])
+
+
+def test_row_digest_matches_canonical_json_for_escaped_identity() -> None:
+    row = (day(12), 'a"b', "folder/é.parquet", 7)
+    expected = sha256(canonical_json_bytes([row])).hexdigest()
+    assert digest_row_keys((row,)) == expected

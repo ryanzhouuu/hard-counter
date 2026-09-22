@@ -7,11 +7,12 @@ training; this module validates the protocol structure and fit provenance.
 from collections.abc import Iterable
 from datetime import UTC, datetime
 from hashlib import sha256
+from json import dumps
 from typing import Literal, Self
 
 from pydantic import Field, field_validator, model_validator
 
-from clash_sos.domain.canonical_dataset import canonical_json_bytes
+from clash_sos.domain.canonical_dataset import canonical_json_bytes, utc_z_timestamp
 from clash_sos.domain.manifests import ManifestModel, Sha256
 
 PROTOCOL_VERSION = "attention-protocol:v1"
@@ -44,7 +45,13 @@ class RowKeyDigest:
             raise ValueError("row keys must be unique and sorted")
         if self._previous is not None:
             self._digest.update(b",")
-        self._digest.update(canonical_json_bytes(normalized))
+        self._digest.update(
+            dumps(
+                [utc_z_timestamp(normalized[0]), normalized[1], normalized[2], normalized[3]],
+                ensure_ascii=True,
+                separators=(",", ":"),
+            ).encode()
+        )
         self._previous = normalized
 
     def hexdigest(self) -> str:
