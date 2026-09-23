@@ -10,6 +10,7 @@ from clash_sos.application.attention_evaluate import (
     AttentionEvaluationReport,
     evaluate_attention_cache,
 )
+from clash_sos.application.attention_fit import AttentionFitConfig, fit_attention_model
 from clash_sos.application.attention_support import AttentionSupportIndex
 from clash_sos.domain.attention_model import AttentionMatchupModel
 from clash_sos.domain.attention_schema import AttentionModelConfig, build_attention_schema
@@ -93,5 +94,32 @@ def test_evaluation_rejects_wrong_schema_and_cleans_failed_output(tmp_path: Path
                 comparator=broken_comparator,
             )
         assert not (tmp_path / "failed-output").exists()
+    finally:
+        support.close()
+
+
+def test_real_cache_fit_refit_and_evaluation_connect(tmp_path: Path) -> None:
+    dataset, directory, schema, protocol = write_cache(tmp_path)
+    cache = load_attention_cache(dataset, directory, protocol, schema, chunk_size=1024)
+    fitted = fit_attention_model(
+        schema,
+        cache,
+        AttentionFitConfig(batch_size=1, max_epochs=2, patience=2, seed=7, device="cpu"),
+    )
+    support = AttentionSupportIndex.build(cache, tmp_path / "support.db")
+    try:
+        report = evaluate_attention_cache(
+            cache,
+            fitted.refit_model,
+            fit_protocol=protocol,
+            fit_artifact_id="tiny-fitted-model",
+            role="development",
+            support=support,
+            output_directory=tmp_path / "fitted-evaluation",
+            batch_size=1,
+        )
+        assert report.row_count == 2
+        assert report.evaluation.overall.metrics.log_loss > 0
+        assert fitted.selected_epoch in (1, 2)
     finally:
         support.close()
