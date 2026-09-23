@@ -52,9 +52,13 @@ def iter_attention_sidecars(cache: AttentionCache, role: SliceRole) -> Iterator[
 class AttentionSupportIndex:
     """Count training deck and unordered-pair appearances without outcome data."""
 
-    def __init__(self, path: Path, connection: sqlite3.Connection) -> None:
+    def __init__(
+        self, path: Path, connection: sqlite3.Connection, fit_sha256: str, encoding_sha256: str
+    ) -> None:
         self.path = path
         self.connection = connection
+        self.fit_sha256 = fit_sha256
+        self.encoding_sha256 = encoding_sha256
 
     @classmethod
     def build(cls, cache: AttentionCache, path: Path) -> "AttentionSupportIndex":
@@ -84,7 +88,12 @@ class AttentionSupportIndex:
                     cls._flush(connection, decks, pairs)
                     pending = 0
             cls._flush(connection, decks, pairs)
-            return cls(path, connection)
+            return cls(
+                path,
+                connection,
+                cache.manifest.protocol.fit_sha256(),
+                cache.manifest.encoding_sha256,
+            )
         except BaseException:
             connection.close()
             path.unlink(missing_ok=True)

@@ -18,6 +18,7 @@ class AttentionMatchupModel(nn.Module):
     def __init__(self, schema: AttentionCardSchema) -> None:
         super().__init__()
         config = schema.network
+        self.schema_fingerprint = schema.fingerprint()
         self.identity_count = len(schema.identity_vocab)
         self.explicit = (
             ExplicitInteractions(self.identity_count) if config.explicit_interactions else None
