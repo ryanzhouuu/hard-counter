@@ -199,8 +199,11 @@ class AttentionCardSchema(ManifestModel):
             raise ValueError(f"unsupported card identity: {error.args[0]}") from error
 
     def fingerprint(self) -> str:
-        """Hash the complete validated schema for cache and artifact provenance."""
-        return sha256(canonical_json_bytes(self.model_dump(mode="python"))).hexdigest()
+        """Keep the v1 default hash stable for already-published input caches."""
+        payload = self.model_dump(mode="python")
+        if self.network.neural_component:
+            payload["network"].pop("neural_component")
+        return sha256(canonical_json_bytes(payload)).hexdigest()
 
 
 def build_attention_schema(

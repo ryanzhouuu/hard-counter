@@ -132,6 +132,18 @@ def test_model_configuration_changes_schema_identity(schema: AttentionCardSchema
     assert wider.fingerprint() != schema.fingerprint()
 
 
+def test_default_switch_preserves_cache_identity(schema: AttentionCardSchema) -> None:
+    assert schema.fingerprint() == (
+        "1127cc7ccda8447fc8c597d9a44edf1dc63be16423ccc87c4e92246d43082b6b"
+    )
+    explicit = build_attention_schema(
+        KAGGLE_V6_CARDS.serialize(),
+        attributes=CARD_ATTRIBUTES,
+        network=AttentionModelConfig(neural_component=False),
+    )
+    assert explicit.fingerprint() != schema.fingerprint()
+
+
 def test_builder_rejects_corrupted_catalog_snapshots() -> None:
     catalog = loads(KAGGLE_V6_CARDS.serialize())
     catalog["entries"][1][1] = catalog["entries"][0][1]
