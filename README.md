@@ -1,10 +1,6 @@
 # Clash SoS
 
-Clash Royale matchup analysis for rolling strength of schedule, expected wins, and performance above expectation.
-
-R1 is complete: the canonical analytics contracts and pinned Kaggle version 6 source are
-executable and verified against the full local archive. R2, the reproducible ranked-data
-foundation, is next.
+Tools for preparing Clash Royale ranked match data and training deck matchup models.
 
 ## Toolchain
 
@@ -62,7 +58,7 @@ uv run clash-sos dataset audit-kaggle-v6
 
 The command verifies the archive identity, member checksums, card catalog, and all Parquet
 schemas before writing `data/metadata/kaggle-v6-dataset.json`. It profiles the archive with
-bounded memory and does not create the R2 processed dataset.
+bounded memory without preparing match records for model training.
 
 Print the same audit facts without writing a manifest:
 
@@ -82,14 +78,14 @@ uv run clash-sos dataset prepare-kaggle-v6 \
 The command records the effective options in the processed manifest and fails before doing
 work if `data/processed/kaggle-v6-ranked16-v2` already exists.
 
-Validate a published version in place without rewriting it:
+Validate a prepared dataset in place without rewriting it:
 
 ```bash
 uv run clash-sos dataset verify-kaggle-v6
 ```
 
-Train a matchup model on the published processed dataset and write a versioned
-artifact. The default promoted model is the LightGBM booster with card presence,
+Train a matchup model on the prepared dataset and write a versioned
+artifact. By default, the command trains a LightGBM booster with card presence,
 deck summaries, and a shrunk cluster-matchup rate.
 The command fits temporal train only, scores temporal and player-disjoint
 splits, and fails if the destination already exists:
@@ -106,11 +102,11 @@ The default artifact path is `models/kaggle-v6-ranked16-lightgbm-v3`.
 ### Attention matchup experiments
 
 Install the optional `ml` dependencies before running the deck-only attention
-trainer. Supply a resolved `AttentionProtocol` JSON file for the exact processed
-dataset and network configuration. Its hashes, UTC slice bounds, row counts, and
-row-identity digests are verified before fitting. If you already have a verified
-attention cache, its `manifest.json` contains the resolved protocol object that
-can be saved as a separate JSON file.
+trainer. Supply a JSON protocol file describing the processed dataset and the
+training and evaluation slices. The command checks its hashes, UTC time bounds,
+row counts, and row identities before fitting. If you already have a verified
+attention cache, its `manifest.json` contains the protocol object that can be
+saved as a separate JSON file.
 
 ```bash
 uv run --extra ml clash-sos model train-attention \
@@ -119,12 +115,13 @@ uv run --extra ml clash-sos model train-attention \
   --destination models/kaggle-v6-ranked16-attention-v1
 ```
 
-The command reuses an exact compatible cache or creates it from the published
-processed dataset. It selects epochs on the declared watch slice, refits on the
-declared training slice, and scores the development and optional reporting slices.
+The command reuses a compatible cache or creates it from the prepared dataset.
+It uses the protocol's watch rows to select the number of training epochs, then
+restarts training on the combined fit and watch rows. It scores the development
+rows and, when specified, the reporting rows.
 Progress goes to stderr; the completed destination goes to stdout. A destination
 or output workspace that already exists is refused. Use `--network-config` for a
-validated `AttentionModelConfig` JSON file when testing ablations, and provide a
+validated network configuration JSON file when testing ablations, and provide a
 protocol whose encoding hash matches that configuration. Run
 `clash-sos model train-attention --help` for optimizer, device, and batch options.
 
@@ -151,9 +148,3 @@ pnpm web:typecheck
 pnpm web:test
 pnpm web:build
 ```
-
-## Project status
-
-- R0 repository scaffold: complete.
-- R1 analytics and source-data contract: complete.
-- R2 reproducible ranked-data foundation: next.
