@@ -27,9 +27,8 @@ models/
 *.duckdb
 *.duckdb.tmp/
 
-# Design material is local-only
-docs/design/
-docs/plans/
+# Local working material
+docs/.local/
 
 # Editors and operating systems
 .DS_Store
