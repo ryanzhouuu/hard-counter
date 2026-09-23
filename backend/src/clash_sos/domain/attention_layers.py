@@ -86,3 +86,32 @@ class DeckEncoder(nn.Module):
         for block in self.blocks:
             cards = block(cards)
         return cards
+
+
+class CrossDeckBlock(nn.Module):
+    """Use the same counter-reading parameters in both matchup directions."""
+
+    def __init__(self, config: AttentionModelConfig) -> None:
+        super().__init__()
+        width = config.embedding_width
+        self.attention = nn.MultiheadAttention(
+            width, config.attention_heads, dropout=config.dropout, batch_first=True
+        )
+        self.attention_norm = nn.LayerNorm(width)
+        self.feed_forward = nn.Sequential(
+            nn.Linear(width, config.feed_forward_width),
+            nn.GELU(),
+            nn.Dropout(config.dropout),
+            nn.Linear(config.feed_forward_width, width),
+        )
+        self.output_norm = nn.LayerNorm(width)
+
+    def _read(self, query: Tensor, opponent: Tensor) -> Tensor:
+        """Read opposing cards without changing their original query vectors."""
+        update, _ = self.attention(query, opponent, opponent, need_weights=False)
+        contextual = self.attention_norm(query + update)
+        return self.output_norm(contextual + self.feed_forward(contextual))
+
+    def forward(self, side_a: Tensor, side_b: Tensor) -> tuple[Tensor, Tensor]:
+        """Evaluate both directions from the same pre-block representations."""
+        return self._read(side_a, side_b), self._read(side_b, side_a)

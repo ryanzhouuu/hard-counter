@@ -52,17 +52,20 @@ class AttentionModelConfig(ManifestModel):
     feed_forward_width: int = Field(default=128, gt=0)
     dropout: float = Field(default=0.0, ge=0, lt=1)
     explicit_interactions: bool = True
+    neural_component: bool = True
     within_deck_attention: bool = True
     cross_deck_attention: bool = True
 
     @model_validator(mode="after")
     def validate_dimensions(self) -> Self:
         """Enabled attention paths need blocks with divisible head dimensions."""
-        if self.embedding_width % self.attention_heads:
+        if not self.neural_component and not self.explicit_interactions:
+            raise ValueError("at least one matchup component must be enabled")
+        if self.neural_component and self.embedding_width % self.attention_heads:
             raise ValueError("embedding width must be divisible by attention heads")
-        if self.within_deck_attention and not self.within_deck_blocks:
+        if self.neural_component and self.within_deck_attention and not self.within_deck_blocks:
             raise ValueError("enabled within-deck attention requires a block")
-        if self.cross_deck_attention and not self.cross_deck_blocks:
+        if self.neural_component and self.cross_deck_attention and not self.cross_deck_blocks:
             raise ValueError("enabled cross-deck attention requires a block")
         return self
 
