@@ -103,6 +103,39 @@ The default artifact path is `models/kaggle-v6-ranked16-lightgbm-v3`.
 `--promoted-model card_pair` or `--promoted-model card_log_odds` and a new
 `--destination`.
 
+### Attention matchup experiments
+
+Install the optional `ml` dependencies before running the deck-only attention
+trainer. Supply a resolved `AttentionProtocol` JSON file for the exact processed
+dataset and network configuration. Its hashes, UTC slice bounds, row counts, and
+row-identity digests are verified before fitting. If you already have a verified
+attention cache, its `manifest.json` contains the resolved protocol object that
+can be saved as a separate JSON file.
+
+```bash
+uv run --extra ml clash-sos model train-attention \
+  --protocol data/config/attention-temporal-v1.json \
+  --cache-directory data/cache/attention-temporal-v1 \
+  --destination models/kaggle-v6-ranked16-attention-v1
+```
+
+The command reuses an exact compatible cache or creates it from the published
+processed dataset. It selects epochs on the declared watch slice, refits on the
+declared training slice, and scores the development and optional reporting slices.
+Progress goes to stderr; the completed destination goes to stdout. A destination
+or output workspace that already exists is refused. Use `--network-config` for a
+validated `AttentionModelConfig` JSON file when testing ablations, and provide a
+protocol whose encoding hash matches that configuration. Run
+`clash-sos model train-attention --help` for optimizer, device, and batch options.
+
+The artifact includes CPU weights, the card schema and catalog, fit history,
+evaluation metrics, and aligned prediction Parquet files. Its probabilities are
+deck-only matchup estimates under an equal-skill assumption for the June 2026
+balance era and level-16 cards; they do not establish that player skill was
+removed from the observed outcomes. Attention inference requires the caller to
+provide the matchup's balance-era ID, which must match the artifact. The default
+`model train` selection remains LightGBM.
+
 ## Quality checks
 
 Run the same checks used by GitHub Actions:

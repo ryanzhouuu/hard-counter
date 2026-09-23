@@ -62,7 +62,7 @@ packages = ["backend/src/clash_sos"]
 
 [tool.pytest.ini_options]
 addopts = "--strict-config --strict-markers"
-pythonpath = ["backend/src"]
+pythonpath = ["backend/src", "backend/tests/unit"]
 testpaths = ["backend/tests"]
 
 [tool.coverage.run]
@@ -85,5 +85,6 @@ select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
 include = ["backend/src", "backend/tests"]
 pythonVersion = "3.12"
 typeCheckingMode = "strict"
+extraPaths = ["backend/tests/unit"]
 venv = ".venv"
 venvPath = "."
