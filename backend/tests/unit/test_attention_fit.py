@@ -6,6 +6,7 @@ import numpy as np
 import pytest
 import torch
 
+import clash_sos.application.attention_fit as attention_fit
 from clash_sos.application.attention_fit import (
     AttentionFitConfig,
     AttentionFitTimeLimit,
@@ -107,3 +108,15 @@ def test_fit_rejects_nonfinite_data_and_time_budget(schema: AttentionCardSchema)
         )
     with pytest.raises(ValueError, match="device must be"):
         fit_attention_model(schema, TinySource(), config.model_copy(update={"device": "gpu"}))
+
+
+def test_fit_rejects_deadline_crossed_during_final_refit_batch(
+    schema: AttentionCardSchema, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    readings = iter((0.0, 0.2, 0.4, 0.6, 2.0))
+    monkeypatch.setattr(attention_fit, "monotonic", lambda: next(readings))
+    config = AttentionFitConfig(
+        batch_size=4, max_epochs=1, patience=1, seed=2, device="cpu", time_limit_seconds=1
+    )
+    with pytest.raises(AttentionFitTimeLimit, match="no result was published"):
+        fit_attention_model(schema, TinySource(), config)

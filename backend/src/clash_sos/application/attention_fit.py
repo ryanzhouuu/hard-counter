@@ -83,12 +83,14 @@ class AttentionFitTimeLimit(TimeoutError):
     """Stop without a result when the wall-time budget expires."""
 
 
-def _check_deadline(deadline: float | None) -> None:
-    """Fail before another minibatch if the fit budget has expired."""
-    if deadline is not None and monotonic() >= deadline:
+def _check_deadline(deadline: float | None) -> float:
+    """Return the checked time or fail when the fit budget has expired."""
+    checked = monotonic()
+    if deadline is not None and checked >= deadline:
         raise AttentionFitTimeLimit(
             "attention fit exceeded its time limit; no result was published"
         )
+    return checked
 
 
 def _batches(
@@ -203,7 +205,7 @@ def fit_attention_model(
         _, rows = _run_epoch(refit, source, "refit", effective, epoch, deadline, refit_optimizer)
         trained_rows += rows
     refit.eval()
-    elapsed = monotonic() - started
+    elapsed = _check_deadline(deadline) - started
     return AttentionFitResult(
         selection_model=model,
         refit_model=refit,

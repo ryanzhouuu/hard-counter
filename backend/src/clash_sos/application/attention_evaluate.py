@@ -100,11 +100,10 @@ def evaluate_attention_cache(
         chunk_index = 0
         for tokens, labels in cache.iter_batches(role, batch_size=batch_size):
             with torch.inference_mode():
+                logits = model(torch.tensor(tokens, dtype=torch.long, device=device))
                 probabilities = cast(
                     list[float],
-                    torch.sigmoid(model(torch.tensor(tokens, dtype=torch.long, device=device)))
-                    .cpu()
-                    .tolist(),  # type: ignore[reportUnknownMemberType]
+                    torch.sigmoid(logits.to(device="cpu", dtype=torch.float64)).tolist(),  # type: ignore[reportUnknownMemberType]
                 )
             sidecars = list(islice(metadata, len(labels)))
             if len(sidecars) != len(labels):
