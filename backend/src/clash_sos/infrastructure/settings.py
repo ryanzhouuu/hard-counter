@@ -1,5 +1,7 @@
 from functools import lru_cache
+from pathlib import Path
 
+from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -13,6 +15,10 @@ class Settings(BaseSettings):
     app_name: str = "Clash SoS API"
     database_url: str = "postgresql+psycopg://clash_sos:clash_sos@localhost:5432/clash_sos"
     log_level: str = "INFO"
+    royale_api_token: SecretStr | None = Field(
+        default=None, validation_alias="CLASH_ROYALE_API_TOKEN"
+    )
+    active_model_path: Path = Path("models/kaggle-v6-ranked16-attention-v1")
 
 
 @lru_cache

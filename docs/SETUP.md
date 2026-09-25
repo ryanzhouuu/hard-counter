@@ -50,6 +50,12 @@ uv run clash-sos version
 uv run clash-sos-worker status
 ```
 
+For live player lookup, set `CLASH_ROYALE_API_TOKEN` in the ignored `.env` file.
+Create the key for the public IP address of the machine running the API, and keep
+it on the backend. Set `CLASH_SOS_ACTIVE_MODEL_PATH` to switch the model artifact
+without changing code. It defaults to `models/kaggle-v6-ranked16-attention-v1`;
+install the optional `ml` dependencies when using that attention artifact.
+
 ## Prepare ranked data
 
 Audit the pinned Kaggle version 6 archive and write its ignored local manifest:
