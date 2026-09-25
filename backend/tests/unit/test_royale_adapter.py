@@ -62,6 +62,19 @@ def test_maps_known_evolution_and_hero_forms() -> None:
     assert result.opponent_deck[6] == "musketeer:hero"
 
 
+def test_form_marker_does_not_duplicate_name_prefix() -> None:
+    raw = battle()
+    raw["opponent"][0]["cards"][6] = {
+        "name": "Hero Musketeer",
+        "heroLevel": 1,
+    }
+
+    result = adapt_battle(raw, "#ABC")
+
+    assert result.skip_reason is None
+    assert result.opponent_deck[6] == "musketeer:hero"
+
+
 def test_skips_new_cards_and_new_forms_without_guessing() -> None:
     raw = battle()
     raw["team"][0]["cards"][0]["name"] = "Future Card"

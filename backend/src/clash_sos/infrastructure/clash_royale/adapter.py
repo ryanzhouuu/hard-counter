@@ -79,9 +79,9 @@ def _cards(side: dict[str, object], names: dict[str, str]) -> tuple[LiveCard, ..
         lookup = " ".join(name.casefold().split())
         evolution_level = raw.get("evolutionLevel")
         hero_level = raw.get("heroLevel")
-        if type(evolution_level) is int and evolution_level > 0:
+        if type(evolution_level) is int and evolution_level > 0 and not lookup.startswith("evo "):
             lookup = f"evo {lookup}"
-        if type(hero_level) is int and hero_level > 0:
+        if type(hero_level) is int and hero_level > 0 and not lookup.startswith("hero "):
             lookup = f"hero {lookup}"
         cards.append(LiveCard(name=name, identity=names.get(lookup)))
     return tuple(cards)
