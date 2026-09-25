@@ -42,48 +42,16 @@ class RollingSoSAnalyzer:
                 continue
             eligible.append(self._orient(record, player))
 
-        eligible.sort(
-            key=lambda observation: (observation.timestamp, observation.battle_fingerprint)
-        )
         exclusion_reasons = tuple(
             ExclusionReasonCount(issue=issue, count=count)
             for issue, count in sorted(exclusion_counts.items(), key=lambda item: item[0].value)
         )
-        excluded_count = record_count - len(eligible)
-        available_provenance = tuple(
-            dict.fromkeys(observation.provenance for observation in eligible)
-        )
-
-        if len(eligible) < window_size:
-            return RollingSoSResult(
-                status=AnalysisState.INSUFFICIENT_DATA,
-                target_player=player,
-                requested_window=window_size,
-                eligible_count=len(eligible),
-                excluded_count=excluded_count,
-                exclusion_reasons=exclusion_reasons,
-                provenance=available_provenance,
-            )
-
-        window = tuple(eligible[-window_size:])
-        expected_wins = sum(observation.player_win_probability for observation in window)
-        actual_wins = sum(observation.actual_win for observation in window)
-        strength_of_schedule = sum(observation.difficulty for observation in window) / window_size
-        provenance = tuple(dict.fromkeys(observation.provenance for observation in window))
-
-        return RollingSoSResult(
-            status=AnalysisState.AVAILABLE,
-            target_player=player,
-            requested_window=window_size,
-            eligible_count=len(eligible),
-            excluded_count=excluded_count,
+        return summarize_observations(
+            player,
+            eligible,
+            window_size=window_size,
+            excluded_count=record_count - len(eligible),
             exclusion_reasons=exclusion_reasons,
-            window=window,
-            strength_of_schedule=strength_of_schedule,
-            expected_wins=expected_wins,
-            actual_wins=actual_wins,
-            performance_above_expectation=actual_wins - expected_wins,
-            provenance=provenance,
         )
 
     def _exclusion_issues(
@@ -160,3 +128,49 @@ def calculate_rolling_sos(
     """Calculate rolling SoS through the application-layer analyzer."""
 
     return RollingSoSAnalyzer().analyze(target_player, records, window_size)
+
+
+def summarize_observations(
+    target_player: PlayerId | str,
+    observations: Iterable[RollingSoSObservation],
+    *,
+    window_size: int,
+    excluded_count: int = 0,
+    exclusion_reasons: tuple[ExclusionReasonCount, ...] = (),
+) -> RollingSoSResult:
+    """Apply the shared final-N arithmetic to already eligible observations."""
+    if window_size <= 0:
+        raise ValueError("window_size must be positive")
+    player = target_player if isinstance(target_player, PlayerId) else PlayerId(target_player)
+    eligible = sorted(
+        observations,
+        key=lambda observation: (observation.timestamp, observation.battle_fingerprint),
+    )
+    provenance = tuple(dict.fromkeys(observation.provenance for observation in eligible))
+    if len(eligible) < window_size:
+        return RollingSoSResult(
+            status=AnalysisState.INSUFFICIENT_DATA,
+            target_player=player,
+            requested_window=window_size,
+            eligible_count=len(eligible),
+            excluded_count=excluded_count,
+            exclusion_reasons=exclusion_reasons,
+            provenance=provenance,
+        )
+    window = tuple(eligible[-window_size:])
+    expected_wins = sum(observation.player_win_probability for observation in window)
+    actual_wins = sum(observation.actual_win for observation in window)
+    return RollingSoSResult(
+        status=AnalysisState.AVAILABLE,
+        target_player=player,
+        requested_window=window_size,
+        eligible_count=len(eligible),
+        excluded_count=excluded_count,
+        exclusion_reasons=exclusion_reasons,
+        window=window,
+        strength_of_schedule=sum(observation.difficulty for observation in window) / window_size,
+        expected_wins=expected_wins,
+        actual_wins=actual_wins,
+        performance_above_expectation=actual_wins - expected_wins,
+        provenance=tuple(dict.fromkeys(observation.provenance for observation in window)),
+    )

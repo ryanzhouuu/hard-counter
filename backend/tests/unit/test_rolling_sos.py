@@ -5,13 +5,14 @@ from hypothesis import given
 from hypothesis import strategies as st
 from pydantic import AnyHttpUrl, ValidationError
 
-from clash_sos.application.rolling_sos import calculate_rolling_sos
+from clash_sos.application.rolling_sos import calculate_rolling_sos, summarize_observations
 from clash_sos.domain.analytics import (
     AnalysisState,
     BattleAnalysisRecord,
     MatchupPrediction,
     PredictionProvenance,
     PredictionState,
+    RollingSoSObservation,
 )
 from clash_sos.domain.canonical import (
     BalanceChange,
@@ -139,6 +140,30 @@ def test_calculates_the_approved_rolling_aggregates() -> None:
     assert result.expected_wins == pytest.approx(1.50)
     assert result.actual_wins == 2
     assert result.performance_above_expectation == pytest.approx(0.50)
+
+
+def test_summarizes_deck_only_predictions_outside_training_era() -> None:
+    observations = [
+        RollingSoSObservation(
+            timestamp=datetime(2026, 9, 24, hour=index, tzinfo=UTC),
+            battle_fingerprint=f"live-{index}",
+            player_win_probability=probability,
+            actual_win=actual_win,
+            difficulty=1 - probability,
+            provenance=PROVENANCE,
+        )
+        for index, probability, actual_win in [(1, 0.25, 1), (0, 0.75, 0)]
+    ]
+
+    result = summarize_observations(TARGET, observations, window_size=2, excluded_count=1)
+
+    assert result.status is AnalysisState.AVAILABLE
+    assert [item.battle_fingerprint for item in result.window] == ["live-0", "live-1"]
+    assert result.expected_wins == pytest.approx(1.0)
+    assert result.actual_wins == 1
+    assert result.strength_of_schedule == pytest.approx(0.5)
+    assert result.excluded_count == 1
+    assert result.provenance == (PROVENANCE,)
 
 
 def test_uses_the_final_n_sorted_eligible_records() -> None:
