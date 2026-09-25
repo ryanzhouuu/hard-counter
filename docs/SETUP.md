@@ -6,31 +6,31 @@ Run the commands below from the repository root.
 
 - Python 3.12 managed by `uv`
 - Node.js 24.18.1 and `pnpm` 11.20.0
-- PostgreSQL 17
-- Docker Compose
+- PostgreSQL 17 and Docker Compose for database-backed development
 
 ## Install dependencies
 
 Install the listed toolchain versions, then run:
 
 ```bash
-uv sync --locked --dev
+uv sync --locked --dev --extra ml
 pnpm install --frozen-lockfile
 cp .env.example .env
-docker compose up -d postgres
 ```
 
-The PostgreSQL service is available at `localhost:5432`. The example environment file contains the matching local database URL.
+Live lookup does not use PostgreSQL or save battles. Start the optional database
+with `docker compose up -d postgres` for database-backed development. The
+example environment file contains its local URL.
 
-For neural-model development, install the optional ML dependencies as well:
+If using a non-neural artifact, the smaller default Python install is enough:
 
 ```bash
-uv sync --locked --dev --extra ml
+uv sync --locked --dev
 ```
 
 Linux installs the CPU-only PyTorch build used by CI. macOS installs the standard
-build with MPS support when the host makes it available. The default setup remains
-torch-free so the API, CLI, and existing predictors do not require PyTorch.
+build with MPS support when the host makes it available. The default dependency
+set remains torch-free for the API, CLI, and existing predictors.
 
 ## Run locally
 
@@ -50,11 +50,12 @@ uv run clash-sos version
 uv run clash-sos-worker status
 ```
 
-For live player lookup, set `CLASH_ROYALE_API_TOKEN` in the ignored `.env` file.
+For live API lookup, set `CLASH_ROYALE_API_TOKEN` in the ignored `.env` file.
 Create the key for the public IP address of the machine running the API, and keep
 it on the backend. Set `CLASH_SOS_ACTIVE_MODEL_PATH` to switch the model artifact
 without changing code. It defaults to `models/kaggle-v6-ranked16-attention-v1`;
-install the optional `ml` dependencies when using that attention artifact.
+that ignored artifact must exist locally. The attention model needs the optional
+`ml` dependencies shown above.
 
 Request an on-demand report at `/api/player-analysis?tag=%23PLAYER_TAG&window=5`.
 The tag can also omit `#`; `window` accepts 1–30 eligible recent battles. The

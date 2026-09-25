@@ -9,13 +9,13 @@ relative to expectation.
 
 - Audit and prepare ranked match data from the Kaggle version 6 archive.
 - Train and evaluate deck matchup models, including LightGBM, card-pair baselines, and an optional attention model.
-- Run a local web interface and API. The web interface currently shows an
-  overview; the API currently exposes a health endpoint. Matchup and schedule
-  views are still under development.
+- Look up a player on demand through the backend's `/api/player-analysis` route.
+  The web interface is a scaffold with placeholder views.
 
 Model outputs are estimates of deck matchups, not measurements of player skill.
-The attention model's probabilities assume equal player skill and are limited to
-the June 2026 balance era and level-16 cards.
+The attention model was trained on June 2026 ranked level-16 battles and assumes
+equal player skill. Current battle estimates extend beyond that training population;
+new cards and forms are skipped. Live battle history is not saved locally.
 
 ## Development
 
