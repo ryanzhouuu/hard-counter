@@ -56,6 +56,14 @@ it on the backend. Set `CLASH_SOS_ACTIVE_MODEL_PATH` to switch the model artifac
 without changing code. It defaults to `models/kaggle-v6-ranked16-attention-v1`;
 install the optional `ml` dependencies when using that attention artifact.
 
+Request an on-demand report at `/api/player-analysis?tag=%23PLAYER_TAG&window=5`.
+The tag can also omit `#`; `window` accepts 1–30 eligible recent battles. The
+response includes recent battles, per-battle deck estimates, and rolling schedule
+metrics when enough eligible battles are available. Only decisive 1v1 battles
+with two complete, known eight-card decks are scored. Current battles use the
+selected model beyond its June 2026 training population; treat these as
+extrapolated estimates. The lookup does not store battle history.
+
 ## Prepare ranked data
 
 Audit the pinned Kaggle version 6 archive and write its ignored local manifest:

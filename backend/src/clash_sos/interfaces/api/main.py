@@ -6,6 +6,7 @@ from pydantic import BaseModel
 
 from clash_sos import __version__
 from clash_sos.infrastructure.settings import Settings, get_settings
+from clash_sos.interfaces.api.player_analysis import player_router
 
 
 class HealthResponse(BaseModel):
@@ -21,6 +22,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     resolved_settings = settings or get_settings()
     application = FastAPI(title=resolved_settings.app_name, version=__version__)
     application.add_api_route("/health", health, methods=["GET"], response_model=HealthResponse)
+    application.include_router(player_router(resolved_settings))
     return application
 
 
