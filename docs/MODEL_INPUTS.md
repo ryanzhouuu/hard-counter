@@ -7,6 +7,11 @@ and attributes remain the defaults.
 
 ## Catalog snapshots
 
+The packaged `infrastructure/clash_royale/cards.json` snapshot includes the 182
+deck identities released through September 26, 2026: the June identities plus
+Ronin, Minion Giant, Elite Barbarians Evolution, and Hero Valkyrie, Berserker,
+and Ice Wizard. The Kaggle catalog retains its original 176 identities.
+
 Catalog JSON contains `catalog_version` and `entries`. Each entry is
 `[source_id, source_name, card_id, form]`. Source IDs must be ordered from zero;
 names and card/form identities must be unique. Evolution and hero entries need
