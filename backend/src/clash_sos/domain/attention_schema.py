@@ -1,4 +1,4 @@
-"""Frozen card-token layout for the June 2026 deck-only attention model.
+"""Frozen card-token layout with June 2026 defaults for deck-only attention.
 
 The schema maps compact identity tokens to base/form indices and static
 attributes. It can be built and validated without importing PyTorch.
@@ -12,7 +12,7 @@ from typing import Literal, Self, cast
 
 from pydantic import Field, model_validator
 
-from clash_sos.domain.canonical import CardForm, CardId
+from clash_sos.domain.canonical import CardForm
 from clash_sos.domain.canonical_dataset import (
     ACCEPTED_CARD_LEVEL,
     CANONICAL_SCHEMA_VERSION,
@@ -23,9 +23,11 @@ from clash_sos.domain.card_attributes import (
     ATTRIBUTE_VERSION,
     CardAttributeTable,
 )
+from clash_sos.domain.card_catalog import CardCatalog
 from clash_sos.domain.manifests import ManifestModel, Sha256
 
 SCHEMA_VERSION = "attention-card-schema:v1"
+MAX_CARD_IDENTITIES = 2**16
 CATALOG_VERSION = "kaggle-v6-2026-06"
 BALANCE_ERA_ID = "2026-06"
 ELIXIR_DIVISOR = 9
@@ -82,41 +84,21 @@ def _attribute_vector(identity: str, table: CardAttributeTable) -> AttributeVect
 
 
 def _catalog_identities(snapshot: dict[str, object]) -> tuple[str, ...]:
-    """Read every source identity from the stored, source-ordered v6 catalog."""
-    entries = snapshot.get("entries")
-    if snapshot.get("catalog_version") != CATALOG_VERSION or not isinstance(entries, list):
-        raise ValueError("incompatible card catalog snapshot")
-    identities: list[str] = []
-    names: list[str] = []
-    for index, raw in enumerate(cast(list[object], entries)):
-        if not isinstance(raw, list):
-            raise ValueError("invalid card catalog entry")
-        entry = cast(list[object], raw)
-        if len(entry) != 4:
-            raise ValueError("invalid card catalog entry")
-        source_id, source_name, card_id, form = entry
-        if source_id != index or not isinstance(source_name, str) or not source_name:
-            raise ValueError("card catalog source IDs and names must be ordered")
-        if not isinstance(card_id, str) or not isinstance(form, str):
-            raise ValueError("invalid card catalog identity")
-        names.append(source_name)
-        identities.append(f"{CardId(card_id).value}:{CardForm(form).value}")
-    if len(identities) != 176 or len(set(identities)) != 176 or len(set(names)) != 176:
-        raise ValueError("card catalog must contain 176 unique identities")
-    return tuple(identities)
+    catalog = CardCatalog.from_payload(snapshot)
+    return tuple(entry.card.identity_key for entry in catalog.entries)
 
 
 class AttentionCardSchema(ManifestModel):
     """Artifact-ready identity vocabulary and checked static token lookup."""
 
     schema_version: Literal["attention-card-schema:v1"] = SCHEMA_VERSION
-    catalog_version: Literal["kaggle-v6-2026-06"] = CATALOG_VERSION
+    catalog_version: str = Field(default=CATALOG_VERSION, min_length=1)
     catalog_sha256: Sha256
     catalog_snapshot: dict[str, object]
     canonical_schema_version: Literal["kaggle-v6-ranked16-schema:v1"] = CANONICAL_SCHEMA_VERSION
-    balance_era_id: Literal["2026-06"] = BALANCE_ERA_ID
+    balance_era_id: str = Field(default=BALANCE_ERA_ID, min_length=1)
     accepted_level: Literal[16] = ACCEPTED_CARD_LEVEL
-    attribute_version: Literal["card-attributes:2026-06"] = ATTRIBUTE_VERSION
+    attribute_version: str = Field(default=ATTRIBUTE_VERSION, min_length=1)
     elixir_divisor: Literal[9] = ELIXIR_DIVISOR
     attribute_columns: tuple[str, ...] = ATTRIBUTE_COLUMNS
     base_vocab: tuple[str, ...]
@@ -137,18 +119,21 @@ class AttentionCardSchema(ManifestModel):
         if sha256(canonical_json_bytes(self.catalog_snapshot)).hexdigest() != self.catalog_sha256:
             raise ValueError("card catalog hash does not match snapshot")
         catalog_identities = _catalog_identities(self.catalog_snapshot)
+        if self.catalog_snapshot["catalog_version"] != self.catalog_version:
+            raise ValueError("catalog version does not match snapshot")
         if tuple(sorted(catalog_identities)) != self.identity_vocab:
             raise ValueError("identity vocabulary does not match catalog snapshot")
         if self.attribute_columns != ATTRIBUTE_COLUMNS:
             raise ValueError("attribute columns do not match schema version")
-        if len(self.base_vocab) != 121 or tuple(sorted(set(self.base_vocab))) != self.base_vocab:
-            raise ValueError("base vocabulary must contain 121 unique sorted cards")
+        expected_bases = tuple(
+            sorted({identity.rsplit(":", 1)[0] for identity in catalog_identities})
+        )
+        if self.base_vocab != expected_bases:
+            raise ValueError("base vocabulary does not match catalog snapshot")
         if self.form_vocab != tuple(sorted(form.value for form in CardForm)):
             raise ValueError("form vocabulary must contain every supported form")
-        if len(self.identity_vocab) != 176 or tuple(sorted(set(self.identity_vocab))) != (
-            self.identity_vocab
-        ):
-            raise ValueError("identity vocabulary must contain 176 unique sorted keys")
+        if len(self.identity_vocab) > MAX_CARD_IDENTITIES:
+            raise ValueError("identity vocabulary exceeds uint16 capacity")
         if any(
             len(values) != len(self.identity_vocab)
             for values in (self.token_base_indices, self.token_form_indices, self.token_attributes)
@@ -211,6 +196,7 @@ def build_attention_schema(
     *,
     attributes: CardAttributeTable,
     network: AttentionModelConfig,
+    balance_era_id: str = BALANCE_ERA_ID,
 ) -> AttentionCardSchema:
     """Snapshot catalog identities and attributes into a validated v1 schema."""
     raw_snapshot: object = loads(catalog_bytes)
@@ -223,8 +209,11 @@ def build_attention_schema(
     base_index = {card_id: index for index, card_id in enumerate(base_vocab)}
     form_index = {form: index for index, form in enumerate(form_vocab)}
     return AttentionCardSchema(
-        catalog_sha256=sha256(catalog_bytes).hexdigest(),
+        catalog_version=cast(str, catalog_snapshot["catalog_version"]),
+        catalog_sha256=sha256(canonical_json_bytes(catalog_snapshot)).hexdigest(),
         catalog_snapshot=catalog_snapshot,
+        attribute_version=attributes.version,
+        balance_era_id=balance_era_id,
         base_vocab=base_vocab,
         form_vocab=form_vocab,
         identity_vocab=ordered,
