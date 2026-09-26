@@ -16,6 +16,10 @@ Void to five elixir for current-era training. June inputs retain Void at three.
 Spirit Empress retains the existing three-elixir feature convention for its
 three/six-elixir deployment mechanic. Forms continue sharing base attributes.
 
+`clash_royale/towers.json` separately catalogs Tower Princess, Cannoneer,
+Dagger Duchess, and Royal Chef with their official API IDs and rarity-relative
+level offsets. They have no deploy elixir cost and occupy a separate tower slot.
+
 Catalog JSON contains `catalog_version` and `entries`. Each entry is
 `[source_id, source_name, card_id, form]`. Source IDs must be ordered from zero;
 names and card/form identities must be unique. Evolution and hero entries need
