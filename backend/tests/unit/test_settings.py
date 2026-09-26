@@ -25,3 +25,8 @@ def test_settings_accept_environment_overrides(monkeypatch: pytest.MonkeyPatch) 
     settings = Settings()
 
     assert settings.log_level == "DEBUG"
+
+
+def test_settings_accept_live_catalog_path(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("CLASH_SOS_LIVE_CATALOG_PATH", "data/config/cards.json")
+    assert Settings().live_catalog_path == Path("data/config/cards.json")

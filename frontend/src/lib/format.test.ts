@@ -39,6 +39,7 @@ describe("relativeTime", () => {
 describe("labels", () => {
   it("describes skip reasons in plain words", () => {
     expect(skipLabel("unknown_card")).toBe("New card not yet supported");
+    expect(skipLabel("model_coverage")).toBe("Card not supported by this model");
     expect(skipLabel("team_battle")).toBe("Team battle");
     expect(skipLabel("something_new")).toBe("Not scored");
     expect(skipLabel(null)).toBe("Not scored");

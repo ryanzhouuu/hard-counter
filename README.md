@@ -22,3 +22,6 @@ new cards and forms are skipped. Live battle history is not saved locally.
 
 See [SETUP.md](docs/SETUP.md) for installation, local commands, data
 preparation, model training, and quality checks.
+
+See [MODEL_INPUTS.md](docs/MODEL_INPUTS.md) for selected card catalogs and
+attributes, attention cache rebuilding, and live model coverage.

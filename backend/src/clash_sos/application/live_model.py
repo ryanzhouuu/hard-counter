@@ -2,6 +2,7 @@
 
 from collections.abc import Sequence
 from dataclasses import dataclass
+from hashlib import sha256
 from json import loads
 from pathlib import Path
 from typing import cast
@@ -10,6 +11,8 @@ from pydantic import ValidationError
 
 from clash_sos.application.model_predict import predict_matchup
 from clash_sos.domain.analytics import MatchupPrediction, PredictionProvenance, PredictionState
+from clash_sos.domain.canonical import RecordIssue
+from clash_sos.domain.card_catalog import CardCatalog
 from clash_sos.domain.model_artifact import ModelArtifactManifest
 
 DeckPair = tuple[tuple[str, ...], tuple[str, ...]]
@@ -36,6 +39,12 @@ class LiveModelInfo:
         )
 
 
+def _unavailable_prediction() -> MatchupPrediction:
+    return MatchupPrediction(
+        state=PredictionState.UNAVAILABLE, issue=RecordIssue.UNAVAILABLE_MODEL_COVERAGE
+    )
+
+
 def _manifest_kind(artifact: Path) -> str:
     """Reject missing or non-object manifests before selecting a loader."""
     try:
@@ -54,7 +63,7 @@ def _manifest_kind(artifact: Path) -> str:
 def score_live_decks(
     artifact: Path, pairs: Sequence[DeckPair]
 ) -> tuple[LiveModelInfo, tuple[MatchupPrediction, ...]]:
-    """Keep June provenance while permitting explicit use on newer deck pairs."""
+    """Retain training provenance and exclude pairs outside the frozen vocabulary."""
     kind = _manifest_kind(artifact)
     if kind == "matchup_attention":
         try:
@@ -65,15 +74,24 @@ def score_live_decks(
             raise LiveModelError("missing_ml_runtime") from error
         try:
             manifest, schema, model = load_attention_artifact(artifact)
-            tokens = [(schema.encode_deck(a), schema.encode_deck(b)) for a, b in pairs]
-            probabilities: list[float] = []
+            vocabulary = set(schema.identity_vocab)
+            supported = [
+                index
+                for index, (a, b) in enumerate(pairs)
+                if set(a).issubset(vocabulary) and set(b).issubset(vocabulary)
+            ]
+            tokens = [
+                (schema.encode_deck(pairs[index][0]), schema.encode_deck(pairs[index][1]))
+                for index in supported
+            ]
+            probabilities: list[float | None] = [None] * len(pairs)
             if tokens:
                 with torch.inference_mode():
                     logits = model(torch.tensor(tokens, dtype=torch.long))
-                    probabilities = [
-                        float(value.item())
-                        for value in torch.sigmoid(logits.to(dtype=torch.float64))
-                    ]
+                    for index, value in zip(
+                        supported, torch.sigmoid(logits.to(dtype=torch.float64)), strict=True
+                    ):
+                        probabilities[index] = float(value.item())
         except (OSError, ValueError, RuntimeError) as error:
             raise LiveModelError("model_unavailable") from error
         info = LiveModelInfo(
@@ -88,6 +106,8 @@ def score_live_decks(
                 side_a_win_probability=probability,
                 provenance=info.provenance,
             )
+            if probability is not None
+            else _unavailable_prediction()
             for probability in probabilities
         )
         return info, predictions
@@ -101,7 +121,23 @@ def score_live_decks(
             catalog_version=manifest.catalog_version,
             training_era_id=manifest.balance_era_id,
         )
-        predictions = tuple(predict_matchup(artifact, a, b) for a, b in pairs)
+        catalog_file = next(file for file in manifest.files if file.kind == "card_catalog")
+        catalog_bytes = (artifact / catalog_file.path).read_bytes()
+        if (
+            len(catalog_bytes) != catalog_file.size_bytes
+            or sha256(catalog_bytes).hexdigest() != catalog_file.sha256
+        ):
+            raise LiveModelError("model_unavailable")
+        catalog = CardCatalog.from_payload(loads(catalog_bytes))
+        if catalog.version != manifest.catalog_version:
+            raise LiveModelError("model_unavailable")
+        vocabulary = {entry.card.identity_key for entry in catalog.entries}
+        predictions = tuple(
+            predict_matchup(artifact, a, b)
+            if set(a).issubset(vocabulary) and set(b).issubset(vocabulary)
+            else _unavailable_prediction()
+            for a, b in pairs
+        )
     except (OSError, ValueError, ValidationError) as error:
         raise LiveModelError("model_unavailable") from error
     return info, predictions

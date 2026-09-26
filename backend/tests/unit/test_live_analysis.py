@@ -2,12 +2,23 @@
 
 from collections.abc import Sequence
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
+from catalog_fixture import expanded_catalog
 
 from clash_sos.application import live_analysis
 from clash_sos.application.live_model import DeckPair, LiveModelInfo
 from clash_sos.domain.analytics import MatchupPrediction, PredictionState
+from clash_sos.domain.attention_model import AttentionMatchupModel
+from clash_sos.domain.attention_schema import (
+    AttentionCardSchema,
+    AttentionModelConfig,
+    build_attention_schema,
+)
+from clash_sos.domain.card_attributes import CARD_ATTRIBUTES
+from clash_sos.infrastructure.kaggle_v6.catalog import KAGGLE_V6_CARDS
+from clash_sos.infrastructure.ml import attention_artifact_io
 
 
 def _battle(time: str, *, unknown: bool = False, crowns: int = 2) -> dict[str, object]:
@@ -147,3 +158,72 @@ def test_live_report_rejects_mismatched_profile() -> None:
         live_analysis.analyze_live_player(
             {"tag": "#OTHER"}, [], tag="#ABC", artifact=Path("model"), window_size=5
         )
+
+
+@pytest.mark.parametrize("all_unsupported", [False, True])
+def test_live_report_excludes_model_coverage_without_losing_other_battles(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, all_unsupported: bool
+) -> None:
+    catalog, _ = expanded_catalog(1)
+    catalog_path = tmp_path / "catalog.json"
+    catalog_path.write_bytes(catalog.serialize())
+    artifact = tmp_path / "artifact"
+    artifact.mkdir()
+    (artifact / "manifest.json").write_text('{"manifest_type":"matchup_attention"}')
+    schema = build_attention_schema(
+        KAGGLE_V6_CARDS.serialize(),
+        attributes=CARD_ATTRIBUTES,
+        network=AttentionModelConfig(neural_component=False),
+    )
+    model = AttentionMatchupModel(schema)
+    manifest = SimpleNamespace(
+        model_version="test",
+        dataset_version="test",
+        catalog_version=schema.catalog_version,
+        balance_era_id=schema.balance_era_id,
+    )
+
+    def load(_path: Path) -> tuple[SimpleNamespace, AttentionCardSchema, AttentionMatchupModel]:
+        return manifest, schema, model
+
+    monkeypatch.setattr(attention_artifact_io, "load_attention_artifact", load)
+    future = _battle("20260925T120000Z")
+    future["team"] = [
+        {
+            "tag": "#ABC",
+            "crowns": 2,
+            "cards": [
+                {"name": name}
+                for name in [
+                    "Future 0",
+                    "Archers",
+                    "Goblins",
+                    "Giant",
+                    "P.E.K.K.A",
+                    "Minions",
+                    "Balloon",
+                    "Witch",
+                ]
+            ],
+        }
+    ]
+    raw = [future] if all_unsupported else [future, _battle("20260925T110000Z")]
+    result = live_analysis.analyze_live_player(
+        {"tag": "#ABC", "name": "Player"},
+        raw,
+        tag="#ABC",
+        artifact=artifact,
+        window_size=1,
+        catalog_path=catalog_path,
+    )
+    assert result.battles[0].skip_reason == "model_coverage"
+    assert result.battles[0].win_probability is None
+    assert not result.battles[0].in_window
+    assert result.schedule.excluded_count == 1
+    assert result.schedule.eligible_count == (0 if all_unsupported else 1)
+    if all_unsupported:
+        assert result.schedule.status == "insufficient_data"
+    else:
+        assert result.battles[1].win_probability == 0.5
+        assert result.battles[1].in_window
+        assert result.schedule.expected_wins == 0.5

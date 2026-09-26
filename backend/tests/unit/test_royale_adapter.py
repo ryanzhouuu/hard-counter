@@ -1,7 +1,13 @@
 """Recent battle conversion keeps deck-only eligibility and clear skip reasons."""
 
+from dataclasses import replace
 from typing import Any
 
+import pytest
+from catalog_fixture import expanded_catalog
+
+from clash_sos.domain.card_catalog import CardCatalog
+from clash_sos.infrastructure.card_inputs import CardInputError
 from clash_sos.infrastructure.clash_royale.adapter import adapt_battle
 
 
@@ -154,3 +160,15 @@ def test_shows_team_battles_and_draws_without_scoring() -> None:
     result = adapt_battle(raw, "#ABC")
     assert result.outcome == "draw"
     assert result.skip_reason == "draw"
+
+
+def test_adapter_uses_selected_mapping_and_rejects_normalized_name_collisions() -> None:
+    catalog, _ = expanded_catalog(1)
+    raw = battle()
+    raw["team"][0]["cards"][0]["name"] = "Future 0"
+    result = adapt_battle(raw, "#ABC", catalog=catalog)
+    assert result.skip_reason is None
+    assert result.player_deck[0] == "z-future-000:base"
+    entries = (*catalog.entries[:-1], replace(catalog.entries[-1], source_name=" KNIGHT "))
+    with pytest.raises(CardInputError, match="names collide"):
+        adapt_battle(raw, "#ABC", catalog=CardCatalog(catalog.version, entries))

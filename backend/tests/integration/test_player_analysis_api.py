@@ -116,3 +116,20 @@ def test_lookup_reports_key_rejection(monkeypatch: pytest.MonkeyPatch) -> None:
     response = asyncio.run(_request("/api/player-analysis?tag=ABC", _settings()))
     assert response.status_code == 503
     assert "allowed IP" in response.json()["detail"]
+
+
+def test_lookup_reports_invalid_selected_catalog(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    async def player(_self: RoyaleClient, tag: str) -> dict[str, object]:
+        return {"tag": tag, "name": "Player"}
+
+    async def battles(_self: RoyaleClient, _tag: str) -> list[dict[str, object]]:
+        return []
+
+    monkeypatch.setattr(RoyaleClient, "player", player)
+    monkeypatch.setattr(RoyaleClient, "battles", battles)
+    settings = _settings().model_copy(update={"live_catalog_path": tmp_path / "missing.json"})
+    response = asyncio.run(_request("/api/player-analysis?tag=ABC", settings))
+    assert response.status_code == 503
+    assert "live card catalog" in response.json()["detail"]

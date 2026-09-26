@@ -7,6 +7,7 @@ from fastapi import APIRouter, HTTPException, Query
 
 from clash_sos.application.live_analysis import LiveAnalysisResponse, analyze_live_player
 from clash_sos.application.live_model import LiveModelError
+from clash_sos.infrastructure.card_inputs import CardInputError
 from clash_sos.infrastructure.clash_royale.client import RoyaleAPIError, RoyaleClient
 from clash_sos.infrastructure.settings import Settings
 
@@ -21,6 +22,7 @@ ERRORS: dict[str, tuple[int, str]] = {
     "invalid_response": (502, "Clash Royale returned an unexpected response."),
     "model_unavailable": (503, "The selected model artifact is unavailable."),
     "missing_ml_runtime": (503, "The selected model requires the ML runtime."),
+    "catalog_unavailable": (503, "The selected live card catalog is unavailable or invalid."),
 }
 
 
@@ -56,7 +58,10 @@ def player_router(settings: Settings) -> APIRouter:
                 tag=normalized,
                 artifact=settings.active_model_path,
                 window_size=window,
+                catalog_path=settings.live_catalog_path,
             )
+        except CardInputError as error:
+            raise HTTPException(status_code=503, detail=ERRORS["catalog_unavailable"][1]) from error
         except (RoyaleAPIError, LiveModelError) as error:
             status, detail = ERRORS.get(error.args[0], ERRORS["upstream_unavailable"])
             raise HTTPException(status_code=status, detail=detail) from error

@@ -1,5 +1,6 @@
 """Build an on-demand player report from recent official battles."""
 
+from dataclasses import replace
 from datetime import datetime
 from pathlib import Path
 
@@ -7,7 +8,8 @@ from pydantic import BaseModel, Field
 
 from clash_sos.application.live_model import score_live_decks
 from clash_sos.application.rolling_sos import summarize_observations
-from clash_sos.domain.analytics import RollingSoSObservation
+from clash_sos.domain.analytics import PredictionState, RollingSoSObservation
+from clash_sos.infrastructure.card_inputs import load_card_catalog
 from clash_sos.infrastructure.clash_royale.adapter import LiveBattle, LiveCard, adapt_battle
 
 
@@ -97,10 +99,12 @@ def analyze_live_player(
     tag: str,
     artifact: Path,
     window_size: int,
+    catalog_path: Path | None = None,
 ) -> LiveAnalysisResponse:
     """Score known decisive 1v1 battles and summarize the newest eligible window."""
     player = _player(profile, tag)
-    battles = [adapt_battle(raw, tag) for raw in raw_battles]
+    catalog = load_card_catalog(catalog_path)
+    battles = [adapt_battle(raw, tag, catalog=catalog) for raw in raw_battles]
     eligible = [battle for battle in battles if battle.skip_reason is None]
     info, predictions = score_live_decks(
         artifact,
@@ -108,7 +112,11 @@ def analyze_live_player(
     )
     observations: list[RollingSoSObservation] = []
     probabilities: dict[str, float] = {}
+    unsupported: set[str] = set()
     for battle, prediction in zip(eligible, predictions, strict=True):
+        if prediction.state is PredictionState.UNAVAILABLE:
+            unsupported.add(battle.fingerprint)
+            continue
         if battle.timestamp is None or prediction.side_a_win_probability is None:
             raise ValueError("eligible_battle_unscored")
         probability = prediction.side_a_win_probability
@@ -123,11 +131,17 @@ def analyze_live_player(
                 provenance=info.provenance,
             )
         )
+    battles = [
+        replace(battle, skip_reason="model_coverage")
+        if battle.fingerprint in unsupported
+        else battle
+        for battle in battles
+    ]
     summary = summarize_observations(
         tag,
         observations,
         window_size=window_size,
-        excluded_count=len(battles) - len(eligible),
+        excluded_count=len(battles) - len(observations),
     )
     window = {observation.battle_fingerprint for observation in summary.window}
     ordered = sorted(
