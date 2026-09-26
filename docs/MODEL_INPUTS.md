@@ -11,6 +11,10 @@ The packaged `infrastructure/clash_royale/cards.json` snapshot includes the 182
 deck identities released through September 26, 2026: the June identities plus
 Ronin, Minion Giant, Elite Barbarians Evolution, and Hero Valkyrie, Berserker,
 and Ice Wizard. The Kaggle catalog retains its original 176 identities.
+Its companion `clash_royale/attributes.json` adds Ronin and Minion Giant and sets
+Void to five elixir for current-era training. June inputs retain Void at three.
+Spirit Empress retains the existing three-elixir feature convention for its
+three/six-elixir deployment mechanic. Forms continue sharing base attributes.
 
 Catalog JSON contains `catalog_version` and `entries`. Each entry is
 `[source_id, source_name, card_id, form]`. Source IDs must be ordered from zero;
