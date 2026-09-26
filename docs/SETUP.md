@@ -42,6 +42,8 @@ pnpm web:dev
 ```
 
 The API listens on `http://127.0.0.1:8000`, and the Vite development server prints its local URL when it starts.
+The development server forwards `/api` requests to the API, so open the Vite URL
+and enter a player tag.
 
 The executable shells can be checked without starting a server:
 
