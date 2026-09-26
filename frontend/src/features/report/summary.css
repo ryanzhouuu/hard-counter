@@ -1,0 +1,105 @@
+.expectation {
+  margin: 0 0 22px;
+}
+
+.expectation-track {
+  position: relative;
+  height: 10px;
+  overflow: hidden;
+  border-radius: 5px;
+  background: var(--track);
+}
+
+.expectation-base,
+.expectation-gap {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+}
+
+.expectation-base {
+  left: 0;
+  background: var(--expected);
+}
+
+.gap-positive {
+  --gap-color: var(--green);
+}
+
+.gap-negative {
+  --gap-color: var(--red);
+}
+
+.expectation-gap {
+  background: var(--gap-color);
+}
+
+.expectation-legend {
+  display: flex;
+  gap: 14px;
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.expectation-legend span::before {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 5px;
+  border-radius: 2px;
+  background: var(--gap-color, var(--expected));
+  content: "";
+}
+
+.window-picker {
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.window-picker legend {
+  margin-bottom: 6px;
+  padding: 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.segmented {
+  display: inline-flex;
+  padding: 3px;
+  border-radius: 9px;
+  background: var(--track);
+}
+
+.segmented button {
+  padding: 6px 14px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.segmented button[aria-pressed="true"] {
+  background: var(--surface);
+  color: var(--ink);
+  font-weight: 600;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 8%);
+}
+
+.segmented button:disabled {
+  color: var(--faint);
+  cursor: not-allowed;
+}
+
+@media (max-width: 959px) {
+  .segmented {
+    display: flex;
+  }
+
+  .segmented button {
+    flex: 1;
+  }
+}
