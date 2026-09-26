@@ -45,7 +45,137 @@
   gap: 4px;
 }
 
+.battle {
+  border-top: 1px solid var(--line);
+}
+
+.battle-row {
+  display: grid;
+  grid-template-columns: 26px auto 22px auto 1fr 36px;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 10px 16px;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.battle-row:hover {
+  background: var(--surface-hover);
+}
+
+.outcome {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  background: var(--track);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.outcome-win {
+  background: var(--green-soft);
+  color: var(--green);
+}
+
+.outcome-loss {
+  background: var(--red-soft);
+  color: var(--red);
+}
+
+.battle-opponent {
+  display: none;
+  overflow: hidden;
+  font-size: 15px;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.battle-vs {
+  color: var(--faint);
+  font-size: 11px;
+  text-align: center;
+}
+
+.win-chance,
+.battle-skip {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  font-size: 14px;
+}
+
+.battle-skip {
+  color: var(--muted);
+  font-size: 13px;
+  text-align: right;
+}
+
+.win-chance-track {
+  width: 56px;
+  height: 6px;
+  overflow: hidden;
+  border-radius: 3px;
+  background: var(--track);
+}
+
+.win-chance-track span {
+  display: block;
+  height: 100%;
+  background: var(--blue);
+}
+
+.battle-ago {
+  color: var(--faint);
+  font-size: 12px;
+  text-align: right;
+}
+
+.battle-detail {
+  padding: 6px 16px 18px;
+  border-top: 1px dashed var(--line);
+  background: var(--surface-hover);
+}
+
+.decks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 36px;
+}
+
+.battle-meta {
+  margin: 12px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
 @media (max-width: 959px) {
+  .battle-row {
+    grid-template-columns: 26px minmax(0, 1fr) 96px 30px;
+    gap: 10px;
+    padding: 14px 16px;
+  }
+
+  .battle-row .mini-deck,
+  .battle-vs {
+    display: none;
+  }
+
+  .battle-opponent {
+    display: block;
+  }
+
+  .decks {
+    gap: 4px;
+  }
+
   .deck {
     width: 100%;
   }
