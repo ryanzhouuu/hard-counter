@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field
 from clash_sos.application.live_model import score_live_decks
 from clash_sos.application.rolling_sos import summarize_observations
 from clash_sos.domain.analytics import RollingSoSObservation
-from clash_sos.infrastructure.clash_royale.adapter import LiveBattle, adapt_battle
+from clash_sos.infrastructure.clash_royale.adapter import LiveBattle, LiveCard, adapt_battle
 
 
 class LivePlayer(BaseModel):
@@ -17,13 +17,18 @@ class LivePlayer(BaseModel):
     trophies: int | None
 
 
+class LiveCardReport(BaseModel):
+    name: str
+    icon_url: str | None
+
+
 class LiveBattleReport(BaseModel):
     timestamp: datetime | None
     mode: str
     opponent_name: str
     outcome: str
-    player_cards: tuple[str, ...]
-    opponent_cards: tuple[str, ...]
+    player_cards: tuple[LiveCardReport, ...]
+    opponent_cards: tuple[LiveCardReport, ...]
     skip_reason: str | None
     win_probability: float | None = Field(ge=0, le=1)
 
@@ -66,14 +71,18 @@ def _player(profile: dict[str, object], tag: str) -> LivePlayer:
     )
 
 
+def _card_reports(cards: tuple[LiveCard, ...]) -> tuple[LiveCardReport, ...]:
+    return tuple(LiveCardReport(name=card.name, icon_url=card.icon_url) for card in cards)
+
+
 def _report(battle: LiveBattle, probability: float | None) -> LiveBattleReport:
     return LiveBattleReport(
         timestamp=battle.timestamp,
         mode=battle.mode,
         opponent_name=battle.opponent_name,
         outcome=battle.outcome,
-        player_cards=tuple(card.name for card in battle.player_cards),
-        opponent_cards=tuple(card.name for card in battle.opponent_cards),
+        player_cards=_card_reports(battle.player_cards),
+        opponent_cards=_card_reports(battle.opponent_cards),
         skip_reason=battle.skip_reason,
         win_probability=probability,
     )

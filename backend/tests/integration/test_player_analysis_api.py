@@ -14,6 +14,8 @@ from clash_sos.infrastructure.clash_royale.client import RoyaleAPIError, RoyaleC
 from clash_sos.infrastructure.settings import Settings
 from clash_sos.interfaces.api.main import create_app
 
+KNIGHT_ICON = "https://api-assets.clashroyale.com/cards/300/knight.png"
+
 
 def _settings() -> Settings:
     return Settings.model_validate({"CLASH_ROYALE_API_TOKEN": "test-secret"})
@@ -52,11 +54,13 @@ def test_lookup_returns_scored_recent_battle(monkeypatch: pytest.MonkeyPatch) ->
             "Musketeer",
             "Baby Dragon",
         ]
+        cards: list[dict[str, object]] = [{"name": name} for name in names]
+        cards[0]["iconUrls"] = {"medium": KNIGHT_ICON}
         return [
             {
                 "battleTime": "20260925T120000Z",
                 "gameMode": {"name": "Friendly"},
-                "team": [{"tag": "#ABC", "crowns": 2, "cards": [{"name": name} for name in names]}],
+                "team": [{"tag": "#ABC", "crowns": 2, "cards": cards}],
                 "opponent": [
                     {
                         "tag": "#DEF",
@@ -92,6 +96,10 @@ def test_lookup_returns_scored_recent_battle(monkeypatch: pytest.MonkeyPatch) ->
     assert body["model"]["training_era_id"] == "2026-06"
     assert body["schedule"]["strength_of_schedule"] == pytest.approx(0.3)
     assert body["battles"][0]["win_probability"] == 0.7
+    assert body["battles"][0]["player_cards"][:2] == [
+        {"name": "Knight", "icon_url": KNIGHT_ICON},
+        {"name": "Archers", "icon_url": None},
+    ]
     assert "test-secret" not in response.text
 
 
