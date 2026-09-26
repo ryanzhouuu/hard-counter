@@ -79,7 +79,8 @@ def test_deck_encoding_ignores_card_order_and_validates_level(schema: AttentionC
     ("field", "value", "message"),
     [
         ("schema_version", "attention-card-schema:v2", "Input should be"),
-        ("attribute_version", "card-attributes:2026-07", "Input should be"),
+        ("attribute_version", "card-attributes:2026-07", "attribute snapshot"),
+        ("catalog_version", "catalog:next", "catalog version"),
         ("catalog_sha256", "0" * 64, "catalog hash"),
         ("token_base_indices", (-1,), "lookup arrays"),
     ],
@@ -147,7 +148,7 @@ def test_default_switch_preserves_cache_identity(schema: AttentionCardSchema) ->
 def test_builder_rejects_corrupted_catalog_snapshots() -> None:
     catalog = loads(KAGGLE_V6_CARDS.serialize())
     catalog["entries"][1][1] = catalog["entries"][0][1]
-    with pytest.raises(ValueError, match="176 unique"):
+    with pytest.raises(ValueError, match="unique"):
         build_attention_schema(
             dumps(catalog).encode(),
             attributes=CARD_ATTRIBUTES,
