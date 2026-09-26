@@ -8,6 +8,9 @@ from typing import cast
 
 from clash_sos.infrastructure.kaggle_v6.catalog import KAGGLE_V6_CARDS, KaggleCardCatalog
 
+FORM_CODES = {1: "evo", 2: "hero"}
+UNSUPPORTED_FORM = "unsupported"
+
 
 @dataclass(frozen=True)
 class LiveCard:
@@ -71,19 +74,32 @@ def _timestamp(value: object) -> datetime | None:
     return None
 
 
+def _form(raw: dict[str, object]) -> str | None:
+    """Official battle logs mark heroes with evolutionLevel 2; heroLevel is honored if present."""
+    hero_level = raw.get("heroLevel")
+    if type(hero_level) is int and hero_level > 0:
+        return "hero"
+    evolution_level = raw.get("evolutionLevel")
+    if type(evolution_level) is int and evolution_level > 0:
+        return FORM_CODES.get(evolution_level, UNSUPPORTED_FORM)
+    return None
+
+
+def _identity(name: str, form: str | None, names: dict[str, str]) -> str | None:
+    """Unknown forms never fall back to base cards."""
+    if form == UNSUPPORTED_FORM:
+        return None
+    lookup = " ".join(name.casefold().split())
+    if form is not None and not lookup.startswith(f"{form} "):
+        lookup = f"{form} {lookup}"
+    return names.get(lookup)
+
+
 def _cards(side: dict[str, object], names: dict[str, str]) -> tuple[LiveCard, ...]:
-    """Use explicit form markers; unknown forms never fall back to base cards."""
     cards: list[LiveCard] = []
     for raw in _objects(side.get("cards")):
         name = _text(raw.get("name"), "Unknown card")
-        lookup = " ".join(name.casefold().split())
-        evolution_level = raw.get("evolutionLevel")
-        hero_level = raw.get("heroLevel")
-        if type(evolution_level) is int and evolution_level > 0 and not lookup.startswith("evo "):
-            lookup = f"evo {lookup}"
-        if type(hero_level) is int and hero_level > 0 and not lookup.startswith("hero "):
-            lookup = f"hero {lookup}"
-        cards.append(LiveCard(name=name, identity=names.get(lookup)))
+        cards.append(LiveCard(name=name, identity=_identity(name, _form(raw), names)))
     return tuple(cards)
 
 

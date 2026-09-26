@@ -75,6 +75,25 @@ def test_form_marker_does_not_duplicate_name_prefix() -> None:
     assert result.opponent_deck[6] == "musketeer:hero"
 
 
+def test_reads_hero_form_from_evolution_level_two() -> None:
+    raw = battle()
+    raw["team"][0]["cards"][0]["evolutionLevel"] = 2
+    raw["team"][0]["cards"][3]["evolutionLevel"] = 2
+
+    result = adapt_battle(raw, "#ABC")
+
+    assert result.skip_reason is None
+    assert result.player_deck[0] == "knight:hero"
+    assert result.player_deck[3] == "giant:hero"
+
+
+def test_skips_unrecognized_evolution_level() -> None:
+    raw = battle()
+    raw["team"][0]["cards"][0]["evolutionLevel"] = 3
+
+    assert adapt_battle(raw, "#ABC").skip_reason == "unknown_card"
+
+
 def test_skips_new_cards_and_new_forms_without_guessing() -> None:
     raw = battle()
     raw["team"][0]["cards"][0]["name"] = "Future Card"
