@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field
 from clash_sos.application.live_model import score_live_decks
 from clash_sos.application.rolling_sos import summarize_observations
 from clash_sos.domain.analytics import PredictionState, RollingSoSObservation
-from clash_sos.infrastructure.card_inputs import load_card_catalog
+from clash_sos.infrastructure.card_inputs import load_live_card_catalog
 from clash_sos.infrastructure.clash_royale.adapter import LiveBattle, LiveCard, adapt_battle
 
 
@@ -103,7 +103,7 @@ def analyze_live_player(
 ) -> LiveAnalysisResponse:
     """Score known decisive 1v1 battles and summarize the newest eligible window."""
     player = _player(profile, tag)
-    catalog = load_card_catalog(catalog_path)
+    catalog = load_live_card_catalog(catalog_path)
     battles = [adapt_battle(raw, tag, catalog=catalog) for raw in raw_battles]
     eligible = [battle for battle in battles if battle.skip_reason is None]
     info, predictions = score_live_decks(

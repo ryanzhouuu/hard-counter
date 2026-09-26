@@ -5,6 +5,7 @@ from pathlib import Path
 
 from clash_sos.domain.card_attributes import CARD_ATTRIBUTES, CardAttributeTable
 from clash_sos.domain.card_catalog import CardCatalog
+from clash_sos.infrastructure.clash_royale.catalog import CURRENT_CARD_CATALOG
 from clash_sos.infrastructure.kaggle_v6.catalog import KAGGLE_V6_CARDS
 
 DEFAULT_CARD_CATALOG = KAGGLE_V6_CARDS
@@ -28,6 +29,11 @@ def load_card_catalog(path: Path | None = None) -> CardCatalog:
         return CardCatalog.from_payload(_read_payload(path))
     except ValueError as error:
         raise CardInputError(f"invalid card catalog: {path}") from error
+
+
+def load_live_card_catalog(path: Path | None = None) -> CardCatalog:
+    """Use released mappings for live lookup while training retains June defaults."""
+    return CURRENT_CARD_CATALOG if path is None else load_card_catalog(path)
 
 
 def load_card_attributes(path: Path | None = None) -> CardAttributeTable:
