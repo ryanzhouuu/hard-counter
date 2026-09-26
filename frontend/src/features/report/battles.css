@@ -1,0 +1,56 @@
+.card-image {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.card-tile {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  aspect-ratio: 5 / 6;
+  padding: 2px;
+  overflow: hidden;
+  border-radius: 4px;
+  background: var(--track);
+  color: var(--muted);
+  font-size: 9px;
+  line-height: 1.1;
+  text-align: center;
+}
+
+.mini-deck {
+  display: grid;
+  grid-template-columns: repeat(8, 26px);
+  gap: 2px;
+}
+
+.mini-deck .card-tile {
+  font-size: 0;
+}
+
+.deck-label {
+  margin: 10px 0 8px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.deck-label-player {
+  color: var(--blue);
+}
+
+.deck-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 58px);
+  gap: 4px;
+}
+
+@media (max-width: 959px) {
+  .deck {
+    width: 100%;
+  }
+
+  .deck-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
