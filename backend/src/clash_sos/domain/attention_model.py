@@ -20,8 +20,11 @@ class AttentionMatchupModel(nn.Module):
         config = schema.network
         self.schema_fingerprint = schema.fingerprint()
         self.identity_count = len(schema.identity_vocab)
+        self.input_size = schema.input_size
         self.explicit = (
-            ExplicitInteractions(self.identity_count) if config.explicit_interactions else None
+            ExplicitInteractions(self.identity_count, input_size=self.input_size)
+            if config.explicit_interactions
+            else None
         )
         self.deck_encoder = DeckEncoder(schema) if config.neural_component else None
         self.cross_blocks = nn.ModuleList(
@@ -40,9 +43,9 @@ class AttentionMatchupModel(nn.Module):
         )
 
     def forward(self, tokens: Tensor) -> Tensor:
-        """Return one antisymmetric logit per [batch, two sides, eight cards]."""
-        if tokens.ndim != 3 or tokens.shape[1:] != (2, 8):
-            raise ValueError("attention inputs must have shape [batch, 2, 8]")
+        """Return antisymmetric logits for the schema's eight/nine-token layout."""
+        if tokens.ndim != 3 or tokens.shape[1:] != (2, self.input_size):
+            raise ValueError(f"attention inputs must have shape [batch, 2, {self.input_size}]")
         side_a, side_b = tokens[:, 0], tokens[:, 1]
         score = self.explicit(side_a, side_b) if self.explicit is not None else None
         if self.deck_encoder is not None and self.ordered_head is not None:

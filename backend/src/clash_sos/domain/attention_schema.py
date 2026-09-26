@@ -25,6 +25,7 @@ from clash_sos.domain.card_attributes import (
 )
 from clash_sos.domain.card_catalog import CardCatalog
 from clash_sos.domain.manifests import ManifestModel, Sha256
+from clash_sos.domain.tower_catalog import TowerCatalog
 
 SCHEMA_VERSION = "attention-card-schema:v1"
 MAX_CARD_IDENTITIES = 2**16
@@ -41,6 +42,7 @@ ROLE_ORDER = (
 )
 ATTRIBUTE_COLUMNS = ("scaled_elixir", "elixir_missing", *ROLE_ORDER)
 PROBABILITY_INTERPRETATION = "deck-only matchup estimate under an equal-skill assumption"
+TOWER_INTERPRETATION = "deck-and-tower matchup estimate under an equal-skill assumption"
 AttributeVector = tuple[float, float, float, float, float, float, float, float]
 
 
@@ -74,6 +76,8 @@ class AttentionModelConfig(ManifestModel):
 
 def _attribute_vector(identity: str, table: CardAttributeTable) -> AttributeVector:
     """Keep Mirror missingness separate from its zero numeric placeholder."""
+    if identity.endswith(":tower"):
+        return (0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
     attribute = table.for_identity(identity)
     values = (
         float(attribute.elixir or 0) / ELIXIR_DIVISOR,
@@ -91,11 +95,14 @@ def _catalog_identities(snapshot: dict[str, object]) -> tuple[str, ...]:
 class AttentionCardSchema(ManifestModel):
     """Artifact-ready identity vocabulary and checked static token lookup."""
 
-    schema_version: Literal["attention-card-schema:v1"] = SCHEMA_VERSION
+    schema_version: Literal["attention-card-schema:v1", "attention-card-schema:v2"] = SCHEMA_VERSION
     catalog_version: str = Field(default=CATALOG_VERSION, min_length=1)
     catalog_sha256: Sha256
     catalog_snapshot: dict[str, object]
-    canonical_schema_version: Literal["kaggle-v6-ranked16-schema:v1"] = CANONICAL_SCHEMA_VERSION
+    canonical_schema_version: Literal[
+        "kaggle-v6-ranked16-schema:v1", "official-ranked16-schema:v1"
+    ] = CANONICAL_SCHEMA_VERSION
+    tower_catalog: TowerCatalog | None = None
     balance_era_id: str = Field(default=BALANCE_ERA_ID, min_length=1)
     accepted_level: Literal[16] = ACCEPTED_CARD_LEVEL
     attribute_version: str = Field(default=ATTRIBUTE_VERSION, min_length=1)
@@ -110,7 +117,8 @@ class AttentionCardSchema(ManifestModel):
     attribute_snapshot: dict[str, object]
     network: AttentionModelConfig
     probability_interpretation: Literal[
-        "deck-only matchup estimate under an equal-skill assumption"
+        "deck-only matchup estimate under an equal-skill assumption",
+        "deck-and-tower matchup estimate under an equal-skill assumption",
     ] = PROBABILITY_INTERPRETATION
 
     @model_validator(mode="after")
@@ -118,7 +126,26 @@ class AttentionCardSchema(ManifestModel):
         """Reject reordered, incomplete, or internally inconsistent snapshots."""
         if sha256(canonical_json_bytes(self.catalog_snapshot)).hexdigest() != self.catalog_sha256:
             raise ValueError("card catalog hash does not match snapshot")
-        catalog_identities = _catalog_identities(self.catalog_snapshot)
+        deck_identities = _catalog_identities(self.catalog_snapshot)
+        tower_identities = (
+            tuple(entry.identity for entry in self.tower_catalog.entries)
+            if self.tower_catalog is not None
+            else ()
+        )
+        catalog_identities = (*deck_identities, *tower_identities)
+        if (self.schema_version == "attention-card-schema:v2") != bool(tower_identities):
+            raise ValueError("schema version must match tower input layout")
+        expected_canonical = (
+            "official-ranked16-schema:v1" if tower_identities else CANONICAL_SCHEMA_VERSION
+        )
+        expected_interpretation = (
+            TOWER_INTERPRETATION if tower_identities else PROBABILITY_INTERPRETATION
+        )
+        if (
+            self.canonical_schema_version != expected_canonical
+            or self.probability_interpretation != expected_interpretation
+        ):
+            raise ValueError("schema population and interpretation do not match input layout")
         if self.catalog_snapshot["catalog_version"] != self.catalog_version:
             raise ValueError("catalog version does not match snapshot")
         if tuple(sorted(catalog_identities)) != self.identity_vocab:
@@ -130,7 +157,10 @@ class AttentionCardSchema(ManifestModel):
         )
         if self.base_vocab != expected_bases:
             raise ValueError("base vocabulary does not match catalog snapshot")
-        if self.form_vocab != tuple(sorted(form.value for form in CardForm)):
+        forms = tuple(
+            sorted([form.value for form in CardForm] + (["tower"] if tower_identities else []))
+        )
+        if self.form_vocab != forms:
             raise ValueError("form vocabulary must contain every supported form")
         if len(self.identity_vocab) > MAX_CARD_IDENTITIES:
             raise ValueError("identity vocabulary exceeds uint16 capacity")
@@ -140,7 +170,11 @@ class AttentionCardSchema(ManifestModel):
         ):
             raise ValueError("token lookup arrays must align with identity vocabulary")
         table = CardAttributeTable.from_payload(self.attribute_snapshot)
-        if table.version != self.attribute_version or set(table.cards) != set(self.base_vocab):
+        deck_bases = {identity.rsplit(":", 1)[0] for identity in deck_identities}
+        tower_bases = {identity.rsplit(":", 1)[0] for identity in tower_identities}
+        if deck_bases & tower_bases:
+            raise ValueError("tower and deployable card IDs must be distinct")
+        if table.version != self.attribute_version or set(table.cards) != deck_bases:
             raise ValueError("attribute snapshot does not cover the base vocabulary")
         for index, identity in enumerate(self.identity_vocab):
             parts = identity.rsplit(":", 1)
@@ -168,6 +202,16 @@ class AttentionCardSchema(ManifestModel):
         """Cache lookup for the multi-million-row input materializer."""
         return {identity: index for index, identity in enumerate(self.identity_vocab)}
 
+    @property
+    def input_size(self) -> int:
+        return DECK_SIZE + int(self.tower_catalog is not None)
+
+    @cached_property
+    def tower_indices(self) -> frozenset[int]:
+        return frozenset(
+            index for identity, index in self.identity_index.items() if identity.endswith(":tower")
+        )
+
     def encode_deck(
         self, identities: Sequence[str], *, levels: Sequence[int] | None = None
     ) -> tuple[int, ...]:
@@ -176,6 +220,8 @@ class AttentionCardSchema(ManifestModel):
             raise ValueError("deck must contain exactly eight aligned cards")
         if len(set(identities)) != DECK_SIZE:
             raise ValueError("deck must contain distinct card-form identities")
+        if any(identity.endswith(":tower") for identity in identities):
+            raise ValueError("tower troops cannot occupy deployable deck slots")
         if levels is not None and any(level != self.accepted_level for level in levels):
             raise ValueError("attention schema requires card level 16")
         try:
@@ -183,9 +229,31 @@ class AttentionCardSchema(ManifestModel):
         except KeyError as error:
             raise ValueError(f"unsupported card identity: {error.args[0]}") from error
 
+    def encode_side(
+        self,
+        identities: Sequence[str],
+        *,
+        tower: str | None = None,
+        levels: Sequence[int] | None = None,
+        tower_level: int | None = None,
+    ) -> tuple[int, ...]:
+        """Encode eight cards plus a required known tower for v2 inputs."""
+        cards = self.encode_deck(identities, levels=levels)
+        if self.tower_catalog is None:
+            return cards
+        token = self.identity_index.get(tower or "")
+        if token not in self.tower_indices:
+            raise ValueError("tower-aware inputs require a known tower identity")
+        if tower_level is not None and tower_level != self.accepted_level:
+            raise ValueError("attention schema requires tower level 16")
+        assert token is not None
+        return (*cards, token)
+
     def fingerprint(self) -> str:
         """Keep the v1 default hash stable for already-published input caches."""
         payload = self.model_dump(mode="python")
+        if self.tower_catalog is None:
+            payload.pop("tower_catalog")
         if self.network.neural_component:
             payload["network"].pop("neural_component")
         return sha256(canonical_json_bytes(payload)).hexdigest()
@@ -197,18 +265,32 @@ def build_attention_schema(
     attributes: CardAttributeTable,
     network: AttentionModelConfig,
     balance_era_id: str = BALANCE_ERA_ID,
+    tower_catalog: TowerCatalog | None = None,
 ) -> AttentionCardSchema:
     """Snapshot catalog identities and attributes into a validated v1 schema."""
     raw_snapshot: object = loads(catalog_bytes)
     if not isinstance(raw_snapshot, dict):
         raise ValueError("card catalog snapshot must be an object")
     catalog_snapshot = cast(dict[str, object], raw_snapshot)
-    ordered = tuple(sorted(_catalog_identities(catalog_snapshot)))
+    tower_identities = (
+        tuple(entry.identity for entry in tower_catalog.entries) if tower_catalog else ()
+    )
+    ordered = tuple(sorted((*_catalog_identities(catalog_snapshot), *tower_identities)))
     base_vocab = tuple(sorted({identity.rsplit(":", 1)[0] for identity in ordered}))
-    form_vocab = tuple(sorted(form.value for form in CardForm))
+    form_vocab = tuple(
+        sorted([form.value for form in CardForm] + (["tower"] if tower_catalog else []))
+    )
     base_index = {card_id: index for index, card_id in enumerate(base_vocab)}
     form_index = {form: index for index, form in enumerate(form_vocab)}
     return AttentionCardSchema(
+        schema_version="attention-card-schema:v2" if tower_catalog else SCHEMA_VERSION,
+        canonical_schema_version="official-ranked16-schema:v1"
+        if tower_catalog
+        else CANONICAL_SCHEMA_VERSION,
+        tower_catalog=tower_catalog,
+        probability_interpretation=TOWER_INTERPRETATION
+        if tower_catalog
+        else PROBABILITY_INTERPRETATION,
         catalog_version=cast(str, catalog_snapshot["catalog_version"]),
         catalog_sha256=sha256(canonical_json_bytes(catalog_snapshot)).hexdigest(),
         catalog_snapshot=catalog_snapshot,
