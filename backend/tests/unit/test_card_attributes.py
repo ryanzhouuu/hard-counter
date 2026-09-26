@@ -1,6 +1,6 @@
 import pytest
 
-from clash_sos.domain.card_attributes import CARD_ATTRIBUTES, SUMMARY_COLUMNS
+from clash_sos.domain.card_attributes import CARD_ATTRIBUTES, SUMMARY_COLUMNS, CardAttributeTable
 from clash_sos.infrastructure.kaggle_v6.catalog import KAGGLE_V6_CARDS
 
 
@@ -47,3 +47,14 @@ def test_summaries_average_elixir_and_count_every_role() -> None:
 def test_missing_identity_is_rejected() -> None:
     with pytest.raises(ValueError, match="missing card attributes"):
         CARD_ATTRIBUTES.for_identity("not-a-card:base")
+
+
+def test_attribute_versions_are_data_inputs() -> None:
+    payload = CARD_ATTRIBUTES.to_payload()
+    payload["attribute_version"] = "card-attributes:next"
+    table = CardAttributeTable.from_payload(payload)
+    assert table.version == "card-attributes:next"
+    assert table.cards == CARD_ATTRIBUTES.cards
+    payload["attribute_version"] = " "
+    with pytest.raises(ValueError, match="version is required"):
+        CardAttributeTable.from_payload(payload)
