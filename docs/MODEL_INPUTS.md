@@ -29,3 +29,11 @@ assumption; additional vocabulary entries alone do not establish trained support
 Training eligibility remains level 16. The current Kaggle prepared-data contract
 also requires its ranked mode and winner-first rows. Supporting another catalog
 does not change those source requirements.
+
+## Attention caches
+
+`attention-input-cache:v1` stores card tokens as `uint16` and binary labels as
+`uint8`. Older `uint8` token caches must be regenerated. Training rejects them
+with rebuild guidance and leaves their files intact. Select a fresh
+`--cache-directory` when rebuilding. Changing cache token storage does not change
+an existing model artifact's vocabulary or weights.

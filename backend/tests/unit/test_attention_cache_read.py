@@ -1,5 +1,6 @@
 """Reopen disk caches only when their arrays and metadata remain aligned."""
 
+from json import dumps, loads
 from pathlib import Path
 
 import duckdb
@@ -105,7 +106,7 @@ def test_reopened_cache_yields_repeatable_fit_batches_and_ordered_evaluation(
     second = list(cache.iter_batches("refit", batch_size=1, seed=4, epoch=2))
     assert len(first) == 2
     assert [labels.tolist() for _, labels in first] == [labels.tolist() for _, labels in second]
-    assert all(tokens.shape == (1, 2, 8) and tokens.dtype == np.uint8 for tokens, _ in first)
+    assert all(tokens.shape == (1, 2, 8) and tokens.dtype == np.uint16 for tokens, _ in first)
     evaluation = list(cache.iter_batches("development", batch_size=1, seed=99, epoch=4))
     assert len(evaluation) == 2
     assert [labels.tolist() for _, labels in evaluation] == [
@@ -148,4 +149,40 @@ def test_loader_rejects_corrupt_file_and_sidecar_alignment(tmp_path: Path) -> No
     )
     manifest_path.write_bytes(dump_cache_manifest(manifest.model_copy(update={"files": files})))
     with pytest.raises(AttentionCacheReadError, match="ordinals are not contiguous"):
+        load_attention_cache(dataset, directory, protocol, schema)
+
+
+def test_loader_requires_rebuilding_uint8_caches(tmp_path: Path) -> None:
+    dataset, directory, schema, protocol = write_cache(tmp_path)
+    manifest_path = directory / "manifest.json"
+    payload = loads(manifest_path.read_bytes())
+    payload["token_dtype"] = "uint8"
+    manifest_path.write_text(dumps(payload))
+    with pytest.raises(AttentionCacheReadError, match=r"rebuild.*cache"):
+        load_attention_cache(dataset, directory, protocol, schema)
+    assert (directory / "train/tokens.npy").exists()
+
+
+@pytest.mark.parametrize("invalid_dtype", [True, False])
+def test_loader_checks_array_dtype_and_token_bounds(tmp_path: Path, invalid_dtype: bool) -> None:
+    dataset, directory, schema, protocol = write_cache(tmp_path)
+    path = directory / "train/tokens.npy"
+    tokens = np.load(path)
+    if invalid_dtype:
+        tokens = tokens.astype(np.uint8)
+    else:
+        tokens[0, 0, 0] = len(schema.identity_vocab)
+    np.save(path, tokens)
+    manifest_path = directory / "manifest.json"
+    manifest = AttentionCacheManifest.model_validate_json(manifest_path.read_bytes())
+    size, digest = hash_file(path, 1024)
+    files = tuple(
+        file.model_copy(update={"size_bytes": size, "sha256": digest})
+        if file.path == "train/tokens.npy"
+        else file
+        for file in manifest.files
+    )
+    manifest_path.write_bytes(dump_cache_manifest(manifest.model_copy(update={"files": files})))
+    message = "rebuild.*cache" if invalid_dtype else "token.*vocabulary"
+    with pytest.raises(AttentionCacheReadError, match=message):
         load_attention_cache(dataset, directory, protocol, schema)
