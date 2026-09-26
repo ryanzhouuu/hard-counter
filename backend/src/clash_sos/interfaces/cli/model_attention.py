@@ -26,6 +26,12 @@ def train_attention(
     cache_directory: Path = Path("data/cache/attention-temporal-v1"),
     output_workspace: Path = Path("data/tmp/attention-model-output"),
     network_config: Annotated[Path | None, typer.Option()] = None,
+    catalog: Annotated[
+        Path | None, typer.Option(help="Card catalog JSON; defaults to June")
+    ] = None,
+    attributes: Annotated[
+        Path | None, typer.Option(help="Card attributes JSON; defaults to June")
+    ] = None,
     model_version: str = DEFAULT_ATTENTION_MODEL_VERSION,
     seed: int = 0,
     device: Literal["auto", "cpu", "mps"] = "auto",
@@ -78,6 +84,8 @@ def train_attention(
             staging_config=staging_config,
             model_version=model_version,
             network_config_path=network_config,
+            catalog_path=catalog,
+            attributes_path=attributes,
             progress=lambda message: typer.echo(message, err=True),
         )
     except (ValueError, TimeoutError) as error:

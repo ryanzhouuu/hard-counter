@@ -38,6 +38,10 @@ def test_train_attention_cli_forwards_validated_options(tmp_path: Path) -> None:
                 str(tmp_path / "output"),
                 "--network-config",
                 str(tmp_path / "network.json"),
+                "--catalog",
+                str(tmp_path / "catalog.json"),
+                "--attributes",
+                str(tmp_path / "attributes.json"),
                 "--model-version",
                 "attention-test-v1",
                 "--seed",
@@ -76,6 +80,8 @@ def test_train_attention_cli_forwards_validated_options(tmp_path: Path) -> None:
     assert options["cache_directory"] == tmp_path / "cache"
     assert options["output_workspace"] == tmp_path / "output"
     assert options["network_config_path"] == tmp_path / "network.json"
+    assert options["catalog_path"] == tmp_path / "catalog.json"
+    assert options["attributes_path"] == tmp_path / "attributes.json"
     assert options["model_version"] == "attention-test-v1"
     assert options["fit_config"].model_dump()["batch_size"] == 32
     assert options["fit_config"].model_dump()["learning_rate"] == 0.002

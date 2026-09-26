@@ -37,3 +37,23 @@ does not change those source requirements.
 with rebuild guidance and leaves their files intact. Select a fresh
 `--cache-directory` when rebuilding. Changing cache token storage does not change
 an existing model artifact's vocabulary or weights.
+
+## Selecting training inputs
+
+`model train-attention` accepts optional `--catalog` and `--attributes` JSON paths.
+Without them it uses the packaged June inputs. The balance era comes from the
+resolved protocol and must match the prepared dataset. Its `encoding_sha256` must
+match the selected card inputs and network configuration.
+
+```bash
+uv run --extra ml clash-sos model train-attention \
+  --protocol data/config/attention-temporal.json \
+  --catalog data/config/card-catalog.json \
+  --attributes data/config/card-attributes.json \
+  --cache-directory data/cache/attention-uint16
+```
+
+The Kaggle source validator requires coverage of every identity in its frozen
+June mapping, even when the model catalog contains additional identities. It
+continues verifying manifest/file hashes, the era, and resolved row selections.
+Training from official API snapshots requires a separate preparation adapter.

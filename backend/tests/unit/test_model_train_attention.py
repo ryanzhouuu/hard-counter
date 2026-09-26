@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pytest
 from attention_cache_fixture import write_cache_dataset
+from catalog_fixture import expanded_catalog
 
 from clash_sos.application.attention_fit import AttentionFitConfig, AttentionFitTimeLimit
 from clash_sos.application.dataset_staging import StagingConfig
@@ -14,6 +15,7 @@ from clash_sos.application.model_train_attention import (
 )
 from clash_sos.domain.attention_artifact import AttentionArtifactManifest
 from clash_sos.domain.attention_protocol import AttentionProtocol
+from clash_sos.domain.attention_schema import AttentionModelConfig, build_attention_schema
 from clash_sos.domain.canonical_dataset import canonical_json_bytes
 from clash_sos.infrastructure.ml.attention_artifact_io import load_attention_artifact
 
@@ -110,3 +112,33 @@ def test_attention_training_cleans_output_after_fit_failure(tmp_path: Path) -> N
         )
     assert not (tmp_path / "artifact").exists()
     assert not (tmp_path / "output").exists()
+
+
+def test_attention_training_freezes_explicit_card_inputs(tmp_path: Path) -> None:
+    dataset, protocol_path, protocol = inputs(tmp_path)
+    catalog, attributes = expanded_catalog()
+    catalog_path, attributes_path = tmp_path / "catalog.json", tmp_path / "attributes.json"
+    catalog_path.write_bytes(catalog.serialize())
+    attributes_path.write_bytes(canonical_json_bytes(attributes.to_payload()))
+    schema = build_attention_schema(
+        catalog.serialize(), attributes=attributes, network=AttentionModelConfig()
+    )
+    protocol = protocol.model_copy(update={"encoding_sha256": schema.fingerprint()})
+    protocol_path.write_bytes(canonical_json_bytes(protocol.model_dump(mode="python")))
+    destination = train_attention_artifact(
+        dataset,
+        tmp_path / "artifact",
+        protocol_path=protocol_path,
+        cache_directory=tmp_path / "cache",
+        output_workspace=tmp_path / "output",
+        fit_config=AttentionFitConfig(batch_size=1, max_epochs=1, seed=4, device="cpu"),
+        staging_config=StagingConfig(chunk_size=1024, batch_rows=1, memory_limit="256MB"),
+        model_version="expanded-v1",
+        catalog_path=catalog_path,
+        attributes_path=attributes_path,
+    )
+    manifest, frozen, model = load_attention_artifact(destination, chunk_size=1024)
+    assert manifest.catalog_version == catalog.version
+    assert frozen == schema
+    assert model.identity_count == 266
+    assert frozen.attribute_snapshot == attributes.to_payload()

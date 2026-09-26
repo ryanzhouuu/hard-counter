@@ -13,6 +13,7 @@ from clash_sos.domain.attention_protocol import AttentionProtocol, Partition
 from clash_sos.domain.attention_schema import AttentionCardSchema
 from clash_sos.domain.processed_manifest import ProcessedDatasetManifest, ProcessedOutputFile
 from clash_sos.infrastructure.kaggle_v6.audit_io import hash_file
+from clash_sos.infrastructure.kaggle_v6.catalog import KAGGLE_V6_CARDS
 
 
 class AttentionCacheSourceError(ValueError):
@@ -70,13 +71,16 @@ def validate_attention_sources(
         raise AttentionCacheSourceError("processed manifest is invalid") from error
     if (
         manifest.dataset_version != protocol.dataset_version
-        or manifest.catalog_version != schema.catalog_version
+        or manifest.catalog_version != KAGGLE_V6_CARDS.version
         or len(manifest.accepted.eras) != 1
         or manifest.accepted.eras[0].era_id != protocol.balance_era_id
         or schema.balance_era_id != protocol.balance_era_id
         or schema.fingerprint() != protocol.encoding_sha256
     ):
         raise AttentionCacheSourceError("processed dataset, protocol, and encoding disagree")
+    required_identities = {entry.card.identity_key for entry in KAGGLE_V6_CARDS.entries}
+    if not required_identities.issubset(schema.identity_vocab):
+        raise AttentionCacheSourceError("selected schema does not cover the Kaggle source catalog")
     canonical = _inventoried_file(manifest, "canonical", "canonical.parquet")
     split_kind = "temporal_split" if protocol.family == "temporal" else "player_disjoint_split"
     split = _inventoried_file(manifest, split_kind, protocol.split_file)
