@@ -31,6 +31,7 @@ class LiveBattleReport(BaseModel):
     opponent_cards: tuple[LiveCardReport, ...]
     skip_reason: str | None
     win_probability: float | None = Field(ge=0, le=1)
+    in_window: bool
 
 
 class LiveSchedule(BaseModel):
@@ -75,7 +76,7 @@ def _card_reports(cards: tuple[LiveCard, ...]) -> tuple[LiveCardReport, ...]:
     return tuple(LiveCardReport(name=card.name, icon_url=card.icon_url) for card in cards)
 
 
-def _report(battle: LiveBattle, probability: float | None) -> LiveBattleReport:
+def _report(battle: LiveBattle, probability: float | None, in_window: bool) -> LiveBattleReport:
     return LiveBattleReport(
         timestamp=battle.timestamp,
         mode=battle.mode,
@@ -85,6 +86,7 @@ def _report(battle: LiveBattle, probability: float | None) -> LiveBattleReport:
         opponent_cards=_card_reports(battle.opponent_cards),
         skip_reason=battle.skip_reason,
         win_probability=probability,
+        in_window=in_window,
     )
 
 
@@ -127,6 +129,7 @@ def analyze_live_player(
         window_size=window_size,
         excluded_count=len(battles) - len(eligible),
     )
+    window = {observation.battle_fingerprint for observation in summary.window}
     ordered = sorted(
         battles,
         key=lambda battle: battle.timestamp.timestamp() if battle.timestamp else 0,
@@ -145,5 +148,8 @@ def analyze_live_player(
             actual_wins=summary.actual_wins,
             performance_above_expectation=summary.performance_above_expectation,
         ),
-        battles=tuple(_report(battle, probabilities.get(battle.fingerprint)) for battle in ordered),
+        battles=tuple(
+            _report(battle, probabilities.get(battle.fingerprint), battle.fingerprint in window)
+            for battle in ordered
+        ),
     )
