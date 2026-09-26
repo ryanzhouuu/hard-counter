@@ -81,7 +81,7 @@ Training from official API snapshots requires a separate preparation adapter.
 ## Live mapping and model coverage
 
 Set optional `CLASH_SOS_LIVE_CATALOG_PATH` to a catalog JSON file to select the
-live name/form mapping. It defaults to the packaged June mapping. Actual new
+live name/form mapping. It defaults to the packaged current mapping. Actual new
 API identities and representations still require validation before adding them.
 
 Parsing uses this mapping; scoring uses the selected artifact's frozen
@@ -90,3 +90,6 @@ remain visible with `model_coverage` as their skip reason. They do not contribut
 to rolling metrics or prevent supported battles from being scored. Unknown
 identities/forms remain excluded without substituting base cards. Live mode and
 level handling retain their existing behavior.
+Live parsing separately preserves each side's `supportCards` identity and
+normalized tower level. Missing, malformed, or unknown towers are never assumed
+to be Tower Princess. They do not change legacy deck-only eligibility.

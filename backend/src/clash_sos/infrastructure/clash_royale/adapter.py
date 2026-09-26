@@ -7,7 +7,9 @@ from json import dumps
 from typing import cast
 
 from clash_sos.domain.card_catalog import CardCatalog
-from clash_sos.infrastructure.card_inputs import DEFAULT_CARD_CATALOG, CardInputError
+from clash_sos.infrastructure.card_inputs import CardInputError
+from clash_sos.infrastructure.clash_royale.catalog import CURRENT_CARD_CATALOG
+from clash_sos.infrastructure.clash_royale.tower_adapter import LiveTower, adapt_tower
 
 FORM_CODES = {1: "evo", 2: "hero"}
 UNSUPPORTED_FORM = "unsupported"
@@ -36,6 +38,8 @@ class LiveBattle:
     player_cards: tuple[LiveCard, ...]
     opponent_cards: tuple[LiveCard, ...]
     skip_reason: str | None
+    player_tower: LiveTower | None = None
+    opponent_tower: LiveTower | None = None
 
     @property
     def player_deck(self) -> tuple[str, ...]:
@@ -142,7 +146,7 @@ def _valid_deck(cards: tuple[LiveCard, ...]) -> str | None:
 
 
 def adapt_battle(
-    raw: dict[str, object], tag: str, *, catalog: CardCatalog = DEFAULT_CARD_CATALOG
+    raw: dict[str, object], tag: str, *, catalog: CardCatalog = CURRENT_CARD_CATALOG
 ) -> LiveBattle:
     """Keep unsupported battles visible while admitting only decisive known 1v1 decks."""
     teams = _objects(raw.get("team"))
@@ -189,4 +193,6 @@ def adapt_battle(
         player_cards=player_cards,
         opponent_cards=opponent_cards,
         skip_reason=reason,
+        player_tower=adapt_tower(player_side or {}),
+        opponent_tower=adapt_tower(other_side),
     )
