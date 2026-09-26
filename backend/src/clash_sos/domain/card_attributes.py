@@ -1,4 +1,4 @@
-"""Versioned elixir and role attributes for June 2026 card ids.
+"""Versioned elixir and role attributes with a packaged June 2026 default.
 
 Evolutions and heroes inherit the base card. Mirror has no fixed deploy cost.
 """
@@ -36,8 +36,8 @@ class CardAttributeTable:
     """Lookup and deck summaries for one attribute version."""
 
     def __init__(self, version: str, cards: Mapping[str, CardAttribute]) -> None:
-        if version != ATTRIBUTE_VERSION:
-            raise ValueError("attribute version must be card-attributes:2026-06")
+        if not version.strip():
+            raise ValueError("attribute version is required")
         if not cards:
             raise ValueError("card attributes are required")
         self.version = version
@@ -138,7 +138,7 @@ class CardAttributeTable:
             raise ValueError("mirror must be the only card without elixir")
         version = body.get("attribute_version")
         if not isinstance(version, str):
-            raise ValueError("attribute version must be card-attributes:2026-06")
+            raise ValueError("attribute version is required")
         return cls(version, cards)
 
 
