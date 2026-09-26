@@ -4,6 +4,7 @@ const SKIP_LABELS: Record<string, string> = {
   draw: "Draw",
   team_battle: "Team battle",
   unknown_card: "New card not yet supported",
+  model_coverage: "Card not supported by this model",
   incomplete_deck: "Incomplete deck",
   repeated_card: "Unusual deck",
   incomplete_battle: "Incomplete battle data",

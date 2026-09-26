@@ -6,7 +6,8 @@ from hashlib import sha256
 from json import dumps
 from typing import cast
 
-from clash_sos.infrastructure.kaggle_v6.catalog import KAGGLE_V6_CARDS, KaggleCardCatalog
+from clash_sos.domain.card_catalog import CardCatalog
+from clash_sos.infrastructure.card_inputs import DEFAULT_CARD_CATALOG, CardInputError
 
 FORM_CODES = {1: "evo", 2: "hero"}
 UNSUPPORTED_FORM = "unsupported"
@@ -47,8 +48,14 @@ class LiveBattle:
         return tuple(card.identity for card in self.opponent_cards if card.identity is not None)
 
 
-def _card_names(catalog: KaggleCardCatalog) -> dict[str, str]:
-    return {entry.source_name: entry.card.identity_key for entry in catalog.entries}
+def _card_names(catalog: CardCatalog) -> dict[str, str]:
+    names = {
+        " ".join(entry.source_name.casefold().split()): entry.card.identity_key
+        for entry in catalog.entries
+    }
+    if len(names) != len(catalog.entries):
+        raise CardInputError("catalog names collide after API name normalization")
+    return names
 
 
 def _text(value: object, fallback: str = "") -> str:
@@ -123,7 +130,7 @@ def _cards(side: dict[str, object], names: dict[str, str]) -> tuple[LiveCard, ..
 
 
 def _valid_deck(cards: tuple[LiveCard, ...]) -> str | None:
-    """Require eight distinct identities known to the artifact catalog."""
+    """Require eight distinct identities resolved by the selected mapping."""
     if len(cards) != 8:
         return "incomplete_deck"
     identities = [card.identity for card in cards]
@@ -135,7 +142,7 @@ def _valid_deck(cards: tuple[LiveCard, ...]) -> str | None:
 
 
 def adapt_battle(
-    raw: dict[str, object], tag: str, *, catalog: KaggleCardCatalog = KAGGLE_V6_CARDS
+    raw: dict[str, object], tag: str, *, catalog: CardCatalog = DEFAULT_CARD_CATALOG
 ) -> LiveBattle:
     """Keep unsupported battles visible while admitting only decisive known 1v1 decks."""
     teams = _objects(raw.get("team"))

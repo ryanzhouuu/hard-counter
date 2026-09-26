@@ -19,6 +19,7 @@ class Settings(BaseSettings):
         default=None, validation_alias="CLASH_ROYALE_API_TOKEN"
     )
     active_model_path: Path = Path("models/kaggle-v6-ranked16-attention-v1")
+    live_catalog_path: Path | None = None
 
 
 @lru_cache

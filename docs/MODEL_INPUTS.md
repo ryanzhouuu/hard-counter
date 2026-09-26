@@ -57,3 +57,16 @@ The Kaggle source validator requires coverage of every identity in its frozen
 June mapping, even when the model catalog contains additional identities. It
 continues verifying manifest/file hashes, the era, and resolved row selections.
 Training from official API snapshots requires a separate preparation adapter.
+
+## Live mapping and model coverage
+
+Set optional `CLASH_SOS_LIVE_CATALOG_PATH` to a catalog JSON file to select the
+live name/form mapping. It defaults to the packaged June mapping. Actual new
+API identities and representations still require validation before adding them.
+
+Parsing uses this mapping; scoring uses the selected artifact's frozen
+vocabulary. Battles containing a mapped identity absent from that vocabulary
+remain visible with `model_coverage` as their skip reason. They do not contribute
+to rolling metrics or prevent supported battles from being scored. Unknown
+identities/forms remain excluded without substituting base cards. Live mode and
+level handling retain their existing behavior.
