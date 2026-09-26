@@ -21,9 +21,8 @@ from clash_sos.application.dataset_staging import StagingConfig
 from clash_sos.application.model_train import require_publish_paths
 from clash_sos.domain.attention_protocol import AttentionProtocol
 from clash_sos.domain.attention_schema import AttentionModelConfig, build_attention_schema
-from clash_sos.domain.card_attributes import CARD_ATTRIBUTES
+from clash_sos.infrastructure.card_inputs import load_card_attributes, load_card_catalog
 from clash_sos.infrastructure.kaggle_v6.attention_io import build_attention_cache
-from clash_sos.infrastructure.kaggle_v6.catalog import KAGGLE_V6_CARDS
 from clash_sos.infrastructure.ml.attention_artifact_io import finalize_attention_artifact
 
 
@@ -69,6 +68,8 @@ def train_attention_artifact(
     staging_config: StagingConfig,
     model_version: str,
     network_config_path: Path | None = None,
+    catalog_path: Path | None = None,
+    attributes_path: Path | None = None,
     progress: Callable[[str], None] | None = None,
 ) -> Path:
     """Fit only protocol training rows and publish checked evaluation sidecars."""
@@ -76,10 +77,15 @@ def train_attention_artifact(
     protocol = _load_protocol(protocol_path)
     network = _load_network(network_config_path)
     schema = build_attention_schema(
-        KAGGLE_V6_CARDS.serialize(), attributes=CARD_ATTRIBUTES, network=network
+        load_card_catalog(catalog_path).serialize(),
+        attributes=load_card_attributes(attributes_path),
+        network=network,
+        balance_era_id=protocol.balance_era_id,
     )
     if schema.fingerprint() != protocol.encoding_sha256:
-        raise AttentionTrainError("protocol encoding does not match the selected network")
+        raise AttentionTrainError(
+            "protocol encoding does not match the selected card inputs or network"
+        )
     if progress is not None:
         progress(f"verifying attention inputs ({protocol.refit.row_count} refit rows)")
     cache = build_attention_cache(dataset, cache_directory, protocol, schema, config=staging_config)
