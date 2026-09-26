@@ -111,6 +111,35 @@ def test_live_report_needs_full_window(monkeypatch: pytest.MonkeyPatch) -> None:
     assert result.schedule.status == "insufficient_data"
     assert result.schedule.eligible_count == 1
     assert result.schedule.strength_of_schedule is None
+    assert not any(battle.in_window for battle in result.battles)
+
+
+def test_live_report_marks_newest_window_battles(monkeypatch: pytest.MonkeyPatch) -> None:
+    info = LiveModelInfo("attention", "data", "catalog", "2026-06")
+
+    def score(
+        _artifact: Path, pairs: Sequence[DeckPair]
+    ) -> tuple[LiveModelInfo, tuple[MatchupPrediction, ...]]:
+        prediction = MatchupPrediction(
+            state=PredictionState.AVAILABLE,
+            side_a_win_probability=0.5,
+            provenance=info.provenance,
+        )
+        return info, tuple(prediction for _ in pairs)
+
+    monkeypatch.setattr(live_analysis, "score_live_decks", score)
+    result = live_analysis.analyze_live_player(
+        {"tag": "#ABC", "name": "Player"},
+        [
+            _battle("20260925T100000Z"),
+            _battle("20260925T120000Z"),
+            _battle("20260925T110000Z", unknown=True),
+        ],
+        tag="#ABC",
+        artifact=Path("model"),
+        window_size=1,
+    )
+    assert [battle.in_window for battle in result.battles] == [True, False, False]
 
 
 def test_live_report_rejects_mismatched_profile() -> None:
