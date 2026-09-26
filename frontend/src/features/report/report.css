@@ -1,0 +1,139 @@
+.report-page {
+  flex: 1;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 32px;
+  border-bottom: 1px solid var(--line);
+}
+
+.wordmark {
+  color: var(--ink);
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  text-decoration: none;
+}
+
+.error-notice {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin: 16px 32px 0;
+  padding: 12px 16px;
+  border: 1px solid var(--red-soft);
+  border-radius: 10px;
+  background: #fff7f6;
+  color: var(--red);
+  font-size: 14px;
+}
+
+.error-notice p {
+  margin: 0;
+}
+
+.error-notice button {
+  padding: 6px 12px;
+  border: 1px solid var(--red);
+  border-radius: 7px;
+  background: transparent;
+  color: var(--red);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.report {
+  display: grid;
+  grid-template-columns: 300px minmax(0, 1fr);
+  gap: 40px;
+  padding: 32px;
+  transition: opacity 150ms ease;
+}
+
+.report[data-updating] {
+  opacity: 0.55;
+}
+
+.summary {
+  position: sticky;
+  top: 24px;
+  align-self: start;
+}
+
+.skeleton {
+  display: block;
+  border-radius: 8px;
+  background: var(--track);
+  animation: pulse 1.2s ease-in-out infinite;
+}
+
+.skeleton-name {
+  width: 60%;
+  height: 26px;
+  margin-bottom: 28px;
+}
+
+.skeleton-headline {
+  width: 80%;
+  height: 38px;
+  margin-bottom: 12px;
+}
+
+.skeleton-line {
+  width: 50%;
+  height: 16px;
+}
+
+.skeleton-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.skeleton-row {
+  height: 52px;
+  border-radius: 0;
+}
+
+.skeleton-row + .skeleton-row {
+  border-top: 1px solid var(--line);
+}
+
+@keyframes pulse {
+  50% {
+    opacity: 0.5;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton {
+    animation: none;
+  }
+}
+
+@media (max-width: 959px) {
+  .topbar {
+    padding: 14px 18px;
+  }
+
+  .error-notice {
+    margin: 12px 18px 0;
+  }
+
+  .report {
+    grid-template-columns: 1fr;
+    gap: 20px;
+    padding: 20px 0 0;
+  }
+
+  .summary {
+    position: static;
+    padding: 0 18px;
+  }
+}
