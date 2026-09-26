@@ -1,0 +1,9 @@
+{
+  "catalog_version": "official-towers:2026-09-26",
+  "entries": [
+    {"tower_id": "tower-princess", "name": "Tower Princess", "api_id": 159000000, "max_api_level": 16},
+    {"tower_id": "cannoneer", "name": "Cannoneer", "api_id": 159000001, "max_api_level": 11},
+    {"tower_id": "dagger-duchess", "name": "Dagger Duchess", "api_id": 159000002, "max_api_level": 8},
+    {"tower_id": "royal-chef", "name": "Royal Chef", "api_id": 159000004, "max_api_level": 8}
+  ]
+}
