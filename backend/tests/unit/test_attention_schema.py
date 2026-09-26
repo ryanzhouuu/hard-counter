@@ -78,7 +78,7 @@ def test_deck_encoding_ignores_card_order_and_validates_level(schema: AttentionC
 @pytest.mark.parametrize(
     ("field", "value", "message"),
     [
-        ("schema_version", "attention-card-schema:v2", "Input should be"),
+        ("schema_version", "attention-card-schema:v3", "Input should be"),
         ("attribute_version", "card-attributes:2026-07", "attribute snapshot"),
         ("catalog_version", "catalog:next", "catalog version"),
         ("catalog_sha256", "0" * 64, "catalog hash"),

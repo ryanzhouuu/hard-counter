@@ -33,6 +33,13 @@ feature definitions, and weights together.
 
 ## Schema validation
 
+`attention-card-schema:v2` adds a typed ninth tower token after the eight sorted
+deployable card tokens. Its frozen tower catalog participates in the encoding
+hash. Tower attributes are zero (no deploy elixir or deck roles); the distinct
+tower form and identity embeddings carry their meaning. Attention and explicit
+own/opposing pair terms include towers, allowing learned card/tower interactions.
+V1 inputs and artifacts retain their eight-token layout and original hash.
+
 The schema checks catalog hashes and versions, complete base-card attributes,
 vocabulary alignment, token indices, and attribute vectors. It supports up to
 65,536 card/form identities. Roles, elixir scaling, and form inheritance retain
