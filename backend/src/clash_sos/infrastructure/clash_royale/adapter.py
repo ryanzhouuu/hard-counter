@@ -10,6 +10,8 @@ from clash_sos.infrastructure.kaggle_v6.catalog import KAGGLE_V6_CARDS, KaggleCa
 
 FORM_CODES = {1: "evo", 2: "hero"}
 UNSUPPORTED_FORM = "unsupported"
+ICON_HOST = "https://api-assets.clashroyale.com/"
+ICON_KEYS = {"evo": "evolutionMedium", "hero": "heroMedium"}
 
 
 @dataclass(frozen=True)
@@ -18,6 +20,7 @@ class LiveCard:
 
     name: str
     identity: str | None
+    icon_url: str | None
 
 
 @dataclass(frozen=True)
@@ -95,11 +98,27 @@ def _identity(name: str, form: str | None, names: dict[str, str]) -> str | None:
     return names.get(lookup)
 
 
+def _icon_url(raw: dict[str, object], form: str | None) -> str | None:
+    """Accept only official asset URLs so browsers never load arbitrary hosts."""
+    icons = raw.get("iconUrls")
+    if not isinstance(icons, dict):
+        return None
+    url = cast(dict[str, object], icons).get(ICON_KEYS.get(form or "", "medium"))
+    return url if isinstance(url, str) and url.startswith(ICON_HOST) else None
+
+
 def _cards(side: dict[str, object], names: dict[str, str]) -> tuple[LiveCard, ...]:
     cards: list[LiveCard] = []
     for raw in _objects(side.get("cards")):
         name = _text(raw.get("name"), "Unknown card")
-        cards.append(LiveCard(name=name, identity=_identity(name, _form(raw), names)))
+        form = _form(raw)
+        cards.append(
+            LiveCard(
+                name=name,
+                identity=_identity(name, form, names),
+                icon_url=_icon_url(raw, form),
+            )
+        )
     return tuple(cards)
 
 

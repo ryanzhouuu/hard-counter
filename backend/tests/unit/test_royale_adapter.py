@@ -94,6 +94,44 @@ def test_skips_unrecognized_evolution_level() -> None:
     assert adapt_battle(raw, "#ABC").skip_reason == "unknown_card"
 
 
+def icons(slug: str) -> dict[str, str]:
+    return {
+        key: f"https://api-assets.clashroyale.com/{kind}/300/{slug}.png"
+        for key, kind in (
+            ("medium", "cards"),
+            ("evolutionMedium", "cardevolutions"),
+            ("heroMedium", "cardheroes"),
+        )
+    }
+
+
+def test_selects_icon_for_played_form() -> None:
+    raw = battle()
+    cards = raw["team"][0]["cards"]
+    for card in cards[:3]:
+        card["iconUrls"] = icons(card["name"])
+    cards[1]["evolutionLevel"] = 1
+    cards[2]["evolutionLevel"] = 2
+
+    result = adapt_battle(raw, "#ABC")
+
+    assert [card.icon_url for card in result.player_cards[:3]] == [
+        icons("Knight")["medium"],
+        icons("Archers")["evolutionMedium"],
+        icons("Goblins")["heroMedium"],
+    ]
+
+
+def test_rejects_icons_outside_official_host() -> None:
+    raw = battle()
+    raw["team"][0]["cards"][0]["iconUrls"] = {"medium": "https://example.com/knight.png"}
+    raw["team"][0]["cards"][1]["iconUrls"] = "not an object"
+
+    result = adapt_battle(raw, "#ABC")
+
+    assert [card.icon_url for card in result.player_cards[:3]] == [None, None, None]
+
+
 def test_skips_new_cards_and_new_forms_without_guessing() -> None:
     raw = battle()
     raw["team"][0]["cards"][0]["name"] = "Future Card"
