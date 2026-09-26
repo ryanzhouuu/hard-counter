@@ -7,7 +7,10 @@ import numpy as np
 import polars as pl
 import pytest
 from attention_cache_fixture import LOSE, WIN, write_cache_dataset
+from catalog_fixture import expanded_catalog
 
+from clash_sos.domain.attention_schema import AttentionModelConfig, build_attention_schema
+from clash_sos.domain.canonical_dataset import deck_content_hash
 from clash_sos.infrastructure.kaggle_v6.attention_cache_write import (
     AttentionCacheWriteError,
     write_attention_partition,
@@ -42,7 +45,8 @@ def test_partition_writer_streams_aligned_mirrored_rows(tmp_path: Path) -> None:
     tokens = np.load(tmp_path / "cache" / partition.tokens_path, mmap_mode="r")
     labels = np.load(tmp_path / "cache" / partition.labels_path, mmap_mode="r")
     assert tokens.shape == (2, 2, 8)
-    assert tokens.dtype == np.uint8
+    assert tokens.dtype == np.uint16
+    assert labels.dtype == np.uint8
     assert labels.tolist() == [1, 0]
     assert tokens[0, 0].tolist() == list(schema.encode_deck(tuple(f"{card}:base" for card in WIN)))
     assert tokens[1, 0].tolist() == list(schema.encode_deck(tuple(f"{card}:base" for card in LOSE)))
@@ -123,3 +127,39 @@ def test_partition_writer_rejects_invalid_card_level(tmp_path: Path) -> None:
             )
     finally:
         connection.close()
+
+
+def test_partition_writer_preserves_tokens_above_255(tmp_path: Path) -> None:
+    dataset = tmp_path / "dataset"
+    _, protocol = write_cache_dataset(dataset)
+    catalog, attributes = expanded_catalog()
+    schema = build_attention_schema(
+        catalog.serialize(), attributes=attributes, network=AttentionModelConfig()
+    )
+    cards = tuple(f"z-future-{index:03}" for index in range(82, 90))
+    expected = schema.encode_deck(tuple(f"{card}:base" for card in cards))
+    assert max(expected) > 255
+    canonical = tmp_path / "expanded.parquet"
+    pl.read_parquet(dataset / "canonical.parquet").with_columns(
+        pl.lit(list(cards)).alias("side_a_card_ids"),
+        pl.lit(deck_content_hash(cards, ("base",) * 8, (16,) * 8)).alias("side_a_deck_hash"),
+    ).write_parquet(canonical)
+    connection = duckdb.connect()
+    try:
+        partition, _ = write_attention_partition(
+            connection,
+            canonical_path=canonical,
+            split_path=dataset / "splits-temporal.parquet",
+            partition="train",
+            expected_rows=2,
+            mirror_seed=0,
+            schema=schema,
+            slices={"refit": protocol.refit},
+            workspace=tmp_path / "cache",
+        )
+    finally:
+        connection.close()
+    tokens = np.load(tmp_path / "cache" / partition.tokens_path)
+    assert tokens.dtype == np.uint16
+    assert tokens[0, 0].tolist() == list(expected)
+    assert tokens[1, 1].tolist() == list(expected)

@@ -111,7 +111,7 @@ def write_attention_partition(
     tokens_path = directory / "tokens.npy"
     labels_path = directory / "labels.npy"
     tokens = np.lib.format.open_memmap(
-        tokens_path, mode="w+", dtype=np.uint8, shape=(expected_rows, 2, 8)
+        tokens_path, mode="w+", dtype=np.uint16, shape=(expected_rows, 2, 8)
     )
     labels = np.lib.format.open_memmap(
         labels_path, mode="w+", dtype=np.uint8, shape=(expected_rows,)

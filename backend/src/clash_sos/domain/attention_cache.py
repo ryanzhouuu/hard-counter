@@ -64,7 +64,7 @@ class AttentionCacheManifest(ManifestModel):
     cache_version: Literal["attention-input-cache:v1"] = CACHE_VERSION
     protocol: AttentionProtocol
     encoding_sha256: Sha256
-    token_dtype: Literal["uint8"] = "uint8"
+    token_dtype: Literal["uint16"] = "uint16"
     label_dtype: Literal["uint8"] = "uint8"
     partitions: tuple[CachePartition, ...]
     slices: tuple[CacheSliceRange, ...]

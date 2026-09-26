@@ -62,7 +62,7 @@ class AttentionCache:
                 yield np.asarray(tokens[first:stop]), np.asarray(labels[first:stop])
 
 
-def _check_arrays(directory: Path, partition: CachePartition) -> None:
+def _check_arrays(directory: Path, partition: CachePartition, identity_count: int) -> None:
     """Reject a validly hashed file whose NumPy header has the wrong layout."""
     try:
         tokens = np.load(directory / partition.tokens_path, mmap_mode="r", allow_pickle=False)
@@ -72,13 +72,18 @@ def _check_arrays(directory: Path, partition: CachePartition) -> None:
     if (
         tokens.shape != (partition.row_count, 2, 8)
         or labels.shape != (partition.row_count,)
-        or tokens.dtype != np.dtype("uint8")
         or labels.dtype != np.dtype("uint8")
     ):
         raise AttentionCacheReadError("cache array shape or dtype mismatch")
+    if tokens.dtype != np.dtype("uint16"):
+        raise AttentionCacheReadError(
+            "rebuild attention cache with uint16 tokens in a fresh directory"
+        )
     for first in range(0, partition.row_count, 100_000):
         if np.any(labels[first : first + 100_000] > 1):
             raise AttentionCacheReadError("cache labels must be binary")
+        if np.any(tokens[first : first + 100_000] >= identity_count):
+            raise AttentionCacheReadError("cache token is outside the schema vocabulary")
 
 
 def _row_key(row: dict[str, object]) -> RowKey:
@@ -149,6 +154,10 @@ def load_attention_cache(
     try:
         manifest = AttentionCacheManifest.model_validate_json(manifest_path.read_bytes())
     except ValidationError as error:
+        if any(item["loc"] == ("token_dtype",) for item in error.errors()):
+            raise AttentionCacheReadError(
+                "rebuild attention cache with uint16 tokens in a fresh directory"
+            ) from error
         raise AttentionCacheReadError("attention cache manifest is invalid") from error
     if manifest.protocol != protocol or manifest.encoding_sha256 != schema.fingerprint():
         raise AttentionCacheReadError("attention cache protocol or schema mismatch")
@@ -164,6 +173,6 @@ def load_attention_cache(
         if size != file.size_bytes or digest != file.sha256:
             raise AttentionCacheReadError(f"cache member hash mismatch: {file.path}")
     for partition in manifest.partitions:
-        _check_arrays(directory, partition)
+        _check_arrays(directory, partition, len(schema.identity_vocab))
     _check_sidecars(directory, manifest)
     return AttentionCache(directory, manifest)
