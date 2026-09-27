@@ -75,3 +75,17 @@ def test_snapshot_rejects_duplicate_battle_identities(tmp_path: Path) -> None:
             export_snapshot(connection, tmp_path, train_end=stamp(10), validation_end=stamp(20))
     finally:
         connection.close()
+
+
+def test_snapshot_requires_a_positive_batch_bound(tmp_path: Path) -> None:
+    with pytest.raises(ValueError, match="batch size must be positive"):
+        write_snapshot_parts(
+            tmp_path / "source.jsonl",
+            tmp_path / "parts",
+            schema=tower_schema(),
+            dataset_version=VERSION,
+            start=stamp(1),
+            end=stamp(27),
+            batch_rows=0,
+        )
+    assert not (tmp_path / "parts").exists()

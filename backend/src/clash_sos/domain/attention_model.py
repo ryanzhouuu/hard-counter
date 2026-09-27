@@ -1,8 +1,10 @@
-"""Deck-only matchup logits with exact shared-parameter swap construction.
+"""Matchup logits with exact shared-parameter swap construction.
 
 The explicit baseline and attention ablations use the same input schema. Training
 and serving call the same forward pass; row metadata never enters the network.
 """
+
+from typing import Literal
 
 import torch
 from torch import Tensor, nn
@@ -13,7 +15,7 @@ from clash_sos.domain.attention_schema import AttentionCardSchema
 
 
 class AttentionMatchupModel(nn.Module):
-    """Return P(side A wins) logits under the deck-only equal-skill assumption."""
+    """Return P(side A wins) logits under the equal-skill assumption."""
 
     def __init__(self, schema: AttentionCardSchema) -> None:
         super().__init__()
@@ -21,6 +23,10 @@ class AttentionMatchupModel(nn.Module):
         self.schema_fingerprint = schema.fingerprint()
         self.identity_count = len(schema.identity_vocab)
         self.input_size = schema.input_size
+        self.probability_interpretation: Literal[
+            "deck-only matchup estimate under an equal-skill assumption",
+            "deck-and-tower matchup estimate under an equal-skill assumption",
+        ] = schema.probability_interpretation
         self.explicit = (
             ExplicitInteractions(self.identity_count, input_size=self.input_size)
             if config.explicit_interactions

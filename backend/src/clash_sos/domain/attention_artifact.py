@@ -1,4 +1,4 @@
-"""Manifest contract for immutable deck-only attention artifacts.
+"""Manifest contract for immutable attention artifacts.
 
 The protocol identifies the training population; all published members are
 inventoried separately from the manifest so reload can verify their bytes.

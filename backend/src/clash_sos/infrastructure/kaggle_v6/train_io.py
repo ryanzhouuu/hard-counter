@@ -140,8 +140,6 @@ oriented AS (
 
 
 _ORIENTED_SQL = _oriented_sql(include_levels=False)
-_CACHE_ORIENTED_SQL = _oriented_sql(include_levels=True)
-_CACHE_WINDOWED_SQL = _oriented_sql(include_levels=True, windowed=True)
 
 
 def _as_int(value: object) -> int:

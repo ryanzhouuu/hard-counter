@@ -37,7 +37,8 @@ class AttentionEvaluationReport(ManifestModel):
     protocol: AttentionProtocol
     row_count: int = Field(gt=0)
     probability_interpretation: Literal[
-        "deck-only matchup estimate under an equal-skill assumption"
+        "deck-only matchup estimate under an equal-skill assumption",
+        "deck-and-tower matchup estimate under an equal-skill assumption",
     ] = PROBABILITY_INTERPRETATION
     evaluation: MatchupEvaluation
 
@@ -150,6 +151,7 @@ def evaluate_attention_cache(
         if predicted:
             _write_prediction_chunk(output_directory, predicted, chunk_index)
         report = AttentionEvaluationReport(
+            probability_interpretation=model.probability_interpretation,
             fit_artifact_id=fit_artifact_id,
             role=role,
             protocol=cache.manifest.protocol,

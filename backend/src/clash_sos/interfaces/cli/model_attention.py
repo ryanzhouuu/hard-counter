@@ -32,6 +32,9 @@ def train_attention(
     attributes: Annotated[
         Path | None, typer.Option(help="Card attributes JSON; defaults to June")
     ] = None,
+    feature_schema: Annotated[
+        Path | None, typer.Option(help="Frozen feature schema, including tower inputs if present")
+    ] = None,
     model_version: str = DEFAULT_ATTENTION_MODEL_VERSION,
     seed: int = 0,
     device: Literal["auto", "cpu", "mps"] = "auto",
@@ -47,7 +50,7 @@ def train_attention(
     chunk_size: int = 8 * 1024 * 1024,
     batch_rows: int = 10_000,
 ) -> None:
-    """Fit a deck-only model and publish one version with scored row sidecars."""
+    """Fit an attention model and publish one version with scored row sidecars."""
     try:
         initialize_attention_runtime(seed, device)
         from clash_sos.application.attention_fit import AttentionFitConfig
@@ -86,6 +89,7 @@ def train_attention(
             network_config_path=network_config,
             catalog_path=catalog,
             attributes_path=attributes,
+            schema_path=feature_schema,
             progress=lambda message: typer.echo(message, err=True),
         )
     except (ValueError, TimeoutError) as error:

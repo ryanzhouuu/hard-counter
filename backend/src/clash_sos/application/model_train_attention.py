@@ -20,7 +20,11 @@ from clash_sos.application.attention_support import AttentionSupportIndex
 from clash_sos.application.dataset_staging import StagingConfig
 from clash_sos.application.model_train import require_publish_paths
 from clash_sos.domain.attention_protocol import AttentionProtocol
-from clash_sos.domain.attention_schema import AttentionModelConfig, build_attention_schema
+from clash_sos.domain.attention_schema import (
+    AttentionCardSchema,
+    AttentionModelConfig,
+    build_attention_schema,
+)
 from clash_sos.infrastructure.card_inputs import load_card_attributes, load_card_catalog
 from clash_sos.infrastructure.kaggle_v6.attention_io import build_attention_cache
 from clash_sos.infrastructure.ml.attention_artifact_io import finalize_attention_artifact
@@ -70,18 +74,30 @@ def train_attention_artifact(
     network_config_path: Path | None = None,
     catalog_path: Path | None = None,
     attributes_path: Path | None = None,
+    schema_path: Path | None = None,
     progress: Callable[[str], None] | None = None,
 ) -> Path:
     """Fit only protocol training rows and publish checked evaluation sidecars."""
     require_publish_paths(destination, output_workspace)
     protocol = _load_protocol(protocol_path)
-    network = _load_network(network_config_path)
-    schema = build_attention_schema(
-        load_card_catalog(catalog_path).serialize(),
-        attributes=load_card_attributes(attributes_path),
-        network=network,
-        balance_era_id=protocol.balance_era_id,
-    )
+    if schema_path is not None:
+        if any(path is not None for path in (network_config_path, catalog_path, attributes_path)):
+            raise AttentionTrainError(
+                "feature schema cannot be combined with other input overrides"
+            )
+        try:
+            schema = AttentionCardSchema.model_validate_json(schema_path.read_bytes())
+        except (OSError, ValidationError) as error:
+            raise AttentionTrainError("selected attention feature schema is invalid") from error
+        if schema.balance_era_id != protocol.balance_era_id:
+            raise AttentionTrainError("feature schema and protocol balance eras disagree")
+    else:
+        schema = build_attention_schema(
+            load_card_catalog(catalog_path).serialize(),
+            attributes=load_card_attributes(attributes_path),
+            network=_load_network(network_config_path),
+            balance_era_id=protocol.balance_era_id,
+        )
     if schema.fingerprint() != protocol.encoding_sha256:
         raise AttentionTrainError(
             "protocol encoding does not match the selected card inputs or network"

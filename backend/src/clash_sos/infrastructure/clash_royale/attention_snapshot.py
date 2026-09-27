@@ -22,6 +22,8 @@ def write_snapshot_parts(
     end: datetime,
     batch_rows: int,
 ) -> int:
+    if batch_rows < 1:
+        raise ValueError("snapshot batch size must be positive")
     directory.mkdir()
     columns = {
         **polars_schema(CANONICAL_SCHEMA),
@@ -50,19 +52,27 @@ def write_snapshot_parts(
                     or not start <= row.timestamp < end
                 ):
                     raise ValueError("row dataset, era, or timestamp disagrees with snapshot")
-                for side in ("a", "b"):
+                for ids, forms, levels, tower, tower_level in (
+                    (
+                        row.side_a_card_ids,
+                        row.side_a_card_forms,
+                        row.side_a_card_levels,
+                        row.side_a_tower,
+                        row.side_a_tower_level,
+                    ),
+                    (
+                        row.side_b_card_ids,
+                        row.side_b_card_forms,
+                        row.side_b_card_levels,
+                        row.side_b_tower,
+                        row.side_b_tower_level,
+                    ),
+                ):
                     schema.encode_side(
-                        tuple(
-                            f"{card}:{form}"
-                            for card, form in zip(
-                                getattr(row, f"side_{side}_card_ids"),
-                                getattr(row, f"side_{side}_card_forms"),
-                                strict=True,
-                            )
-                        ),
-                        levels=getattr(row, f"side_{side}_card_levels"),
-                        tower=getattr(row, f"side_{side}_tower"),
-                        tower_level=getattr(row, f"side_{side}_tower_level"),
+                        tuple(f"{card}:{form}" for card, form in zip(ids, forms, strict=True)),
+                        levels=levels,
+                        tower=tower,
+                        tower_level=tower_level,
                     )
             except ValueError as error:
                 raise ValueError(f"invalid normalized battle on line {number}: {error}") from error
