@@ -35,6 +35,8 @@ def train(
     protocol_path: Path,
     *,
     network_config_path: Path | None = None,
+    schema_path: Path | None = None,
+    catalog_path: Path | None = None,
     progress: Callable[[str], None] | None = None,
 ) -> Path:
     """Apply small CPU settings to the public application runner."""
@@ -48,6 +50,8 @@ def train(
         staging_config=StagingConfig(chunk_size=1024, batch_rows=1, memory_limit="256MB"),
         model_version="attention-tiny-v1",
         network_config_path=network_config_path,
+        schema_path=schema_path,
+        catalog_path=catalog_path,
         progress=progress,
     )
 
@@ -142,3 +146,29 @@ def test_attention_training_freezes_explicit_card_inputs(tmp_path: Path) -> None
     assert frozen == schema
     assert model.identity_count == 266
     assert frozen.attribute_snapshot == attributes.to_payload()
+
+
+def test_attention_training_rejects_invalid_or_conflicting_frozen_schema(tmp_path: Path) -> None:
+    dataset, protocol_path, _ = inputs(tmp_path)
+    schema_path = tmp_path / "schema.json"
+    with pytest.raises(AttentionTrainError, match="feature schema is invalid"):
+        train(tmp_path, dataset, protocol_path, schema_path=schema_path)
+    with pytest.raises(AttentionTrainError, match="cannot be combined"):
+        train(
+            tmp_path,
+            dataset,
+            protocol_path,
+            schema_path=schema_path,
+            catalog_path=tmp_path / "catalog.json",
+        )
+    catalog, attributes = expanded_catalog()
+    schema = build_attention_schema(
+        catalog.serialize(),
+        attributes=attributes,
+        network=AttentionModelConfig(),
+        balance_era_id="other-era",
+    )
+    schema_path.write_text(schema.model_dump_json())
+    with pytest.raises(AttentionTrainError, match="balance eras disagree"):
+        train(tmp_path, dataset, protocol_path, schema_path=schema_path)
+    assert not (tmp_path / "cache").exists()

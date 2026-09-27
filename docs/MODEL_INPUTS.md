@@ -1,9 +1,9 @@
 # Model input contracts
 
-The attention model uses `attention-card-schema:v1`. Catalog and attribute
-versions describe the selected data; vocabulary sizes are derived from that
-catalog rather than fixed to the June 2026 population. The packaged June catalog
-and attributes remain the defaults.
+Attention supports eight-card `attention-card-schema:v1` and nine-token
+`attention-card-schema:v2` inputs. Catalog and attribute versions describe the
+selected data; vocabulary sizes derive from that catalog. Legacy training keeps
+the packaged June defaults. Official snapshot preparation uses current inputs.
 
 ## Catalog snapshots
 
@@ -43,7 +43,7 @@ V1 inputs and artifacts retain their eight-token layout and original hash.
 The schema checks catalog hashes and versions, complete base-card attributes,
 vocabulary alignment, token indices, and attribute vectors. It supports up to
 65,536 card/form identities. Roles, elixir scaling, and form inheritance retain
-their existing meanings. Models still estimate deck matchups under an equal-skill
+their existing meanings. Models estimate matchups under an equal-skill
 assumption; additional vocabulary entries alone do not establish trained support.
 
 Training eligibility remains level 16. The current Kaggle prepared-data contract
@@ -52,11 +52,14 @@ does not change those source requirements.
 
 ## Attention caches
 
-`attention-input-cache:v1` stores card tokens as `uint16` and binary labels as
+`attention-input-cache:v1` stores eight tokens per side; v2 stores eight cards
+followed by one tower. Both store tokens as `uint16` and binary labels as
 `uint8`. Older `uint8` token caches must be regenerated. Training rejects them
 with rebuild guidance and leaves their files intact. Select a fresh
 `--cache-directory` when rebuilding. Changing cache token storage does not change
-an existing model artifact's vocabulary or weights.
+an existing model artifact's vocabulary or weights. Readers verify the layout
+version, vocabulary bounds, and tower slot types. In v2, support counts describe
+deck-plus-tower lineups so identical decks with different towers remain distinct.
 
 ## Selecting training inputs
 
@@ -76,7 +79,57 @@ uv run --extra ml clash-sos model train-attention \
 The Kaggle source validator requires coverage of every identity in its frozen
 June mapping, even when the model catalog contains additional identities. It
 continues verifying manifest/file hashes, the era, and resolved row selections.
-Training from official API snapshots requires a separate preparation adapter.
+Official snapshots use the normalized preparation command below.
+
+## Preparing tower-aware training inputs
+
+`dataset prepare-official-attention` accepts normalized JSONL, one
+`TowerBattleRow` per line. It does not accept raw API battle-log JSON. Each row
+uses the canonical winner-first battle fields, `source_id="official-api"`, the
+selected dataset version and era, eight distinct supported card identities per
+side, and normalized card levels of 16. Both `side_a_tower` and `side_b_tower`
+must be supported `:tower` identities with their corresponding
+`side_a_tower_level` and `side_b_tower_level` equal to 16. Record towers from
+the battle's `supportCards`; never substitute the current player profile or
+assume Tower Princess. API rarity-relative levels must be normalized first.
+
+`event_key` and `fingerprint` identify the source battle. Repeated fingerprints
+or event keys fail preparation, including conflicting observations. The retained
+`archive_member` and zero-based `row_number` locate normalized input rows; they
+do not claim historical collection provenance. The snapshot inventory records
+file hashes, counts, versions, era, and temporal bounds.
+
+Preparation validates every row in bounded batches and publishes an immutable
+snapshot with `canonical.parquet`, `splits-temporal.parquet`, `manifest.json`,
+`protocol.json`, and `feature-schema.json`. All three partitions must be
+nonempty; training needs at least two distinct timestamps for fit/watch
+selection. Bounds are timezone-aware and half-open. No rows outside the declared
+interval are silently dropped. Kaggle rows lack towers and cannot train v2.
+
+```bash
+uv run clash-sos dataset prepare-official-attention \
+  --source data/normalized/official-ranked16.jsonl \
+  --destination data/processed/official-ranked16-v1 \
+  --dataset-version official-ranked16-v1 --balance-era 2026-09 \
+  --start 2026-09-07T00:00:00Z --train-end 2026-09-21T00:00:00Z \
+  --validation-end 2026-09-24T00:00:00Z --end 2026-09-27T00:00:00Z
+
+uv run --extra ml clash-sos model train-attention \
+  --dataset data/processed/official-ranked16-v1 \
+  --protocol data/processed/official-ranked16-v1/protocol.json \
+  --feature-schema data/processed/official-ranked16-v1/feature-schema.json \
+  --cache-directory data/cache/official-ranked16-v1 \
+  --model-version official-ranked16-attention-v1
+```
+
+The dates above illustrate a single-era snapshot; select bounds for the actual
+collected population. `--network-config` on preparation selects an architecture
+before resolving the protocol. Training's `--feature-schema` freezes the entire
+input and network contract and cannot be combined with `--catalog`,
+`--attributes`, or `--network-config`. The selected schema must match the
+protocol's era and encoding hash. Publishing a candidate does not promote it
+to live serving; select its artifact through the existing model setting after
+evaluation. Current catalog coverage alone does not provide learned estimates.
 
 ## Live mapping and model coverage
 

@@ -1,4 +1,4 @@
-"""Frozen card-token layout with June 2026 defaults for deck-only attention.
+"""Frozen card/tower token layout with June 2026 defaults.
 
 The schema maps compact identity tokens to base/form indices and static
 attributes. It can be built and validated without importing PyTorch.
@@ -267,7 +267,7 @@ def build_attention_schema(
     balance_era_id: str = BALANCE_ERA_ID,
     tower_catalog: TowerCatalog | None = None,
 ) -> AttentionCardSchema:
-    """Snapshot catalog identities and attributes into a validated v1 schema."""
+    """Freeze catalog identities and attributes into the selected input layout."""
     raw_snapshot: object = loads(catalog_bytes)
     if not isinstance(raw_snapshot, dict):
         raise ValueError("card catalog snapshot must be an object")

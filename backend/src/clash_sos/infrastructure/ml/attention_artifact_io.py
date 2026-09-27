@@ -108,7 +108,12 @@ def finalize_attention_artifact(
         expected_roles.add("reporting")
     if {item.role for item in reports} != expected_roles or len(reports) != len(expected_roles):
         raise AttentionArtifactError("artifact evaluation roles are incomplete")
-    if any(item.protocol != protocol or item.fit_artifact_id != model_version for item in reports):
+    if any(
+        item.protocol != protocol
+        or item.fit_artifact_id != model_version
+        or item.probability_interpretation != schema.probability_interpretation
+        for item in reports
+    ):
         raise AttentionArtifactError("artifact evaluations do not match fit identity")
     (workspace / "card-catalog.json").write_bytes(canonical_json_bytes(schema.catalog_snapshot))
     (workspace / "feature-schema.json").write_bytes(
@@ -229,6 +234,7 @@ def load_attention_artifact(
             any(
                 item.protocol != manifest.fit_protocol
                 or item.fit_artifact_id != manifest.model_version
+                or item.probability_interpretation != manifest.probability_interpretation
                 for item in reports
             )
             or {item.role for item in reports} != expected_roles
