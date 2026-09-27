@@ -5,6 +5,7 @@ Only the selected canonical and split inputs are read; source files remain immut
 
 from dataclasses import dataclass
 from hashlib import sha256
+from json import loads
 from pathlib import Path
 
 from pydantic import ValidationError
@@ -12,6 +13,7 @@ from pydantic import ValidationError
 from clash_sos.domain.attention_protocol import AttentionProtocol, Partition
 from clash_sos.domain.attention_schema import AttentionCardSchema
 from clash_sos.domain.processed_manifest import ProcessedDatasetManifest, ProcessedOutputFile
+from clash_sos.infrastructure.clash_royale.attention_sources import validate_official_sources
 from clash_sos.infrastructure.kaggle_v6.audit_io import hash_file
 from clash_sos.infrastructure.kaggle_v6.catalog import KAGGLE_V6_CARDS
 
@@ -66,9 +68,16 @@ def validate_attention_sources(
     if sha256(manifest_bytes).hexdigest() != protocol.processed_manifest_sha256:
         raise AttentionCacheSourceError("processed manifest hash mismatch")
     try:
+        if loads(manifest_bytes).get("manifest_type") == "attention_dataset":
+            canonical, split, counts = validate_official_sources(
+                dataset, manifest_bytes, protocol, schema, chunk_size
+            )
+            return AttentionSources(manifest_path, canonical, split, counts)
         manifest = ProcessedDatasetManifest.model_validate_json(manifest_bytes)
-    except ValidationError as error:
-        raise AttentionCacheSourceError("processed manifest is invalid") from error
+    except (ValidationError, ValueError, AttributeError) as error:
+        raise AttentionCacheSourceError(f"processed manifest is invalid: {error}") from error
+    if schema.tower_catalog is not None:
+        raise AttentionCacheSourceError("Kaggle rows have no towers; use an official snapshot")
     if (
         manifest.dataset_version != protocol.dataset_version
         or manifest.catalog_version != KAGGLE_V6_CARDS.version
