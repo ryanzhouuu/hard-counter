@@ -118,6 +118,11 @@ def build_attention_cache(
         connection = None
         rmtree(temp_directory)
         manifest = AttentionCacheManifest(
+            cache_version=(
+                "attention-input-cache:v2"
+                if schema.tower_catalog is not None
+                else "attention-input-cache:v1"
+            ),
             protocol=protocol,
             encoding_sha256=schema.fingerprint(),
             partitions=tuple(partitions),
