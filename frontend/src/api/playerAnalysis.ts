@@ -5,6 +5,11 @@ type Card = {
 
 type Outcome = "win" | "loss" | "draw" | "unknown";
 
+type Tower = Card & {
+  identity: string | null;
+  level: number | null;
+};
+
 type Battle = {
   timestamp: string | null;
   mode: string;
@@ -12,6 +17,8 @@ type Battle = {
   outcome: Outcome;
   player_cards: Card[];
   opponent_cards: Card[];
+  player_tower: Tower | null;
+  opponent_tower: Tower | null;
   skip_reason: string | null;
   win_probability: number | null;
   in_window: boolean;
@@ -35,6 +42,7 @@ type PlayerAnalysis = {
     dataset_version: string;
     catalog_version: string;
     training_era_id: string;
+    input_scope: "deck_only" | "deck_and_tower";
   };
   schedule: Schedule;
   battles: Battle[];
@@ -84,4 +92,4 @@ async function fetchPlayerAnalysis(
 }
 
 export { AnalysisError, FALLBACK_MESSAGE, fetchPlayerAnalysis, isRetryable };
-export type { Battle, Card, Outcome, PlayerAnalysis, Schedule };
+export type { Battle, Card, Outcome, PlayerAnalysis, Schedule, Tower };

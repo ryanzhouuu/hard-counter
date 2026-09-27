@@ -41,6 +41,9 @@ describe("labels", () => {
     expect(skipLabel("unknown_card")).toBe("New card not yet supported");
     expect(skipLabel("model_coverage")).toBe("Card not supported by this model");
     expect(skipLabel("team_battle")).toBe("Team battle");
+    expect(skipLabel("missing_tower")).toBe("Tower troop not recorded");
+    expect(skipLabel("unknown_tower")).toBe("Tower troop not yet supported");
+    expect(skipLabel("invalid_tower")).toBe("Incomplete tower troop data");
     expect(skipLabel("something_new")).toBe("Not scored");
     expect(skipLabel(null)).toBe("Not scored");
   });
