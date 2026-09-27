@@ -43,9 +43,15 @@ class OrientedCacheRow:
     example: OrientedExample
     side_a_levels: tuple[int, ...]
     side_b_levels: tuple[int, ...]
+    side_a_tower: str | None = None
+    side_b_tower: str | None = None
+    side_a_tower_level: int | None = None
+    side_b_tower_level: int | None = None
 
 
-def _oriented_sql(*, include_levels: bool, windowed: bool = False) -> str:
+def _oriented_sql(
+    *, include_levels: bool, windowed: bool = False, include_towers: bool = False
+) -> str:
     """Keep one mirror rule while legacy fixtures retain their narrow projection."""
     joined_levels = "c.side_a_card_levels, c.side_b_card_levels," if include_levels else ""
     oriented_levels = (
@@ -55,6 +61,21 @@ def _oriented_sql(*, include_levels: bool, windowed: bool = False) -> str:
         else ""
     )
     window_filter = "AND c.timestamp >= ? AND c.timestamp < ?" if windowed else ""
+    joined_towers = (
+        "c.side_a_tower, c.side_b_tower, c.side_a_tower_level, c.side_b_tower_level,"
+        if include_towers
+        else ""
+    )
+    oriented_towers = (
+        "".join(
+            f"CASE WHEN mirrored THEN side_{other}_{field} ELSE side_{side}_{field} "
+            f"END AS side_{side}_{field},"
+            for side, other in (("a", "b"), ("b", "a"))
+            for field in ("tower", "tower_level")
+        )
+        if include_towers
+        else ""
+    )
     return f"""
 WITH joined AS (
     SELECT
@@ -69,6 +90,7 @@ WITH joined AS (
         c.side_b_card_ids,
         c.side_b_card_forms,
         {joined_levels}
+        {joined_towers}
         c.side_a_deck_hash,
         c.side_b_deck_hash,
         (
@@ -109,6 +131,7 @@ oriented AS (
             x -> x[1] || ':' || x[2]
         ) AS side_b_keys,
         {oriented_levels}
+        {oriented_towers}
         CASE WHEN mirrored THEN side_b_deck_hash ELSE side_a_deck_hash END AS deck_a_hash,
         CASE WHEN mirrored THEN side_a_deck_hash ELSE side_b_deck_hash END AS deck_b_hash
     FROM joined
@@ -295,6 +318,7 @@ def iter_oriented_cache_rows(
     batch_rows: int = 10_000,
     start: datetime | None = None,
     end: datetime | None = None,
+    with_towers: bool = False,
 ) -> Iterator[OrientedCacheRow]:
     """Stream ordered cache rows; optional half-open windows bound DuckDB memory."""
     if batch_rows < 1:
@@ -304,7 +328,12 @@ def iter_oriented_cache_rows(
     if start is not None and end is not None and start >= end:
         raise KaggleV6TrainError("cache window must be nonempty")
     _require_paths(canonical_path, split_path)
-    sql = _CACHE_WINDOWED_SQL if start is not None else _CACHE_ORIENTED_SQL
+    sql = _oriented_sql(include_levels=True, windowed=start is not None, include_towers=with_towers)
+    tower_columns = (
+        ", side_a_tower, side_b_tower, side_a_tower_level, side_b_tower_level"
+        if with_towers
+        else ""
+    )
     params = _oriented_params(canonical_path, split_path, partition=partition, seed=seed)
     if start is not None and end is not None:
         params.extend((start, end))
@@ -314,6 +343,7 @@ def iter_oriented_cache_rows(
         SELECT timestamp, fingerprint, archive_member, row_number, label,
                side_a_keys, side_b_keys, side_a_levels, side_b_levels,
                deck_a_hash, deck_b_hash, side_a_player_id, side_b_player_id
+               {tower_columns}
         FROM oriented
         ORDER BY timestamp, fingerprint, archive_member, row_number
         """,
@@ -340,4 +370,8 @@ def iter_oriented_cache_rows(
                 ),
                 side_a_levels=_as_levels(row[7]),
                 side_b_levels=_as_levels(row[8]),
+                side_a_tower=_as_str(row[13]) if with_towers else None,
+                side_b_tower=_as_str(row[14]) if with_towers else None,
+                side_a_tower_level=_as_int(row[15]) if with_towers else None,
+                side_b_tower_level=_as_int(row[16]) if with_towers else None,
             )

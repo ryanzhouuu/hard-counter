@@ -61,7 +61,7 @@ class CacheSliceRange(ManifestModel):
 class AttentionCacheManifest(ManifestModel):
     """A complete cache can be reused only with its exact source and protocol."""
 
-    cache_version: Literal["attention-input-cache:v1"] = CACHE_VERSION
+    cache_version: Literal["attention-input-cache:v1", "attention-input-cache:v2"] = CACHE_VERSION
     protocol: AttentionProtocol
     encoding_sha256: Sha256
     token_dtype: Literal["uint16"] = "uint16"

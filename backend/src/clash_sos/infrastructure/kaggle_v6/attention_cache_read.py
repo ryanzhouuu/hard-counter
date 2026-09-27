@@ -62,7 +62,7 @@ class AttentionCache:
                 yield np.asarray(tokens[first:stop]), np.asarray(labels[first:stop])
 
 
-def _check_arrays(directory: Path, partition: CachePartition, identity_count: int) -> None:
+def _check_arrays(directory: Path, partition: CachePartition, schema: AttentionCardSchema) -> None:
     """Reject a validly hashed file whose NumPy header has the wrong layout."""
     try:
         tokens = np.load(directory / partition.tokens_path, mmap_mode="r", allow_pickle=False)
@@ -70,7 +70,7 @@ def _check_arrays(directory: Path, partition: CachePartition, identity_count: in
     except (OSError, ValueError) as error:
         raise AttentionCacheReadError("cache arrays cannot be opened") from error
     if (
-        tokens.shape != (partition.row_count, 2, 8)
+        tokens.shape != (partition.row_count, 2, schema.input_size)
         or labels.shape != (partition.row_count,)
         or labels.dtype != np.dtype("uint8")
     ):
@@ -82,8 +82,14 @@ def _check_arrays(directory: Path, partition: CachePartition, identity_count: in
     for first in range(0, partition.row_count, 100_000):
         if np.any(labels[first : first + 100_000] > 1):
             raise AttentionCacheReadError("cache labels must be binary")
-        if np.any(tokens[first : first + 100_000] >= identity_count):
+        batch = tokens[first : first + 100_000]
+        if np.any(batch >= len(schema.identity_vocab)):
             raise AttentionCacheReadError("cache token is outside the schema vocabulary")
+        if schema.tower_catalog is not None and (
+            np.any(np.isin(batch[:, :, :8], tuple(schema.tower_indices)))
+            or not np.all(np.isin(batch[:, :, 8], tuple(schema.tower_indices)))
+        ):
+            raise AttentionCacheReadError("cache tower tokens must occupy only the ninth slot")
 
 
 def _row_key(row: dict[str, object]) -> RowKey:
@@ -161,6 +167,13 @@ def load_attention_cache(
         raise AttentionCacheReadError("attention cache manifest is invalid") from error
     if manifest.protocol != protocol or manifest.encoding_sha256 != schema.fingerprint():
         raise AttentionCacheReadError("attention cache protocol or schema mismatch")
+    expected_version = (
+        "attention-input-cache:v2"
+        if schema.tower_catalog is not None
+        else "attention-input-cache:v1"
+    )
+    if manifest.cache_version != expected_version:
+        raise AttentionCacheReadError("attention cache version does not match input layout")
     try:
         validate_attention_sources(dataset, protocol, schema, chunk_size=chunk_size)
     except ValueError as error:
@@ -173,6 +186,6 @@ def load_attention_cache(
         if size != file.size_bytes or digest != file.sha256:
             raise AttentionCacheReadError(f"cache member hash mismatch: {file.path}")
     for partition in manifest.partitions:
-        _check_arrays(directory, partition, len(schema.identity_vocab))
+        _check_arrays(directory, partition, schema)
     _check_sidecars(directory, manifest)
     return AttentionCache(directory, manifest)

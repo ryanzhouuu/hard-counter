@@ -5,6 +5,7 @@ The caller owns the unpublished workspace and removes it after any failure.
 
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
+from hashlib import sha256
 from itertools import chain
 from pathlib import Path
 
@@ -63,6 +64,10 @@ def _write_sidecar(rows: list[dict[str, object]], path: Path) -> None:
     pl.DataFrame(rows).write_parquet(path, compression="zstd")
 
 
+def _lineup_hash(deck: str, tower: str | None, level: int | None) -> str:
+    return deck if tower is None else sha256(f"{deck}|{tower}|{level}".encode()).hexdigest()
+
+
 def _partition_windows(
     connection: duckdb.DuckDBPyConnection, split_path: Path, partition: Partition
 ) -> tuple[tuple[datetime, datetime], ...]:
@@ -111,7 +116,7 @@ def write_attention_partition(
     tokens_path = directory / "tokens.npy"
     labels_path = directory / "labels.npy"
     tokens = np.lib.format.open_memmap(
-        tokens_path, mode="w+", dtype=np.uint16, shape=(expected_rows, 2, 8)
+        tokens_path, mode="w+", dtype=np.uint16, shape=(expected_rows, 2, schema.input_size)
     )
     labels = np.lib.format.open_memmap(
         labels_path, mode="w+", dtype=np.uint8, shape=(expected_rows,)
@@ -131,6 +136,7 @@ def write_attention_partition(
             batch_rows=batch_rows,
             start=start,
             end=end,
+            with_towers=schema.tower_catalog is not None,
         )
         for start, end in _partition_windows(connection, split_path, partition)
     )
@@ -143,11 +149,17 @@ def write_attention_partition(
         if row.example.label not in (0, 1):
             raise AttentionCacheWriteError("oriented label must be binary")
         try:
-            tokens[count, 0, :] = schema.encode_deck(
-                row.example.side_a_keys, levels=row.side_a_levels
+            tokens[count, 0, :] = schema.encode_side(
+                row.example.side_a_keys,
+                levels=row.side_a_levels,
+                tower=row.side_a_tower,
+                tower_level=row.side_a_tower_level,
             )
-            tokens[count, 1, :] = schema.encode_deck(
-                row.example.side_b_keys, levels=row.side_b_levels
+            tokens[count, 1, :] = schema.encode_side(
+                row.example.side_b_keys,
+                levels=row.side_b_levels,
+                tower=row.side_b_tower,
+                tower_level=row.side_b_tower_level,
             )
         except ValueError as error:
             raise AttentionCacheWriteError(f"invalid deck at row {count}: {error}") from error
@@ -159,8 +171,12 @@ def write_attention_partition(
                 "fingerprint": row.fingerprint,
                 "archive_member": row.archive_member,
                 "row_number": row.row_number,
-                "deck_a_hash": row.example.deck_a_hash,
-                "deck_b_hash": row.example.deck_b_hash,
+                "deck_a_hash": _lineup_hash(
+                    row.example.deck_a_hash, row.side_a_tower, row.side_a_tower_level
+                ),
+                "deck_b_hash": _lineup_hash(
+                    row.example.deck_b_hash, row.side_b_tower, row.side_b_tower_level
+                ),
                 "side_a_player_id": row.example.side_a_player_id,
                 "side_b_player_id": row.example.side_b_player_id,
             }
