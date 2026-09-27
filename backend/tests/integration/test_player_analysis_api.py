@@ -8,7 +8,7 @@ import pytest
 from httpx import ASGITransport, AsyncClient, Response
 
 from clash_sos.application import live_analysis
-from clash_sos.application.live_model import DeckPair, LiveModelInfo
+from clash_sos.application.live_model import DeckPair, LiveModelInfo, TowerPair
 from clash_sos.domain.analytics import MatchupPrediction, PredictionState
 from clash_sos.infrastructure.clash_royale.client import RoyaleAPIError, RoyaleClient
 from clash_sos.infrastructure.settings import Settings
@@ -75,7 +75,10 @@ def test_lookup_returns_scored_recent_battle(monkeypatch: pytest.MonkeyPatch) ->
     info = LiveModelInfo("attention", "data", "catalog", "2026-06")
 
     def score(
-        _artifact: Path, _pairs: Sequence[DeckPair]
+        _artifact: Path,
+        _pairs: Sequence[DeckPair],
+        *,
+        tower_pairs: Sequence[TowerPair] | None = None,
     ) -> tuple[LiveModelInfo, tuple[MatchupPrediction, ...]]:
         return info, (
             MatchupPrediction(

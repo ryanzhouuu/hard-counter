@@ -16,6 +16,7 @@ from clash_sos.domain.card_catalog import CardCatalog
 from clash_sos.domain.model_artifact import ModelArtifactManifest
 
 DeckPair = tuple[tuple[str, ...], tuple[str, ...]]
+TowerPair = tuple[str | None, str | None]
 
 
 class LiveModelError(ValueError):
@@ -28,6 +29,7 @@ class LiveModelInfo:
     dataset_version: str
     catalog_version: str
     training_era_id: str
+    input_scope: str = "deck_only"
 
     @property
     def provenance(self) -> PredictionProvenance:
@@ -61,9 +63,14 @@ def _manifest_kind(artifact: Path) -> str:
 
 
 def score_live_decks(
-    artifact: Path, pairs: Sequence[DeckPair]
+    artifact: Path,
+    pairs: Sequence[DeckPair],
+    *,
+    tower_pairs: Sequence[TowerPair] | None = None,
 ) -> tuple[LiveModelInfo, tuple[MatchupPrediction, ...]]:
     """Retain training provenance and exclude pairs outside the frozen vocabulary."""
+    if tower_pairs is not None and len(tower_pairs) != len(pairs):
+        raise ValueError("tower pairs must align with deck pairs")
     kind = _manifest_kind(artifact)
     if kind == "matchup_attention":
         try:
@@ -75,13 +82,25 @@ def score_live_decks(
         try:
             manifest, schema, model = load_attention_artifact(artifact)
             vocabulary = set(schema.identity_vocab)
+            with_towers = schema.tower_catalog is not None
+            tower_vocabulary: set[str] = (
+                {entry.identity for entry in schema.tower_catalog.entries}
+                if schema.tower_catalog is not None
+                else set()
+            )
+            towers = tower_pairs if tower_pairs is not None else [(None, None)] * len(pairs)
             supported = [
                 index
                 for index, (a, b) in enumerate(pairs)
-                if set(a).issubset(vocabulary) and set(b).issubset(vocabulary)
+                if set(a).issubset(vocabulary)
+                and set(b).issubset(vocabulary)
+                and (not with_towers or all(tower in tower_vocabulary for tower in towers[index]))
             ]
             tokens = [
-                (schema.encode_deck(pairs[index][0]), schema.encode_deck(pairs[index][1]))
+                (
+                    schema.encode_side(pairs[index][0], tower=towers[index][0]),
+                    schema.encode_side(pairs[index][1], tower=towers[index][1]),
+                )
                 for index in supported
             ]
             probabilities: list[float | None] = [None] * len(pairs)
@@ -99,6 +118,7 @@ def score_live_decks(
             dataset_version=manifest.dataset_version,
             catalog_version=manifest.catalog_version,
             training_era_id=manifest.balance_era_id,
+            input_scope="deck_and_tower" if with_towers else "deck_only",
         )
         predictions = tuple(
             MatchupPrediction(

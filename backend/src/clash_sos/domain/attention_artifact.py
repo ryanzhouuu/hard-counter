@@ -59,7 +59,8 @@ class AttentionArtifactManifest(ManifestModel):
     fit_seed: int = Field(ge=0, le=2**32 - 1)
     runtime: AttentionArtifactRuntime
     probability_interpretation: Literal[
-        "deck-only matchup estimate under an equal-skill assumption"
+        "deck-only matchup estimate under an equal-skill assumption",
+        "deck-and-tower matchup estimate under an equal-skill assumption",
     ] = PROBABILITY_INTERPRETATION
     files: tuple[AttentionArtifactFile, ...]
 
