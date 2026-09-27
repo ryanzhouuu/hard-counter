@@ -93,3 +93,8 @@ level handling retain their existing behavior.
 Live parsing separately preserves each side's `supportCards` identity and
 normalized tower level. Missing, malformed, or unknown towers are never assumed
 to be Tower Princess. They do not change legacy deck-only eligibility.
+For v2 artifacts, missing/unknown towers exclude the battle with a visible tower
+reason. Reports include both towers and `model.input_scope` (`deck_only` or
+`deck_and_tower`). Live estimates still extrapolate across levels and modes;
+training requires normalized level 16. Direct attention predictions accept
+`side_a_tower` and `side_b_tower` identity strings and require both for v2.

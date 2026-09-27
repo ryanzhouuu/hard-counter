@@ -11,6 +11,7 @@ from clash_sos.application.rolling_sos import summarize_observations
 from clash_sos.domain.analytics import PredictionState, RollingSoSObservation
 from clash_sos.infrastructure.card_inputs import load_live_card_catalog
 from clash_sos.infrastructure.clash_royale.adapter import LiveBattle, LiveCard, adapt_battle
+from clash_sos.infrastructure.clash_royale.tower_adapter import LiveTower
 
 
 class LivePlayer(BaseModel):
@@ -24,6 +25,13 @@ class LiveCardReport(BaseModel):
     icon_url: str | None
 
 
+class LiveTowerReport(BaseModel):
+    name: str
+    identity: str | None
+    level: int | None
+    icon_url: str | None
+
+
 class LiveBattleReport(BaseModel):
     timestamp: datetime | None
     mode: str
@@ -34,6 +42,8 @@ class LiveBattleReport(BaseModel):
     skip_reason: str | None
     win_probability: float | None = Field(ge=0, le=1)
     in_window: bool
+    player_tower: LiveTowerReport | None = None
+    opponent_tower: LiveTowerReport | None = None
 
 
 class LiveSchedule(BaseModel):
@@ -52,6 +62,7 @@ class LiveModelReport(BaseModel):
     dataset_version: str
     catalog_version: str
     training_era_id: str
+    input_scope: str = "deck_only"
 
 
 class LiveAnalysisResponse(BaseModel):
@@ -78,6 +89,14 @@ def _card_reports(cards: tuple[LiveCard, ...]) -> tuple[LiveCardReport, ...]:
     return tuple(LiveCardReport(name=card.name, icon_url=card.icon_url) for card in cards)
 
 
+def _tower_report(tower: LiveTower | None) -> LiveTowerReport | None:
+    if tower is None:
+        return None
+    return LiveTowerReport(
+        name=tower.name, identity=tower.identity, level=tower.level, icon_url=tower.icon_url
+    )
+
+
 def _report(battle: LiveBattle, probability: float | None, in_window: bool) -> LiveBattleReport:
     return LiveBattleReport(
         timestamp=battle.timestamp,
@@ -89,6 +108,8 @@ def _report(battle: LiveBattle, probability: float | None, in_window: bool) -> L
         skip_reason=battle.skip_reason,
         win_probability=probability,
         in_window=in_window,
+        player_tower=_tower_report(battle.player_tower),
+        opponent_tower=_tower_report(battle.opponent_tower),
     )
 
 
@@ -109,6 +130,13 @@ def analyze_live_player(
     info, predictions = score_live_decks(
         artifact,
         [(battle.player_deck, battle.opponent_deck) for battle in eligible],
+        tower_pairs=[
+            (
+                battle.player_tower.identity if battle.player_tower else None,
+                battle.opponent_tower.identity if battle.opponent_tower else None,
+            )
+            for battle in eligible
+        ],
     )
     observations: list[RollingSoSObservation] = []
     probabilities: dict[str, float] = {}
@@ -131,12 +159,15 @@ def analyze_live_player(
                 provenance=info.provenance,
             )
         )
-    battles = [
-        replace(battle, skip_reason="model_coverage")
-        if battle.fingerprint in unsupported
-        else battle
-        for battle in battles
-    ]
+    for index, battle in enumerate(battles):
+        if battle.fingerprint in unsupported:
+            reason = "model_coverage"
+            if info.input_scope == "deck_and_tower":
+                for tower in (battle.player_tower, battle.opponent_tower):
+                    if tower is not None and tower.issue is not None:
+                        reason = tower.issue
+                        break
+            battles[index] = replace(battle, skip_reason=reason)
     summary = summarize_observations(
         tag,
         observations,

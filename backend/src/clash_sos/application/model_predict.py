@@ -31,6 +31,8 @@ def predict_matchup(
     side_b: Sequence[str],
     *,
     balance_era_id: str | None = None,
+    side_a_tower: str | None = None,
+    side_b_tower: str | None = None,
 ) -> MatchupPrediction:
     """Predict P(side A wins); attention calls must attest the matchup era."""
     manifest_path = artifact / "manifest.json"
@@ -58,7 +60,10 @@ def predict_matchup(
         if balance_era_id != manifest.balance_era_id:
             raise KaggleV6ModelTrainError("attention artifact does not cover the supplied era")
         try:
-            tokens = (attention_schema.encode_deck(side_a), attention_schema.encode_deck(side_b))
+            tokens = (
+                attention_schema.encode_side(side_a, tower=side_a_tower),
+                attention_schema.encode_side(side_b, tower=side_b_tower),
+            )
         except ValueError as error:
             raise KaggleV6ModelTrainError(str(error)) from error
         with torch.inference_mode():

@@ -23,8 +23,11 @@ def test_attention_batch_loads_once_and_retains_training_era(
 
     class Schema:
         identity_vocab = ("one", "two", "three", "four")
+        tower_catalog = None
 
-        def encode_deck(self, cards: tuple[str, ...]) -> tuple[int, ...]:
+        def encode_side(
+            self, cards: tuple[str, ...], *, tower: str | None = None
+        ) -> tuple[int, ...]:
             return tuple(len(card) for card in cards)
 
     class Model:

@@ -123,6 +123,7 @@ def finalize_attention_artifact(
     }
     torch.save(weights, workspace / "weights.pt")
     manifest = AttentionArtifactManifest(
+        probability_interpretation=schema.probability_interpretation,
         model_version=model_version,
         dataset_version=protocol.dataset_version,
         catalog_version=schema.catalog_version,
@@ -191,6 +192,7 @@ def load_attention_artifact(
             schema.fingerprint() != manifest.encoding_sha256
             or schema.catalog_version != manifest.catalog_version
             or schema.balance_era_id != manifest.balance_era_id
+            or schema.probability_interpretation != manifest.probability_interpretation
             or (artifact / "card-catalog.json").read_bytes()
             != canonical_json_bytes(schema.catalog_snapshot)
         ):

@@ -8,7 +8,7 @@ import pytest
 from catalog_fixture import expanded_catalog
 
 from clash_sos.application import live_analysis
-from clash_sos.application.live_model import DeckPair, LiveModelInfo
+from clash_sos.application.live_model import DeckPair, LiveModelInfo, TowerPair
 from clash_sos.domain.analytics import MatchupPrediction, PredictionState
 from clash_sos.domain.attention_model import AttentionMatchupModel
 from clash_sos.domain.attention_schema import (
@@ -56,7 +56,7 @@ def test_live_report_scores_only_eligible_battles(monkeypatch: pytest.MonkeyPatc
     seen: list[tuple[Path, Sequence[DeckPair]]] = []
 
     def score(
-        artifact: Path, pairs: Sequence[DeckPair]
+        artifact: Path, pairs: Sequence[DeckPair], *, tower_pairs: Sequence[TowerPair] | None = None
     ) -> tuple[LiveModelInfo, tuple[MatchupPrediction, ...]]:
         seen.append((artifact, pairs))
         return info, tuple(
@@ -98,7 +98,10 @@ def test_live_report_needs_full_window(monkeypatch: pytest.MonkeyPatch) -> None:
     info = LiveModelInfo("attention", "data", "catalog", "2026-06")
 
     def score(
-        _artifact: Path, _pairs: Sequence[DeckPair]
+        _artifact: Path,
+        _pairs: Sequence[DeckPair],
+        *,
+        tower_pairs: Sequence[TowerPair] | None = None,
     ) -> tuple[LiveModelInfo, tuple[MatchupPrediction, ...]]:
         return (
             info,
@@ -129,7 +132,10 @@ def test_live_report_marks_newest_window_battles(monkeypatch: pytest.MonkeyPatch
     info = LiveModelInfo("attention", "data", "catalog", "2026-06")
 
     def score(
-        _artifact: Path, pairs: Sequence[DeckPair]
+        _artifact: Path,
+        pairs: Sequence[DeckPair],
+        *,
+        tower_pairs: Sequence[TowerPair] | None = None,
     ) -> tuple[LiveModelInfo, tuple[MatchupPrediction, ...]]:
         prediction = MatchupPrediction(
             state=PredictionState.AVAILABLE,
