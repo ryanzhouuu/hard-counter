@@ -18,6 +18,7 @@ class Settings(BaseSettings):
     royale_api_token: SecretStr | None = Field(
         default=None, validation_alias="CLASH_ROYALE_API_TOKEN"
     )
+    royale_api_base_url: str = "https://api.clashroyale.com/v1/"
     active_model_path: Path = Path("models/kaggle-v6-ranked16-attention-v1")
     live_catalog_path: Path | None = None
 

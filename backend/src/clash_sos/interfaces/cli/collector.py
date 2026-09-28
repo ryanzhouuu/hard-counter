@@ -90,14 +90,15 @@ def sweep_collector(
         due = store.due_tags(tags, now=datetime.now(UTC))
         before = store.summary()
         if due:
-            token = get_settings().royale_api_token
+            settings = get_settings()
+            token = settings.royale_api_token
             if token is None:
                 raise typer.BadParameter("CLASH_ROYALE_API_TOKEN is required")
 
             async def sweep() -> dict[str, int]:
                 """Share the bounded polling path while stopping after one pass."""
                 async with httpx.AsyncClient(
-                    base_url="https://api.clashroyale.com/v1/", timeout=12.0
+                    base_url=settings.royale_api_base_url, timeout=12.0
                 ) as http:
                     return await collect_for_duration(
                         RoyaleClient(http, token.get_secret_value()),
@@ -143,15 +144,14 @@ def run_collector(
         )
     except (ValueError, OSError) as error:
         raise typer.BadParameter(str(error)) from error
-    token = get_settings().royale_api_token
+    settings = get_settings()
+    token = settings.royale_api_token
     if token is None:
         raise typer.BadParameter("CLASH_ROYALE_API_TOKEN is required")
     store = CollectorStore(database)
 
     async def campaign() -> dict[str, int]:
-        async with httpx.AsyncClient(
-            base_url="https://api.clashroyale.com/v1/", timeout=12.0
-        ) as http:
+        async with httpx.AsyncClient(base_url=settings.royale_api_base_url, timeout=12.0) as http:
             return await collect_for_duration(
                 RoyaleClient(http, token.get_secret_value()),
                 store,

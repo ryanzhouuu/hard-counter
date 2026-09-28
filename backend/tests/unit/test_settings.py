@@ -17,6 +17,7 @@ def test_settings_use_project_defaults(
 
     assert settings.app_name == "Clash SoS API"
     assert settings.log_level == "INFO"
+    assert settings.royale_api_base_url == "https://api.clashroyale.com/v1/"
 
 
 def test_settings_accept_environment_overrides(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -30,3 +31,8 @@ def test_settings_accept_environment_overrides(monkeypatch: pytest.MonkeyPatch) 
 def test_settings_accept_live_catalog_path(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("CLASH_SOS_LIVE_CATALOG_PATH", "data/config/cards.json")
     assert Settings().live_catalog_path == Path("data/config/cards.json")
+
+
+def test_settings_accept_royale_api_base_url(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("CLASH_SOS_ROYALE_API_BASE_URL", "https://proxy.royaleapi.dev/v1/")
+    assert Settings().royale_api_base_url == "https://proxy.royaleapi.dev/v1/"

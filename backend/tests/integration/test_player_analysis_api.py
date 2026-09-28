@@ -121,6 +121,19 @@ def test_lookup_reports_key_rejection(monkeypatch: pytest.MonkeyPatch) -> None:
     assert "allowed IP" in response.json()["detail"]
 
 
+def test_lookup_uses_configured_api_base_url(monkeypatch: pytest.MonkeyPatch) -> None:
+    async def player(self: RoyaleClient, _tag: str) -> dict[str, object]:
+        assert str(self.client.base_url) == "https://proxy.royaleapi.dev/v1/"
+        raise RoyaleAPIError("player_not_found")
+
+    monkeypatch.setattr(RoyaleClient, "player", player)
+    settings = _settings().model_copy(
+        update={"royale_api_base_url": "https://proxy.royaleapi.dev/v1/"}
+    )
+    response = asyncio.run(_request("/api/player-analysis?tag=ABC", settings))
+    assert response.status_code == 404
+
+
 def test_lookup_reports_invalid_selected_catalog(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

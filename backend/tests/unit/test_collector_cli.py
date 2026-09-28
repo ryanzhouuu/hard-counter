@@ -12,6 +12,7 @@ from pydantic import SecretStr
 from test_collector_normalize import battle
 from typer.testing import CliRunner
 
+from clash_sos.infrastructure.clash_royale.client import RoyaleClient
 from clash_sos.infrastructure.clash_royale.collector_normalize import normalize_battle
 from clash_sos.infrastructure.clash_royale.collector_store import CollectorStore
 from clash_sos.interfaces.cli import collector as collector_cli
@@ -96,6 +97,7 @@ def test_cli_sweep_polls_once_then_skips_recent_tag(
     async_client = httpx.AsyncClient
 
     def mock_async_client(*, base_url: str, timeout: float) -> httpx.AsyncClient:
+        assert base_url == "https://proxy.royaleapi.dev/v1/"
         return async_client(
             transport=httpx.MockTransport(respond), base_url=base_url, timeout=timeout
         )
@@ -104,7 +106,10 @@ def test_cli_sweep_polls_once_then_skips_recent_tag(
     monkeypatch.setattr(
         collector_cli,
         "get_settings",
-        lambda: SimpleNamespace(royale_api_token=SecretStr("test-token")),
+        lambda: SimpleNamespace(
+            royale_api_token=SecretStr("test-token"),
+            royale_api_base_url="https://proxy.royaleapi.dev/v1/",
+        ),
     )
     args = ["collect", "sweep", "--cohort", str(cohort), "--database", str(database)]
     first = CliRunner().invoke(app, args)
@@ -118,6 +123,38 @@ def test_cli_sweep_polls_once_then_skips_recent_tag(
     assert requests == 1
     assert loads(second.stdout)["skipped_not_due"] == 1
     assert loads(second.stdout)["attempted"] == 0
+
+
+def test_cli_run_uses_configured_api_base_url(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    cohort = tmp_path / "players.txt"
+    cohort.write_text("#ABC\n")
+    seen: list[str] = []
+
+    async def collect(client: RoyaleClient, *_args: object, **_kwargs: object) -> dict[str, int]:
+        seen.append(str(client.client.base_url))
+        return {}
+
+    monkeypatch.setattr(collector_cli, "collect_for_duration", collect)
+    monkeypatch.setattr(
+        collector_cli,
+        "get_settings",
+        lambda: SimpleNamespace(
+            royale_api_token=SecretStr("test-token"),
+            royale_api_base_url="https://proxy.royaleapi.dev/v1/",
+        ),
+    )
+    collector_cli.run_collector(
+        cohort=cohort,
+        duration_minutes=1,
+        poll_interval_minutes=1,
+        request_spacing_seconds=1,
+        failure_backoff_seconds=1,
+        rate_limit_backoff_seconds=1,
+        database=tmp_path / "collector.sqlite",
+    )
+    assert seen == ["https://proxy.royaleapi.dev/v1/"]
 
 
 def test_sweep_report_uses_invocation_deltas() -> None:

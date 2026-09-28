@@ -11,8 +11,6 @@ from clash_sos.infrastructure.card_inputs import CardInputError
 from clash_sos.infrastructure.clash_royale.client import RoyaleAPIError, RoyaleClient
 from clash_sos.infrastructure.settings import Settings
 
-BASE_URL = "https://api.clashroyale.com/v1/"
-
 ERRORS: dict[str, tuple[int, str]] = {
     "missing_credentials": (503, "Add CLASH_ROYALE_API_TOKEN to the backend .env file."),
     "credentials_rejected": (503, "The API key was rejected. Check the key and its allowed IP."),
@@ -48,7 +46,9 @@ def player_router(settings: Settings) -> APIRouter:
         if token is None:
             raise HTTPException(status_code=503, detail=ERRORS["missing_credentials"][1])
         try:
-            async with httpx.AsyncClient(base_url=BASE_URL, timeout=12) as client:
+            async with httpx.AsyncClient(
+                base_url=settings.royale_api_base_url, timeout=12
+            ) as client:
                 royale = RoyaleClient(client, token.get_secret_value())
                 profile = await royale.player(normalized)
                 battles = await royale.battles(normalized)

@@ -53,11 +53,18 @@ uv run clash-sos-worker status
 ```
 
 For live API lookup, set `CLASH_ROYALE_API_TOKEN` in the ignored `.env` file.
-Create the key for the public IP address of the machine running the API, and keep
-it on the backend. Set `CLASH_SOS_ACTIVE_MODEL_PATH` to switch the model artifact
-without changing code. It defaults to `models/kaggle-v6-ranked16-attention-v1`;
+For direct API access, create the key for the public IP address of the machine
+running the backend. Keep the key on the backend. Set `CLASH_SOS_ACTIVE_MODEL_PATH`
+to switch the model artifact without changing code. It defaults to
+`models/kaggle-v6-ranked16-attention-v1`;
 that ignored artifact must exist locally. The attention model needs the optional
 `ml` dependencies shown above.
+
+The backend and collector use `https://api.clashroyale.com/v1/` by default. For
+a changing outbound IP, [RoyaleAPI's proxy](https://docs.royaleapi.com/proxy)
+can use a key that allows `45.79.218.79`. Set
+`CLASH_SOS_ROYALE_API_BASE_URL=https://proxy.royaleapi.dev/v1/` in `.env` to route
+both through it. The proxy receives the API key and requests.
 
 Request an on-demand report at `/api/player-analysis?tag=%23PLAYER_TAG&window=5`.
 The tag can also omit `#`; `window` accepts 1–30 eligible recent battles. The
