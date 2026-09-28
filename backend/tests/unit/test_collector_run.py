@@ -144,3 +144,29 @@ def test_credential_rejection_stops_without_checkpoint(tmp_path: Path) -> None:
         assert "polls" not in store.summary()
     finally:
         store.close()
+
+
+def test_collector_rejects_more_than_four_hundred_tags(tmp_path: Path) -> None:
+    clock = FakeClock()
+    store = CollectorStore(tmp_path / "collector.sqlite")
+
+    async def campaign() -> None:
+        async with httpx.AsyncClient(
+            transport=httpx.MockTransport(lambda _: httpx.Response(200, json=[])),
+            base_url="https://api.clashroyale.com/v1/",
+        ) as http:
+            await collect_for_duration(
+                RoyaleClient(http, "test-token"),
+                store,
+                tuple(f"#T{index:03d}" for index in range(401)),
+                config(),
+                now=clock.now,
+                monotonic=clock.monotonic,
+                sleep=clock.sleep,
+            )
+
+    try:
+        with pytest.raises(ValueError, match="1-400"):
+            asyncio.run(campaign())
+    finally:
+        store.close()

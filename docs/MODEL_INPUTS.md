@@ -84,9 +84,10 @@ Official snapshots use the normalized preparation command below.
 ## Preparing tower-aware training inputs
 
 The local collector reads a fixed file of player tags, one `#TAG` per line,
-under ignored `data/`. Start with a selected cohort of about 100–200 max-level
+under ignored `data/`. Start with a selected cohort of a few hundred max-level
 ranked players; this is a sampling choice, not a representative-population
-guarantee. The command accepts smaller cohorts for a pilot. Supply the official
+guarantee. The command accepts 1–400 distinct tags, including smaller cohorts
+for a pilot. Supply the official
 API token through `CLASH_ROYALE_API_TOKEN`. Collection timing is explicit until
 request limits and log depth have been measured. One request is in flight at a
 time. A later run with the same database and cohort resumes due polls and

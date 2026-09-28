@@ -10,7 +10,11 @@ import httpx
 import typer
 
 from clash_sos.application.collector_export import export_collected_matches
-from clash_sos.application.collector_run import CollectorConfig, collect_for_duration
+from clash_sos.application.collector_run import (
+    MAX_COHORT_TAGS,
+    CollectorConfig,
+    collect_for_duration,
+)
 from clash_sos.infrastructure.clash_royale.client import RoyaleAPIError, RoyaleClient
 from clash_sos.infrastructure.clash_royale.collector_normalize import TAG_PATTERN
 from clash_sos.infrastructure.clash_royale.collector_store import CollectorStore
@@ -24,8 +28,8 @@ DEFAULT_DATABASE = Path("data/collector/official.sqlite")
 def load_cohort(path: Path) -> tuple[str, ...]:
     """Require one stable, distinct official player tag per nonblank line."""
     tags = tuple(line.strip().upper() for line in path.read_text().splitlines() if line.strip())
-    if not 1 <= len(tags) <= 200 or len(set(tags)) != len(tags):
-        raise ValueError("cohort must contain 1-200 distinct tags")
+    if not 1 <= len(tags) <= MAX_COHORT_TAGS or len(set(tags)) != len(tags):
+        raise ValueError(f"cohort must contain 1-{MAX_COHORT_TAGS} distinct tags")
     if any(not TAG_PATTERN.fullmatch(tag) for tag in tags):
         raise ValueError("cohort lines must contain only official player tags like #ABC")
     return tags

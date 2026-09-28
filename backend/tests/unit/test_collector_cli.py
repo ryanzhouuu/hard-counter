@@ -24,6 +24,11 @@ def test_cohort_requires_distinct_tag_lines(tmp_path: Path) -> None:
     path.write_text("#ABC extra\n")
     with pytest.raises(ValueError, match="only official player tags"):
         load_cohort(path)
+    path.write_text("".join(f"#T{index:03d}\n" for index in range(300)))
+    assert len(load_cohort(path)) == 300
+    path.write_text("".join(f"#T{index:03d}\n" for index in range(401)))
+    with pytest.raises(ValueError, match="1-400"):
+        load_cohort(path)
 
 
 def test_cli_exports_and_reports_existing_database(tmp_path: Path) -> None:

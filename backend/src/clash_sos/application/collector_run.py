@@ -15,6 +15,8 @@ from clash_sos.infrastructure.clash_royale.collector_normalize import (
 )
 from clash_sos.infrastructure.clash_royale.collector_store import CollectorStore
 
+MAX_COHORT_TAGS = 400
+
 
 @dataclass(frozen=True)
 class CollectorConfig:
@@ -52,8 +54,8 @@ async def collect_for_duration(
     progress: Callable[[str], None] | None = None,
 ) -> dict[str, int]:
     """Refetch due logs after failures or restarts; checkpoint only complete fetches."""
-    if not cohort or len(cohort) > 200 or len(set(cohort)) != len(cohort):
-        raise ValueError("collector cohort must contain 1-200 distinct tags")
+    if not cohort or len(cohort) > MAX_COHORT_TAGS or len(set(cohort)) != len(cohort):
+        raise ValueError(f"collector cohort must contain 1-{MAX_COHORT_TAGS} distinct tags")
     deadline = monotonic() + config.duration_seconds
     next_request_at = monotonic()
     while monotonic() < deadline:
