@@ -2,6 +2,7 @@
 
 from dataclasses import dataclass
 from datetime import datetime
+from os import link
 from pathlib import Path
 from uuid import uuid4
 
@@ -105,7 +106,10 @@ def export_collected_matches(
                 written += 1
         if not written:
             raise ValueError("no eligible current-ranked matches in export window")
-        temporary.replace(destination)
+        try:
+            link(temporary, destination)
+        except FileExistsError as error:
+            raise ValueError("collector export destination already exists") from error
         return ExportResult(written, skipped_mode)
     finally:
         temporary.unlink(missing_ok=True)

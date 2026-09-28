@@ -134,3 +134,21 @@ def test_resume_refetches_due_tags_and_flags_nonoverlap(tmp_path: Path) -> None:
         assert store.summary()["api_rate_limited"] == 1
     finally:
         store.close()
+
+
+def test_empty_bounded_log_after_prior_poll_flags_possible_gap(tmp_path: Path) -> None:
+    store = CollectorStore(tmp_path / "collector.sqlite")
+    try:
+        record(store, "#ABC", [normalize_battle(battle(), "#ABC")])
+        result = store.record_poll(
+            "#ABC",
+            [],
+            Counter(),
+            observed_at=NOW + timedelta(hours=1),
+            next_due=NOW + timedelta(hours=2),
+            log_length=0,
+        )
+        assert result.possible_gap
+        assert store.summary()["possible_gaps"] == 1
+    finally:
+        store.close()

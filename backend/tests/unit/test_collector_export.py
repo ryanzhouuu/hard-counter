@@ -93,6 +93,34 @@ def test_export_publishes_current_mode_and_leaves_sqlite_intact(tmp_path: Path) 
                 start=START,
                 end=END,
             )
+        retained = source.read_bytes()
+        published_manifest = (published / "manifest.json").read_bytes()
+        changed = battle()
+        changed["battleTime"] = "20260902T120000.000Z"
+        changed["team"][0]["crowns"] = 0
+        store.record_poll(
+            "#DEF",
+            [normalize_battle(changed, "#DEF")],
+            Counter(),
+            observed_at=END,
+            next_due=END + timedelta(hours=1),
+            log_length=1,
+        )
+        assert store.summary()["matches_conflicted"] == 1
+        assert source.read_bytes() == retained
+        assert (published / "manifest.json").read_bytes() == published_manifest
+        later = tmp_path / "later.jsonl"
+        assert (
+            export_collected_matches(
+                store,
+                later,
+                dataset_version="later",
+                balance_era_id="2026-09",
+                start=START,
+                end=END,
+            ).written
+            == 5
+        )
     finally:
         store.close()
 
