@@ -83,6 +83,37 @@ Official snapshots use the normalized preparation command below.
 
 ## Preparing tower-aware training inputs
 
+The local collector reads a fixed file of player tags, one `#TAG` per line,
+under ignored `data/`. Start with a selected cohort of about 100–200 max-level
+ranked players; this is a sampling choice, not a representative-population
+guarantee. The command accepts smaller cohorts for a pilot. Supply the official
+API token through `CLASH_ROYALE_API_TOKEN`. Collection timing is explicit until
+request limits and log depth have been measured. One request is in flight at a
+time. A later run with the same database and cohort resumes due polls and
+refetches the available log; battles that have already fallen out of that log
+cannot be recovered.
+
+```bash
+uv run clash-sos collect run \
+  --cohort data/collector/players.txt --duration-minutes 60 \
+  --poll-interval-minutes 20 --request-spacing-seconds 2 \
+  --failure-backoff-seconds 60 --rate-limit-backoff-seconds 300
+uv run clash-sos collect report
+uv run clash-sos collect export \
+  --destination data/tmp/official-ranked16-pilot.jsonl \
+  --dataset-version official-ranked16-pilot --balance-era 2026-09 \
+  --start 2026-09-07T00:00:00Z --end 2026-09-27T00:00:00Z
+```
+
+These timing values illustrate a bounded pilot and should be adjusted from
+observed rate-limit, log-depth, and overlap counts. The SQLite database at
+`data/collector/official.sqlite` retains normalized match variants, poll state,
+and conflicts. `collect report` shows status, rejection, failure, and possible
+gap counts. Exports include only conflict-free, eligible current-mode matches;
+older-mode eligible matches are counted as skipped. The JSONL file is a
+temporary bridge to preparation. Give each export a new destination; publishing
+a Parquet snapshot leaves SQLite untouched.
+
 `dataset prepare-official-attention` accepts normalized JSONL, one
 `TowerBattleRow` per line. It does not accept raw API battle-log JSON. Each row
 uses the canonical winner-first battle fields, `source_id="official-api"`, the
@@ -112,7 +143,7 @@ interval are silently dropped. Kaggle rows lack towers and cannot train v2.
 
 ```bash
 uv run clash-sos dataset prepare-official-attention \
-  --source data/normalized/official-ranked16.jsonl \
+  --source data/tmp/official-ranked16-pilot.jsonl \
   --destination data/processed/official-ranked16-v1 \
   --dataset-version official-ranked16-v1 --balance-era 2026-09 \
   --start 2026-09-07T00:00:00Z --train-end 2026-09-21T00:00:00Z \

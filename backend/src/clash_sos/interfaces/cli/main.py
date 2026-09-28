@@ -30,6 +30,7 @@ from clash_sos.infrastructure.kaggle_v6.audit import (
     write_dataset_manifest,
 )
 from clash_sos.infrastructure.kaggle_v6.source import KAGGLE_V6_ARCHIVE_NAME
+from clash_sos.interfaces.cli.collector import app as collector_app
 from clash_sos.interfaces.cli.dataset_attention import prepare_official_attention
 from clash_sos.interfaces.cli.model_attention import train_attention
 
@@ -38,6 +39,7 @@ dataset_app = typer.Typer(no_args_is_help=True)
 model_app = typer.Typer(no_args_is_help=True)
 app.add_typer(dataset_app, name="dataset")
 app.add_typer(model_app, name="model")
+app.add_typer(collector_app, name="collect")
 model_app.command("train-attention")(train_attention)
 dataset_app.command("prepare-official-attention")(prepare_official_attention)
 
