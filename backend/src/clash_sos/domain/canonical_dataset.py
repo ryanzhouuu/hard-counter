@@ -131,7 +131,7 @@ class CanonicalBattleRow(DomainModel):
     dataset_version: str = Field(min_length=1)
     source_id: str = Field(min_length=1)
     timestamp: datetime
-    mode: Literal["Ranked1v1_NewArena"]
+    mode: Literal["Ranked1v1_NewArena", "Ranked1v1_NewArena2"]
     balance_era_id: str = Field(min_length=1)
     outcome: Literal[BattleOutcome.SIDE_A_WIN]
     event_key: Sha256
@@ -158,6 +158,9 @@ class CanonicalBattleRow(DomainModel):
 
     @model_validator(mode="after")
     def validate_row(self) -> Self:
+        """Keep Kaggle's ranked mode fixed while admitting current official rows."""
+        if self.source_id != "official-api" and self.mode != ACCEPTED_MODE:
+            raise ValueError("legacy canonical rows require the June ranked mode")
         self._validate_deck(
             self.side_a_card_ids,
             self.side_a_card_forms,

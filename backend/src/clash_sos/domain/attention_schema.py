@@ -100,7 +100,9 @@ class AttentionCardSchema(ManifestModel):
     catalog_sha256: Sha256
     catalog_snapshot: dict[str, object]
     canonical_schema_version: Literal[
-        "kaggle-v6-ranked16-schema:v1", "official-ranked16-schema:v1"
+        "kaggle-v6-ranked16-schema:v1",
+        "official-ranked16-schema:v1",
+        "official-ranked16-schema:v2",
     ] = CANONICAL_SCHEMA_VERSION
     tower_catalog: TowerCatalog | None = None
     balance_era_id: str = Field(default=BALANCE_ERA_ID, min_length=1)
@@ -135,16 +137,16 @@ class AttentionCardSchema(ManifestModel):
         catalog_identities = (*deck_identities, *tower_identities)
         if (self.schema_version == "attention-card-schema:v2") != bool(tower_identities):
             raise ValueError("schema version must match tower input layout")
-        expected_canonical = (
-            "official-ranked16-schema:v1" if tower_identities else CANONICAL_SCHEMA_VERSION
-        )
         expected_interpretation = (
             TOWER_INTERPRETATION if tower_identities else PROBABILITY_INTERPRETATION
         )
-        if (
-            self.canonical_schema_version != expected_canonical
-            or self.probability_interpretation != expected_interpretation
-        ):
+        valid_canonical = (
+            self.canonical_schema_version
+            in {"official-ranked16-schema:v1", "official-ranked16-schema:v2"}
+            if tower_identities
+            else self.canonical_schema_version == CANONICAL_SCHEMA_VERSION
+        )
+        if not valid_canonical or self.probability_interpretation != expected_interpretation:
             raise ValueError("schema population and interpretation do not match input layout")
         if self.catalog_snapshot["catalog_version"] != self.catalog_version:
             raise ValueError("catalog version does not match snapshot")
@@ -266,6 +268,9 @@ def build_attention_schema(
     network: AttentionModelConfig,
     balance_era_id: str = BALANCE_ERA_ID,
     tower_catalog: TowerCatalog | None = None,
+    official_schema_version: Literal[
+        "official-ranked16-schema:v1", "official-ranked16-schema:v2"
+    ] = "official-ranked16-schema:v1",
 ) -> AttentionCardSchema:
     """Freeze catalog identities and attributes into the selected input layout."""
     raw_snapshot: object = loads(catalog_bytes)
@@ -284,9 +289,9 @@ def build_attention_schema(
     form_index = {form: index for index, form in enumerate(form_vocab)}
     return AttentionCardSchema(
         schema_version="attention-card-schema:v2" if tower_catalog else SCHEMA_VERSION,
-        canonical_schema_version="official-ranked16-schema:v1"
-        if tower_catalog
-        else CANONICAL_SCHEMA_VERSION,
+        canonical_schema_version=(
+            official_schema_version if tower_catalog else CANONICAL_SCHEMA_VERSION
+        ),
         tower_catalog=tower_catalog,
         probability_interpretation=TOWER_INTERPRETATION
         if tower_catalog

@@ -92,6 +92,10 @@ must be supported `:tower` identities with their corresponding
 `side_a_tower_level` and `side_b_tower_level` equal to 16. Record towers from
 the battle's `supportCards`; never substitute the current player profile or
 assume Tower Princess. API rarity-relative levels must be normalized first.
+Current official Path of Legends logs use `Ranked1v1_NewArena2`; the default
+`official-ranked16-schema:v2` preserves that value. The older
+`official-ranked16-schema:v1` remains available through `--official-schema-version`
+for snapshots containing `Ranked1v1_NewArena`.
 
 `event_key` and `fingerprint` identify the source battle. Repeated fingerprints
 or event keys fail preparation, including conflicting observations. The retained

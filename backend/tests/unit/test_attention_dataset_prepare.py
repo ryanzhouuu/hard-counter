@@ -79,3 +79,41 @@ def test_preparation_removes_only_owned_output_after_failure(tmp_path: Path, inv
     assert source.read_bytes() == before
     assert not (tmp_path / "dataset").exists()
     assert not tuple(tmp_path.glob(".*.building-*"))
+
+
+def test_current_ranked_snapshot_freezes_v2_mode_and_schema(tmp_path: Path) -> None:
+    source = tmp_path / "current.jsonl"
+    rows = tuple(row.model_copy(update={"mode": "Ranked1v1_NewArena2"}) for row in tower_rows())
+    write_tower_source(source, rows)
+    schema = AttentionCardSchema.model_validate(
+        tower_schema()
+        .model_copy(update={"canonical_schema_version": "official-ranked16-schema:v2"})
+        .model_dump()
+    )
+    destination = prepare_official_attention_dataset(
+        source,
+        tmp_path / "current-dataset",
+        schema=schema,
+        dataset_version=VERSION,
+        start=stamp(1),
+        train_end=stamp(10),
+        validation_end=stamp(20),
+        end=stamp(27),
+        watch_fraction=0.3,
+        config=StagingConfig(batch_rows=2, memory_limit="256MB"),
+    )
+    manifest = AttentionDatasetManifest.model_validate_json(
+        (destination / "manifest.json").read_bytes()
+    )
+    assert manifest.canonical_schema_version == "official-ranked16-schema:v2"
+    assert (
+        build_attention_cache(
+            destination,
+            tmp_path / "current-cache",
+            AttentionProtocol.model_validate_json((destination / "protocol.json").read_bytes()),
+            AttentionCardSchema.model_validate_json(
+                (destination / "feature-schema.json").read_bytes()
+            ),
+        ).manifest.protocol.refit.row_count
+        == 3
+    )

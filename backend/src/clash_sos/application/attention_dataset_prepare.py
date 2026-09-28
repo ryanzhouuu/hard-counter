@@ -4,6 +4,7 @@ from datetime import datetime
 from hashlib import sha256
 from pathlib import Path
 from shutil import rmtree
+from typing import Literal, cast
 from uuid import uuid4
 
 from clash_sos.application.attention_protocol_resolve import (
@@ -40,6 +41,7 @@ def prepare_official_attention_dataset(
     mirror_seed: int = 0,
     config: StagingConfig | None = None,
 ) -> Path:
+    """Freeze one era of official rows under their exact input schema and split."""
     if schema.tower_catalog is None:
         raise ValueError("official snapshot preparation requires a tower-aware schema")
     bounds = (start, train_end, validation_end, end)
@@ -87,6 +89,10 @@ def prepare_official_attention_dataset(
             for size, digest in (hash_file(workspace / name, settings.chunk_size),)
         )
         manifest = AttentionDatasetManifest(
+            canonical_schema_version=cast(
+                Literal["official-ranked16-schema:v1", "official-ranked16-schema:v2"],
+                schema.canonical_schema_version,
+            ),
             dataset_version=dataset_version,
             balance_era_id=schema.balance_era_id,
             catalog_version=schema.catalog_version,

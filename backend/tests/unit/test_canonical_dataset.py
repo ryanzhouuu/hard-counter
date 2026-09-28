@@ -85,6 +85,8 @@ def test_row_number_is_zero_based() -> None:
 def test_canonical_row_requires_ranked_mode_and_side_a_win() -> None:
     with pytest.raises(ValidationError):
         canonical_row(mode="Ladder")
+    with pytest.raises(ValidationError, match="legacy canonical rows"):
+        canonical_row(mode="Ranked1v1_NewArena2")
     with pytest.raises(ValidationError):
         canonical_row(outcome=BattleOutcome.SIDE_B_WIN)
 

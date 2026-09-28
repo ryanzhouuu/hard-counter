@@ -2,7 +2,7 @@
 
 from datetime import datetime
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Literal
 
 import typer
 
@@ -35,6 +35,9 @@ def prepare_official_attention(
     train_end: Annotated[datetime, typer.Option(parser=parse_snapshot_datetime)],
     validation_end: Annotated[datetime, typer.Option(parser=parse_snapshot_datetime)],
     end: Annotated[datetime, typer.Option(parser=parse_snapshot_datetime)],
+    official_schema_version: Annotated[
+        Literal["official-ranked16-schema:v1", "official-ranked16-schema:v2"], typer.Option()
+    ] = "official-ranked16-schema:v2",
     network_config: Annotated[Path | None, typer.Option()] = None,
     watch_fraction: float = 0.1,
     mirror_seed: int = 0,
@@ -53,6 +56,7 @@ def prepare_official_attention(
             CURRENT_CARD_CATALOG.serialize(),
             attributes=CURRENT_CARD_ATTRIBUTES,
             tower_catalog=CURRENT_TOWER_CATALOG,
+            official_schema_version=official_schema_version,
             balance_era_id=balance_era,
             network=network,
         )

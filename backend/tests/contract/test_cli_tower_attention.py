@@ -37,6 +37,8 @@ def test_official_snapshot_cli_trains_reloads_and_scores_towers(tmp_path: Path) 
             VERSION,
             "--balance-era",
             "2026-09",
+            "--official-schema-version",
+            "official-ranked16-schema:v1",
             "--start",
             stamp(1).isoformat(),
             "--train-end",
@@ -166,3 +168,39 @@ def test_official_preparation_cli_rejects_naive_bounds(tmp_path: Path) -> None:
     )
     assert result.exit_code != 0 and "timezone-aware" in result.output
     assert not (tmp_path / "dataset").exists()
+
+
+def test_official_preparation_cli_defaults_to_current_ranked_schema(tmp_path: Path) -> None:
+    source = tmp_path / "current.jsonl"
+    write_tower_source(
+        source,
+        tuple(row.model_copy(update={"mode": "Ranked1v1_NewArena2"}) for row in tower_rows()),
+    )
+    result = runner.invoke(
+        app,
+        [
+            "dataset",
+            "prepare-official-attention",
+            "--source",
+            str(source),
+            "--destination",
+            str(tmp_path / "current-dataset"),
+            "--dataset-version",
+            VERSION,
+            "--balance-era",
+            "2026-09",
+            "--start",
+            stamp(1).isoformat(),
+            "--train-end",
+            stamp(10).isoformat(),
+            "--validation-end",
+            stamp(20).isoformat(),
+            "--end",
+            stamp(27).isoformat(),
+            "--watch-fraction",
+            "0.3",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    manifest = loads((tmp_path / "current-dataset" / "manifest.json").read_text())
+    assert manifest["canonical_schema_version"] == "official-ranked16-schema:v2"

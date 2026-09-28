@@ -12,6 +12,8 @@ from clash_sos.domain.manifests import ManifestModel
 
 
 class TowerBattleRow(CanonicalBattleRow):
+    """Preserve the original official ranked mode in published v1 snapshots."""
+
     side_a_tower: str = Field(pattern=r"^[a-z0-9-]+:tower$")
     side_b_tower: str = Field(pattern=r"^[a-z0-9-]+:tower$")
     side_a_tower_level: Literal[16]
@@ -19,14 +21,33 @@ class TowerBattleRow(CanonicalBattleRow):
 
     @model_validator(mode="after")
     def require_official_source(self) -> Self:
-        if self.source_id != "official-api":
-            raise ValueError("tower battles require the official-api source")
+        """Reject non-official rows and current-era ranked modes in v1."""
+        if self.source_id != "official-api" or self.mode != "Ranked1v1_NewArena":
+            raise ValueError("v1 tower battles require the original official ranked mode")
+        return self
+
+
+class TowerBattleRowV2(CanonicalBattleRow):
+    """Keep the current official ranked mode rather than relabeling it as June ranked."""
+
+    side_a_tower: str = Field(pattern=r"^[a-z0-9-]+:tower$")
+    side_b_tower: str = Field(pattern=r"^[a-z0-9-]+:tower$")
+    side_a_tower_level: Literal[16]
+    side_b_tower_level: Literal[16]
+
+    @model_validator(mode="after")
+    def require_current_official_source(self) -> Self:
+        """Reject relabeled June modes in the new official snapshot contract."""
+        if self.source_id != "official-api" or self.mode != "Ranked1v1_NewArena2":
+            raise ValueError("v2 tower battles require the current official ranked mode")
         return self
 
 
 class AttentionDatasetManifest(ManifestModel):
     manifest_type: Literal["attention_dataset"] = "attention_dataset"
-    canonical_schema_version: Literal["official-ranked16-schema:v1"] = "official-ranked16-schema:v1"
+    canonical_schema_version: Literal[
+        "official-ranked16-schema:v1", "official-ranked16-schema:v2"
+    ] = "official-ranked16-schema:v1"
     dataset_version: str = Field(min_length=1)
     balance_era_id: str = Field(min_length=1)
     catalog_version: str = Field(min_length=1)

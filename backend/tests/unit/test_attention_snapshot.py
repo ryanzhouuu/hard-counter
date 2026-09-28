@@ -6,6 +6,7 @@ import pytest
 from test_tower_attention import tower_schema
 from tower_dataset_fixture import VERSION, stamp, tower_rows, write_tower_source
 
+from clash_sos.domain.attention_schema import AttentionCardSchema
 from clash_sos.infrastructure.clash_royale.attention_snapshot import (
     export_snapshot,
     write_snapshot_parts,
@@ -89,3 +90,28 @@ def test_snapshot_requires_a_positive_batch_bound(tmp_path: Path) -> None:
             batch_rows=0,
         )
     assert not (tmp_path / "parts").exists()
+
+
+def test_current_ranked_mode_requires_official_v2_schema(tmp_path: Path) -> None:
+    source = tmp_path / "source.jsonl"
+    current = tower_rows()[0].model_copy(update={"mode": "Ranked1v1_NewArena2"})
+    write_tower_source(source, (current,))
+    with pytest.raises(ValueError, match="line 1"):
+        write_parts(source, tmp_path)
+    schema = AttentionCardSchema.model_validate(
+        tower_schema()
+        .model_copy(update={"canonical_schema_version": "official-ranked16-schema:v2"})
+        .model_dump()
+    )
+    assert (
+        write_snapshot_parts(
+            source,
+            tmp_path / "current-parts",
+            schema=schema,
+            dataset_version=VERSION,
+            start=stamp(1),
+            end=stamp(27),
+            batch_rows=2,
+        )
+        == 1
+    )
