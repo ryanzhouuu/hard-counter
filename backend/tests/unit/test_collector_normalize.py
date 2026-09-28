@@ -96,6 +96,26 @@ def test_nonmax_levels_and_draws_are_normalized_but_ineligible() -> None:
     assert normalize_battle(raw, "#ABC").exclusion_reason == "unsupported_mode"
 
 
+def test_evolution_hero_and_champion_keep_distinct_max_level_identities() -> None:
+    raw = battle()
+    raw["team"][0]["cards"][1]["evolutionLevel"] = 1
+    raw["team"][0]["cards"][0] = {
+        "name": "Golden Knight",
+        "id": CURRENT_CARD_API_CATALOG["golden-knight"].api_id,
+        "level": 6,
+        "maxLevel": 6,
+    }
+    raw["opponent"][0]["cards"][3]["evolutionLevel"] = 2
+    normalized = normalize_battle(raw, "#ABC")
+    assert normalized.exclusion_reason is None
+    assert ("archers:evolution", 16) in normalized.sides[0].cards
+    assert ("golden-knight:champion", 16) in normalized.sides[0].cards
+    assert ("valkyrie:hero", 16) in normalized.sides[1].cards
+    raw["team"][0]["cards"][1]["evolutionLevel"] = 3
+    with pytest.raises(BattleRejected, match="unknown_card"):
+        normalize_battle(raw, "#ABC")
+
+
 @pytest.mark.parametrize(
     ("change", "reason"),
     [
