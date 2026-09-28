@@ -2,15 +2,20 @@
 
 from collections import Counter
 from datetime import UTC, datetime, timedelta
+from json import loads
 from pathlib import Path
+from types import SimpleNamespace
 
+import httpx
 import pytest
+from pydantic import SecretStr
 from test_collector_normalize import battle
 from typer.testing import CliRunner
 
 from clash_sos.infrastructure.clash_royale.collector_normalize import normalize_battle
 from clash_sos.infrastructure.clash_royale.collector_store import CollectorStore
-from clash_sos.interfaces.cli.collector import load_cohort
+from clash_sos.interfaces.cli import collector as collector_cli
+from clash_sos.interfaces.cli.collector import load_cohort, sweep_report
 from clash_sos.interfaces.cli.main import app
 
 
@@ -73,3 +78,68 @@ def test_cli_exports_and_reports_existing_database(tmp_path: Path) -> None:
     assert export.exit_code == 0, export.output
     assert '"written": 1' in export.output
     assert '"mode":"Ranked1v1_NewArena2"' in destination.read_text()
+
+
+def test_cli_sweep_polls_once_then_skips_recent_tag(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    cohort = tmp_path / "players.txt"
+    cohort.write_text("#ABC\n")
+    database = tmp_path / "collector.sqlite"
+    requests = 0
+
+    def respond(_: httpx.Request) -> httpx.Response:
+        nonlocal requests
+        requests += 1
+        return httpx.Response(200, json=[battle()])
+
+    async_client = httpx.AsyncClient
+
+    def mock_async_client(*, base_url: str, timeout: float) -> httpx.AsyncClient:
+        return async_client(
+            transport=httpx.MockTransport(respond), base_url=base_url, timeout=timeout
+        )
+
+    monkeypatch.setattr(httpx, "AsyncClient", mock_async_client)
+    monkeypatch.setattr(
+        collector_cli,
+        "get_settings",
+        lambda: SimpleNamespace(royale_api_token=SecretStr("test-token")),
+    )
+    args = ["collect", "sweep", "--cohort", str(cohort), "--database", str(database)]
+    first = CliRunner().invoke(app, args)
+    assert first.exit_code == 0, first.output
+    assert requests == 1
+    assert loads(first.stdout)["successful_polls"] == 1
+    assert loads(first.stdout)["eligible_delta"] == 1
+
+    second = CliRunner().invoke(app, args)
+    assert second.exit_code == 0, second.output
+    assert requests == 1
+    assert loads(second.stdout)["skipped_not_due"] == 1
+    assert loads(second.stdout)["attempted"] == 0
+
+
+def test_sweep_report_uses_invocation_deltas() -> None:
+    before = {"polls": 10, "matches_eligible": 20, "duplicates": 4}
+    after = {
+        "polls": 11,
+        "api_rate_limited": 1,
+        "matches_eligible": 21,
+        "matches_ineligible": 2,
+        "duplicates": 6,
+        "rejected_unknown_card": 3,
+        "possible_gaps": 1,
+    }
+    assert sweep_report(before, after, targeted=3, skipped_not_due=1) == {
+        "attempted": 2,
+        "successful_polls": 1,
+        "api_failures": 1,
+        "unfinished": 1,
+        "skipped_not_due": 1,
+        "new_matches": 3,
+        "eligible_delta": 1,
+        "duplicates": 2,
+        "rejected": 3,
+        "possible_gaps": 1,
+    }

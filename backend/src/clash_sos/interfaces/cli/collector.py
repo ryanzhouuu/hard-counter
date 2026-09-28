@@ -1,7 +1,7 @@
 """Local commands for durable official-battle collection and snapshot export."""
 
 import asyncio
-from datetime import datetime
+from datetime import UTC, datetime
 from json import dumps
 from pathlib import Path
 from typing import Annotated
@@ -23,6 +23,7 @@ from clash_sos.interfaces.cli.dataset_attention import parse_snapshot_datetime
 
 app = typer.Typer(no_args_is_help=True)
 DEFAULT_DATABASE = Path("data/collector/official.sqlite")
+DEFAULT_COHORT = Path("data/collector/players.txt")
 
 
 def load_cohort(path: Path) -> tuple[str, ...]:
@@ -33,6 +34,91 @@ def load_cohort(path: Path) -> tuple[str, ...]:
     if any(not TAG_PATTERN.fullmatch(tag) for tag in tags):
         raise ValueError("cohort lines must contain only official player tags like #ABC")
     return tags
+
+
+def sweep_report(
+    before: dict[str, int], after: dict[str, int], targeted: int, skipped_not_due: int
+) -> dict[str, int]:
+    """Derive invocation counts from cumulative SQLite metrics."""
+
+    def delta(key: str) -> int:
+        """Treat metrics absent before a sweep as zero."""
+        return after.get(key, 0) - before.get(key, 0)
+
+    successful_polls = delta("polls")
+    api_failures = sum(delta(key) for key in after if key.startswith("api_"))
+    return {
+        "attempted": successful_polls + api_failures,
+        "successful_polls": successful_polls,
+        "api_failures": api_failures,
+        "unfinished": max(0, targeted - successful_polls - api_failures),
+        "skipped_not_due": skipped_not_due,
+        "new_matches": sum(
+            delta(f"matches_{status}") for status in ("eligible", "ineligible", "conflicted")
+        ),
+        "eligible_delta": delta("matches_eligible"),
+        "duplicates": delta("duplicates"),
+        "rejected": sum(delta(key) for key in after if key.startswith("rejected_")),
+        "possible_gaps": delta("possible_gaps"),
+    }
+
+
+@app.command("sweep")
+def sweep_collector(
+    cohort: Annotated[Path, typer.Option(help="One player tag per line")] = DEFAULT_COHORT,
+    database: Path = DEFAULT_DATABASE,
+    max_duration_minutes: float = 30,
+    min_gap_minutes: float = 60,
+    request_spacing_seconds: float = 2,
+    failure_backoff_seconds: float = 60,
+    rate_limit_backoff_seconds: float = 300,
+) -> None:
+    """Attempt each currently due tag once, then exit with per-sweep counts."""
+    try:
+        tags = load_cohort(cohort)
+        config = CollectorConfig(
+            duration_seconds=max_duration_minutes * 60,
+            poll_interval_seconds=min_gap_minutes * 60,
+            request_spacing_seconds=request_spacing_seconds,
+            failure_backoff_seconds=failure_backoff_seconds,
+            rate_limit_backoff_seconds=rate_limit_backoff_seconds,
+        )
+    except (ValueError, OSError) as error:
+        raise typer.BadParameter(str(error)) from error
+    store = CollectorStore(database)
+    try:
+        due = store.due_tags(tags, now=datetime.now(UTC))
+        before = store.summary()
+        if due:
+            token = get_settings().royale_api_token
+            if token is None:
+                raise typer.BadParameter("CLASH_ROYALE_API_TOKEN is required")
+
+            async def sweep() -> dict[str, int]:
+                """Share the bounded polling path while stopping after one pass."""
+                async with httpx.AsyncClient(
+                    base_url="https://api.clashroyale.com/v1/", timeout=12.0
+                ) as http:
+                    return await collect_for_duration(
+                        RoyaleClient(http, token.get_secret_value()),
+                        store,
+                        due,
+                        config,
+                        progress=lambda message: typer.echo(message, err=True),
+                        single_pass=True,
+                    )
+
+            try:
+                after = asyncio.run(sweep())
+            except RoyaleAPIError as error:
+                typer.echo(f"collector stopped: {error.code}", err=True)
+                raise typer.Exit(code=1) from error
+        else:
+            after = before
+        report = sweep_report(before, after, len(due), len(tags) - len(due))
+        typer.echo(dumps(report, sort_keys=True))
+    finally:
+        store.close()
 
 
 @app.command("run")

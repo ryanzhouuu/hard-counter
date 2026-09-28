@@ -86,19 +86,15 @@ Official snapshots use the normalized preparation command below.
 The local collector reads a fixed file of player tags, one `#TAG` per line,
 under ignored `data/`. Start with a selected cohort of a few hundred max-level
 ranked players; this is a sampling choice, not a representative-population
-guarantee. The command accepts 1–400 distinct tags, including smaller cohorts
-for a pilot. Supply the official
-API token through `CLASH_ROYALE_API_TOKEN`. Collection timing is explicit until
-request limits and log depth have been measured. One request is in flight at a
-time. A later run with the same database and cohort resumes due polls and
-refetches the available log; battles that have already fallen out of that log
-cannot be recovered.
+guarantee. The commands accept 1–400 distinct tags. Supply the official API
+token through `CLASH_ROYALE_API_TOKEN`. One request is in flight at a time.
+The operator-started `collect sweep` attempts each due tag once and exits. For
+the selected 300-tag cohort, run it about four times per day while the local
+machine is available. Gaps in highly active players' bounded logs are possible;
+battles that have already left a log cannot be recovered.
 
 ```bash
-uv run clash-sos collect run \
-  --cohort data/collector/players.txt --duration-minutes 60 \
-  --poll-interval-minutes 20 --request-spacing-seconds 2 \
-  --failure-backoff-seconds 60 --rate-limit-backoff-seconds 300
+uv run clash-sos collect sweep
 uv run clash-sos collect report
 uv run clash-sos collect export \
   --destination data/tmp/official-ranked16-pilot.jsonl \
@@ -106,8 +102,15 @@ uv run clash-sos collect export \
   --start 2026-09-07T00:00:00Z --end 2026-09-27T00:00:00Z
 ```
 
-These timing values illustrate a bounded pilot and should be adjusted from
-observed rate-limit, log-depth, and overlap counts. The SQLite database at
+`collect sweep` defaults to `data/collector/players.txt`, a two-second request
+spacing, a one-hour minimum gap since each tag's last successful poll, and a
+30-minute runtime limit. An interrupted or timed-out sweep keeps completed
+polls, and the next invocation attempts unfinished tags once they are due.
+Failures retain their backoff and credential rejection stops the command.
+The output reports only that invocation's attempts, new matches, duplicates,
+rejections, and possible gaps. `collect run` remains available for bounded
+continuous polling when repeated cycles are needed for diagnosis. Adjust
+timing from observed overlap and API errors. The SQLite database at
 `data/collector/official.sqlite` retains normalized match variants, poll state,
 and conflicts. `collect report` shows status, rejection, failure, and possible
 gap counts. Exports include only conflict-free, eligible current-mode matches;

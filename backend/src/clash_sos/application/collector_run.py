@@ -52,15 +52,23 @@ async def collect_for_duration(
     monotonic: Callable[[], float] = time.monotonic,
     sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
     progress: Callable[[str], None] | None = None,
+    single_pass: bool = False,
 ) -> dict[str, int]:
-    """Refetch due logs after failures or restarts; checkpoint only complete fetches."""
+    """Checkpoint complete fetches; a single pass attempts each tag at most once."""
     if not cohort or len(cohort) > MAX_COHORT_TAGS or len(set(cohort)) != len(cohort):
         raise ValueError(f"collector cohort must contain 1-{MAX_COHORT_TAGS} distinct tags")
     deadline = monotonic() + config.duration_seconds
     next_request_at = monotonic()
+    attempted: set[str] = set()
     while monotonic() < deadline:
-        due = store.due_tags(cohort, now=now())
+        due = tuple(
+            tag
+            for tag in store.due_tags(cohort, now=now())
+            if not single_pass or tag not in attempted
+        )
         if not due:
+            if single_pass:
+                return store.summary()
             await sleep(min(5.0, deadline - monotonic()))
             continue
         for tag in due:
@@ -72,6 +80,7 @@ async def collect_for_duration(
                 await sleep(delay)
             requested_at = monotonic()
             next_request_at = requested_at + config.request_spacing_seconds
+            attempted.add(tag)
             try:
                 raw_battles = await client.battles(tag)
             except RoyaleAPIError as error:

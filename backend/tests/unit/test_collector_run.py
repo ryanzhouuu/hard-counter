@@ -117,6 +117,111 @@ def test_rate_limit_delays_all_tags_then_retries(tmp_path: Path) -> None:
         store.close()
 
 
+def test_single_pass_stops_after_one_attempt_and_resumes_when_due(tmp_path: Path) -> None:
+    clock = FakeClock()
+    calls = 0
+
+    def respond(_: httpx.Request) -> httpx.Response:
+        nonlocal calls
+        calls += 1
+        return httpx.Response(200, json=[battle()])
+
+    async def sweep(store: CollectorStore) -> dict[str, int]:
+        async with httpx.AsyncClient(
+            transport=httpx.MockTransport(respond), base_url="https://api.clashroyale.com/v1/"
+        ) as http:
+            return await collect_for_duration(
+                RoyaleClient(http, "test-token"),
+                store,
+                ("#ABC",),
+                config(35),
+                now=clock.now,
+                monotonic=clock.monotonic,
+                sleep=clock.sleep,
+                single_pass=True,
+            )
+
+    store = CollectorStore(tmp_path / "collector.sqlite")
+    try:
+        assert asyncio.run(sweep(store))["polls"] == 1
+        assert calls == 1
+        assert clock.elapsed == 0
+        assert asyncio.run(sweep(store))["polls"] == 1
+        assert calls == 1
+        clock.elapsed = 11
+        assert asyncio.run(sweep(store))["polls"] == 2
+        assert calls == 2
+    finally:
+        store.close()
+
+
+def test_single_pass_records_failure_without_retrying_it(tmp_path: Path) -> None:
+    clock = FakeClock()
+    calls: list[tuple[str, float]] = []
+
+    def respond(request: httpx.Request) -> httpx.Response:
+        calls.append((request.url.path.split("/")[-2], clock.elapsed))
+        return httpx.Response(429 if len(calls) == 1 else 200, json=[battle()])
+
+    async def sweep(store: CollectorStore) -> dict[str, int]:
+        async with httpx.AsyncClient(
+            transport=httpx.MockTransport(respond), base_url="https://api.clashroyale.com/v1/"
+        ) as http:
+            return await collect_for_duration(
+                RoyaleClient(http, "test-token"),
+                store,
+                ("#ABC", "#DEF"),
+                config(20),
+                now=clock.now,
+                monotonic=clock.monotonic,
+                sleep=clock.sleep,
+                single_pass=True,
+            )
+
+    store = CollectorStore(tmp_path / "collector.sqlite")
+    try:
+        summary = asyncio.run(sweep(store))
+        assert len(calls) == 2
+        assert calls[1][1] >= 7
+        assert summary["api_rate_limited"] == 1
+        assert summary["polls"] == 1
+    finally:
+        store.close()
+
+
+def test_single_pass_keeps_unattempted_tags_due_at_deadline(tmp_path: Path) -> None:
+    clock = FakeClock()
+    calls = 0
+
+    def respond(_: httpx.Request) -> httpx.Response:
+        nonlocal calls
+        calls += 1
+        return httpx.Response(200, json=[])
+
+    async def sweep(store: CollectorStore) -> dict[str, int]:
+        async with httpx.AsyncClient(
+            transport=httpx.MockTransport(respond), base_url="https://api.clashroyale.com/v1/"
+        ) as http:
+            return await collect_for_duration(
+                RoyaleClient(http, "test-token"),
+                store,
+                ("#ABC", "#DEF", "#GHI"),
+                config(1.5),
+                now=clock.now,
+                monotonic=clock.monotonic,
+                sleep=clock.sleep,
+                single_pass=True,
+            )
+
+    store = CollectorStore(tmp_path / "collector.sqlite")
+    try:
+        assert asyncio.run(sweep(store))["polls"] == 2
+        assert calls == 2
+        assert store.due_tags(("#ABC", "#DEF", "#GHI"), now=clock.now()) == ("#GHI",)
+    finally:
+        store.close()
+
+
 def test_credential_rejection_stops_without_checkpoint(tmp_path: Path) -> None:
     clock = FakeClock()
     store = CollectorStore(tmp_path / "collector.sqlite")
