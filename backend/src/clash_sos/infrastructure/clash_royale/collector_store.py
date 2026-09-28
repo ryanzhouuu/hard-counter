@@ -137,6 +137,9 @@ class CollectorStore:
             set(cast(list[str], loads(previous["log_keys"]))) if previous is not None else set()
         )
         gap = bool(prior_keys) and bool(keys) and prior_keys.isdisjoint(keys)
+        exclusions = Counter(
+            battle.exclusion_reason for battle in battles if battle.exclusion_reason is not None
+        )
         new_matches = duplicates = conflicts = 0
         with self.connection:
             for battle in battles:
@@ -157,6 +160,7 @@ class CollectorStore:
                 ("duplicates", duplicates),
                 ("possible_gaps", int(gap)),
                 ("new_conflicts", conflicts),
+                *((f"ineligible_{reason}", count) for reason, count in exclusions.items()),
                 *((f"rejected_{reason}", count) for reason, count in rejections.items()),
             ):
                 self._increment(name, value)

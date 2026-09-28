@@ -82,6 +82,7 @@ def test_ineligible_variant_cannot_enter_export(tmp_path: Path) -> None:
     try:
         record(store, "#ABC", [normalize_battle(raw, "#ABC")])
         assert store.summary()["matches_ineligible"] == 1
+        assert store.summary()["ineligible_non_max_level"] == 1
         assert list(store.export_battles(NOW, NOW + timedelta(days=1))) == []
     finally:
         store.close()
