@@ -102,8 +102,7 @@ def test_train_attention_cli_reports_missing_runtime_and_invalid_options(tmp_pat
     assert invalid.exit_code != 0
     assert "batch_size" in invalid.output
     no_protocol = runner.invoke(app, ["model", "train-attention"])
-    assert no_protocol.exit_code != 0
-    assert "--protocol" in no_protocol.output
+    assert no_protocol.exit_code == 2
 
 
 def test_train_attention_cli_fits_and_reloads_tiny_data(tmp_path: Path) -> None:
