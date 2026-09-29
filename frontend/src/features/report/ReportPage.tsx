@@ -24,7 +24,7 @@ function ReportPage(props: ReportPageProps) {
     <div className="report-page">
       <header className="topbar">
         <a className="wordmark" href="./">
-          Clash SoS
+          Hard Counter
         </a>
         <TagForm key={tag} initialTag={tag} onLookUp={props.onLookUp} />
       </header>

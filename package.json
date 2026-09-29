@@ -1,5 +1,5 @@
 {
-  "name": "clash-sos",
+  "name": "hard-counter",
   "private": true,
   "packageManager": "pnpm@11.20.0",
   "scripts": {

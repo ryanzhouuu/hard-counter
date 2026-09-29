@@ -47,7 +47,7 @@ wheels = [
 ]
 
 [[package]]
-name = "clash-sos"
+name = "hard-counter"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [

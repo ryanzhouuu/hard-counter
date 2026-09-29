@@ -1,6 +1,6 @@
-# Clash SoS
+# Hard Counter
 
-Clash SoS is a project for understanding how difficult a player's Clash Royale
+Hard Counter is a project for understanding how difficult a player's Clash Royale
 matches were. The goal is a tool that combines deck matchup estimates with match
 history to show rolling strength of schedule, expected wins, and performance
 relative to expectation.

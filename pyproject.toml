@@ -3,9 +3,9 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "clash-sos"
+name = "hard-counter"
 version = "0.1.0"
-description = "Clash Royale matchup and strength-of-schedule analysis"
+description = "Hard Counter: Clash Royale matchup and strength-of-schedule analysis"
 readme = "README.md"
 requires-python = ">=3.12,<3.14"
 dependencies = [

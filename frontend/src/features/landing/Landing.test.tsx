@@ -11,7 +11,7 @@ describe("Landing", () => {
     const onLookUp = vi.fn();
     render(<Landing onLookUp={onLookUp} />);
 
-    expect(screen.getByRole("heading", { name: "Clash SoS" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Hard Counter" })).toBeInTheDocument();
     await user.type(screen.getByRole("textbox", { name: "Player tag" }), "#abc123");
     await user.click(screen.getByRole("button", { name: "Look up" }));
 
