@@ -34,7 +34,13 @@ set remains torch-free for the API, CLI, and existing predictors.
 
 ## Run locally
 
-Use separate terminals for the API and web application:
+Start both the API and web application together:
+
+```bash
+pnpm dev
+```
+
+Or use separate terminals:
 
 ```bash
 uv run clash-sos-api

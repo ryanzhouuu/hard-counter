@@ -3,6 +3,7 @@
   "private": true,
   "packageManager": "pnpm@11.20.0",
   "scripts": {
+    "dev": "bash scripts/dev.sh",
     "web:build": "pnpm --dir frontend build",
     "web:dev": "pnpm --dir frontend dev",
     "web:format:check": "pnpm --dir frontend format:check",
