@@ -1,9 +1,9 @@
-import type { Card } from "../../api/playerAnalysis";
+import type { Card, Tower } from "../../api/playerAnalysis";
 import { CardImage } from "./CardImage";
 
-function MiniDeck({ cards }: { cards: Card[] }) {
+function MiniDeck({ cards, className }: { cards: Card[]; className?: string }) {
   return (
-    <span className="mini-deck" aria-hidden="true">
+    <span className={className ? `mini-deck ${className}` : "mini-deck"} aria-hidden="true">
       {cards.map((card, index) => (
         <CardImage key={`${card.name}-${index}`} card={card} decorative />
       ))}
@@ -11,9 +11,9 @@ function MiniDeck({ cards }: { cards: Card[] }) {
   );
 }
 
-type DeckGridProps = { label: string; cards: Card[]; isPlayer?: boolean };
+type DeckGridProps = { label: string; cards: Card[]; tower?: Tower | null; isPlayer?: boolean };
 
-function DeckGrid({ label, cards, isPlayer = false }: DeckGridProps) {
+function DeckGrid({ label, cards, tower = null, isPlayer = false }: DeckGridProps) {
   return (
     <section className="deck" aria-label={`${label} deck`}>
       <h3 className={isPlayer ? "deck-label deck-label-player" : "deck-label"}>{label}</h3>
@@ -22,6 +22,14 @@ function DeckGrid({ label, cards, isPlayer = false }: DeckGridProps) {
           <CardImage key={`${card.name}-${index}`} card={card} />
         ))}
       </div>
+      {tower && (
+        <p className="deck-tower">
+          <span className="deck-tower-icon">
+            <CardImage card={tower} decorative />
+          </span>
+          {tower.name}
+        </p>
+      )}
     </section>
   );
 }

@@ -21,12 +21,16 @@
 
 .mini-deck {
   display: grid;
-  grid-template-columns: repeat(8, 26px);
+  grid-template-columns: repeat(8, 24px);
   gap: 2px;
 }
 
 .mini-deck .card-tile {
   font-size: 0;
+}
+
+.mini-deck-repeat {
+  opacity: 0.35;
 }
 
 .deck-label {
@@ -51,11 +55,11 @@
 
 .battle-row {
   display: grid;
-  grid-template-columns: 26px auto 22px auto 1fr 36px;
+  grid-template-columns: 24px minmax(0, 1fr) 104px 28px 12px;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   width: 100%;
-  padding: 10px 16px;
+  padding: 14px 16px;
   border: 0;
   background: transparent;
   text-align: left;
@@ -64,6 +68,40 @@
 
 .battle-row:hover {
   background: var(--surface-hover);
+}
+
+.battle-row .mini-deck,
+.battle-vs {
+  display: none;
+}
+
+@container battles (min-width: 540px) {
+  .battle-row {
+    grid-template-columns: 24px minmax(80px, 1fr) auto 104px 28px 12px;
+    padding: 10px 16px;
+  }
+
+  .battle-opponent {
+    font-size: 14px;
+  }
+
+  .battle-row .mini-deck-opponent {
+    display: grid;
+  }
+}
+
+@container battles (min-width: 780px) {
+  .battle-row {
+    grid-template-columns: 24px minmax(80px, 1fr) auto 16px auto 104px 28px 12px;
+  }
+
+  .battle-row .mini-deck-player {
+    display: grid;
+  }
+
+  .battle-vs {
+    display: block;
+  }
 }
 
 .outcome {
@@ -89,7 +127,6 @@
 }
 
 .battle-opponent {
-  display: none;
   overflow: hidden;
   font-size: 15px;
   font-weight: 500;
@@ -119,6 +156,7 @@
 }
 
 .win-chance-track {
+  position: relative;
   width: 56px;
   height: 6px;
   overflow: hidden;
@@ -132,10 +170,56 @@
   background: var(--blue);
 }
 
+.win-chance-track::after {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 1px;
+  background: var(--ink);
+  opacity: 0.3;
+  content: "";
+}
+
+.upset-win {
+  --chance-color: var(--green);
+}
+
+.upset-loss {
+  --chance-color: var(--red);
+}
+
+.upset-win,
+.upset-loss {
+  color: var(--chance-color);
+  font-weight: 600;
+}
+
+.upset-win .win-chance-track span,
+.upset-loss .win-chance-track span {
+  background: var(--chance-color);
+}
+
 .battle-ago {
   color: var(--muted);
   font-size: 12px;
   text-align: right;
+}
+
+.battle-chevron {
+  justify-self: center;
+  width: 7px;
+  height: 7px;
+  margin-top: -3px;
+  border-right: 1.5px solid var(--muted);
+  border-bottom: 1.5px solid var(--muted);
+  transform: rotate(45deg);
+  transition: transform 150ms ease;
+}
+
+.battle-row[aria-expanded="true"] .battle-chevron {
+  margin-top: 3px;
+  transform: rotate(225deg);
 }
 
 .battle-detail {
@@ -150,34 +234,39 @@
   gap: 36px;
 }
 
+.deck-tower {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.deck-tower-icon {
+  width: 22px;
+}
+
 .battle-meta {
   margin: 12px 0 0;
   color: var(--muted);
   font-size: 12px;
 }
 
+@media (prefers-reduced-motion: reduce) {
+  .battle-chevron {
+    transition: none;
+  }
+}
+
 @media (max-width: 959px) {
-  .battle-row {
-    grid-template-columns: 26px minmax(0, 1fr) 96px 30px;
-    gap: 10px;
-    padding: 14px 16px;
-  }
-
-  .battle-row .mini-deck,
-  .battle-vs {
-    display: none;
-  }
-
-  .battle-opponent {
-    display: block;
-  }
-
   .decks {
-    gap: 4px;
+    gap: 4px 24px;
   }
 
   .deck {
-    width: 100%;
+    flex: 1 1 240px;
+    max-width: 320px;
   }
 
   .deck-grid {

@@ -37,4 +37,48 @@ describe("BattleRow", () => {
     expect(screen.getByText("Draw", { selector: ".battle-skip" })).toBeInTheDocument();
     expect(screen.queryByText(/%/)).not.toBeInTheDocument();
   });
+
+  it("marks an upset win in the row and the details", async () => {
+    const user = userEvent.setup();
+    render(
+      <ul>
+        <BattleRow battle={makeBattle({ win_probability: 0.3, timestamp: null })} />
+      </ul>,
+    );
+    const row = screen.getByRole("button", { name: /win chance, upset win/ });
+    expect(row.querySelector(".win-chance")).toHaveClass("upset-win");
+
+    await user.click(row);
+
+    expect(screen.getByText("Ranked · your win chance 30% · upset win")).toBeInTheDocument();
+  });
+
+  it("shows tower troops in the details", async () => {
+    const user = userEvent.setup();
+    const tower = { name: "Cannoneer", icon_url: null, identity: "cannoneer:tower", level: 11 };
+    render(
+      <ul>
+        <BattleRow battle={makeBattle({ player_tower: tower, opponent_tower: null })} />
+      </ul>,
+    );
+
+    await user.click(screen.getByRole("button", { name: /^Win/ }));
+
+    const deck = screen.getByRole("region", { name: "You deck" });
+    expect(deck.querySelector(".deck-tower")).toHaveTextContent("Cannoneer");
+    expect(
+      screen.getByRole("region", { name: "Rival deck" }).querySelector(".deck-tower"),
+    ).toBeNull();
+  });
+
+  it("fades a deck repeated from the previous row", () => {
+    const { container } = render(
+      <ul>
+        <BattleRow battle={makeBattle()} repeatsDeck />
+      </ul>,
+    );
+
+    expect(container.querySelector(".mini-deck-player")).toHaveClass("mini-deck-repeat");
+    expect(container.querySelector(".mini-deck-opponent")).not.toHaveClass("mini-deck-repeat");
+  });
 });
