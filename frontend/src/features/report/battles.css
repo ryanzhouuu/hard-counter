@@ -98,7 +98,7 @@
 }
 
 .battle-vs {
-  color: var(--faint);
+  color: var(--muted);
   font-size: 11px;
   text-align: center;
 }
@@ -133,7 +133,7 @@
 }
 
 .battle-ago {
-  color: var(--faint);
+  color: var(--muted);
   font-size: 12px;
   text-align: right;
 }
