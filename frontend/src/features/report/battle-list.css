@@ -24,6 +24,9 @@
 }
 
 .battle-more button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   padding: 0;
   border: 0;
   background: none;
@@ -33,8 +36,23 @@
   cursor: pointer;
 }
 
-.battle-more button + button {
-  color: var(--muted);
+.battle-more button:hover {
+  text-decoration: underline;
+}
+
+.battle-more button::after {
+  width: 5px;
+  height: 5px;
+  margin-top: -3px;
+  border-right: 1.5px solid currentcolor;
+  border-bottom: 1.5px solid currentcolor;
+  transform: rotate(45deg);
+  content: "";
+}
+
+.battle-more button[aria-expanded="true"]::after {
+  margin-top: 3px;
+  transform: rotate(225deg);
 }
 
 @media (max-width: 959px) {

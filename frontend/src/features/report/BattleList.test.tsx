@@ -23,8 +23,32 @@ describe("BattleList", () => {
     await user.click(screen.getByRole("button", { name: "Show 1 older battle" }));
     expect(screen.getAllByRole("listitem")).toHaveLength(2);
 
-    await user.click(screen.getByRole("button", { name: "1 not scored" }));
+    await user.click(screen.getByRole("button", { name: "Show 1 not scored" }));
     expect(screen.getAllByRole("listitem")).toHaveLength(3);
+
+    await user.click(screen.getByRole("button", { name: "Hide 1 not scored" }));
+    expect(screen.getAllByRole("listitem")).toHaveLength(2);
+  });
+
+  it("fades the player's deck only when it repeats the row above", () => {
+    const otherDeck = makeBattle().opponent_cards;
+    const { container } = render(
+      <BattleList
+        windowFilled={false}
+        battles={[
+          makeBattle(),
+          makeBattle({ player_cards: [...makeBattle().player_cards].reverse() }),
+          makeBattle({ player_cards: otherDeck }),
+        ]}
+      />,
+    );
+
+    const decks = container.querySelectorAll(".mini-deck-player");
+    expect([...decks].map((deck) => deck.classList.contains("mini-deck-repeat"))).toEqual([
+      false,
+      true,
+      false,
+    ]);
   });
 
   it("lists every scored battle when the window is not filled", () => {

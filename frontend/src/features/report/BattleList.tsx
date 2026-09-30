@@ -1,20 +1,38 @@
 import { useState } from "react";
 
-import type { Battle } from "../../api/playerAnalysis";
+import type { Battle, Card } from "../../api/playerAnalysis";
 import { BattleRow } from "./BattleRow";
 import "./battle-list.css";
 
 type KeyedBattle = { key: string; battle: Battle };
 type BattleListProps = { battles: Battle[]; windowFilled: boolean };
 
+function deckKey(cards: Card[]): string {
+  return cards
+    .map((card) => card.name)
+    .sort()
+    .join("|");
+}
+
 function Rows({ items }: { items: KeyedBattle[] }) {
   return (
     <ul className="battle-rows">
-      {items.map(({ key, battle }) => (
-        <BattleRow key={key} battle={battle} />
+      {items.map(({ key, battle }, index) => (
+        <BattleRow
+          key={key}
+          battle={battle}
+          repeatsDeck={
+            index > 0 &&
+            deckKey(items[index - 1].battle.player_cards) === deckKey(battle.player_cards)
+          }
+        />
       ))}
     </ul>
   );
+}
+
+function plural(count: number, noun: string): string {
+  return `${count} ${noun}${count === 1 ? "" : "s"}`;
 }
 
 function BattleList({ battles, windowFilled }: BattleListProps) {
@@ -30,7 +48,6 @@ function BattleList({ battles, windowFilled }: BattleListProps) {
   const skipped = keyed.filter(({ battle }) => battle.skip_reason !== null);
   const primary = windowFilled ? scored.filter(({ battle }) => battle.in_window) : scored;
   const older = windowFilled ? scored.filter(({ battle }) => !battle.in_window) : [];
-  const olderLabel = `${older.length} older ${older.length === 1 ? "battle" : "battles"}`;
 
   return (
     <section className="battle-list" aria-label="Recent battles">
@@ -45,7 +62,7 @@ function BattleList({ battles, windowFilled }: BattleListProps) {
               aria-expanded={showOlder}
               onClick={() => setShowOlder((value) => !value)}
             >
-              {showOlder ? "Hide" : "Show"} {olderLabel}
+              {showOlder ? "Hide" : "Show"} {plural(older.length, "older battle")}
             </button>
           )}
           {skipped.length > 0 && (
@@ -54,7 +71,7 @@ function BattleList({ battles, windowFilled }: BattleListProps) {
               aria-expanded={showSkipped}
               onClick={() => setShowSkipped((value) => !value)}
             >
-              {skipped.length} not scored
+              {showSkipped ? "Hide" : "Show"} {skipped.length} not scored
             </button>
           )}
         </div>
