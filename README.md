@@ -29,3 +29,6 @@ preparation, model training, and quality checks.
 
 See [MODEL_INPUTS.md](docs/MODEL_INPUTS.md) for selected card catalogs and
 attributes, attention cache rebuilding, and live model coverage.
+
+See [experiments/README.md](experiments/README.md) for reproducible ML study and
+artifact conventions.
