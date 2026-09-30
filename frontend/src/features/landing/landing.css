@@ -19,6 +19,12 @@
   color: var(--muted);
 }
 
+.landing-hint {
+  margin: 14px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
 .tag-form {
   position: relative;
 }

@@ -12,6 +12,7 @@ describe("Landing", () => {
     render(<Landing onLookUp={onLookUp} />);
 
     expect(screen.getByRole("heading", { name: "Hard Counter" })).toBeInTheDocument();
+    expect(screen.getByText(/Your tag is on your Clash Royale profile/)).toBeInTheDocument();
     await user.type(screen.getByRole("textbox", { name: "Player tag" }), "#abc123");
     await user.click(screen.getByRole("button", { name: "Look up" }));
 
