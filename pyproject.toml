@@ -62,8 +62,8 @@ packages = ["backend/src/clash_sos"]
 
 [tool.pytest.ini_options]
 addopts = "--strict-config --strict-markers"
-pythonpath = ["backend/src", "backend/tests/unit"]
-testpaths = ["backend/tests"]
+pythonpath = [".", "backend/src", "backend/tests/unit"]
+testpaths = ["backend/tests", "experiments/tests"]
 
 [tool.coverage.run]
 branch = true
@@ -75,14 +75,14 @@ skip_covered = true
 
 [tool.ruff]
 line-length = 100
-src = ["backend/src", "backend/tests"]
+src = ["backend/src", "backend/tests", "experiments"]
 target-version = "py312"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
 
 [tool.pyright]
-include = ["backend/src", "backend/tests"]
+include = ["backend/src", "backend/tests", "experiments"]
 pythonVersion = "3.12"
 typeCheckingMode = "strict"
 extraPaths = ["backend/tests/unit"]
