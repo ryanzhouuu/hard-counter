@@ -15,7 +15,7 @@ from clash_sos.infrastructure.clash_royale.collector_normalize import (
 )
 from clash_sos.infrastructure.clash_royale.collector_store import CollectorStore
 
-MAX_COHORT_TAGS = 400
+MAX_COHORT_TAGS = 800
 
 
 @dataclass(frozen=True)

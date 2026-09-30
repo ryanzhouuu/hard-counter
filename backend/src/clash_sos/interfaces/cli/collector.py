@@ -67,7 +67,7 @@ def sweep_report(
 def sweep_collector(
     cohort: Annotated[Path, typer.Option(help="One player tag per line")] = DEFAULT_COHORT,
     database: Path = DEFAULT_DATABASE,
-    max_duration_minutes: float = 30,
+    max_duration_minutes: float = 45,
     min_gap_minutes: float = 60,
     request_spacing_seconds: float = 2,
     failure_backoff_seconds: float = 60,

@@ -84,12 +84,12 @@ Official snapshots use the normalized preparation command below.
 ## Preparing tower-aware training inputs
 
 The local collector reads a fixed file of player tags, one `#TAG` per line,
-under ignored `data/`. Start with a selected cohort of a few hundred max-level
+under ignored `data/`. Start with a selected cohort of several hundred max-level
 ranked players; this is a sampling choice, not a representative-population
-guarantee. The commands accept 1–400 distinct tags. Supply the official API
+guarantee. The commands accept 1–800 distinct tags. Supply the official API
 token through `CLASH_ROYALE_API_TOKEN`. One request is in flight at a time.
 The operator-started `collect sweep` attempts each due tag once and exits. For
-the selected 300-tag cohort, run it about four times per day while the local
+the selected 800-tag cohort, run it about four times per day while the local
 machine is available. Gaps in highly active players' bounded logs are possible;
 battles that have already left a log cannot be recovered.
 
@@ -104,7 +104,7 @@ uv run clash-sos collect export \
 
 `collect sweep` defaults to `data/collector/players.txt`, a two-second request
 spacing, a one-hour minimum gap since each tag's last successful poll, and a
-30-minute runtime limit. An interrupted or timed-out sweep keeps completed
+45-minute runtime limit. An interrupted or timed-out sweep keeps completed
 polls, and the next invocation attempts unfinished tags once they are due.
 Failures retain their backoff and credential rejection stops the command.
 The output reports only that invocation's attempts, new matches, duplicates,

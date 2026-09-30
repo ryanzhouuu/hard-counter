@@ -251,7 +251,7 @@ def test_credential_rejection_stops_without_checkpoint(tmp_path: Path) -> None:
         store.close()
 
 
-def test_collector_rejects_more_than_four_hundred_tags(tmp_path: Path) -> None:
+def test_collector_rejects_more_than_eight_hundred_tags(tmp_path: Path) -> None:
     clock = FakeClock()
     store = CollectorStore(tmp_path / "collector.sqlite")
 
@@ -263,7 +263,7 @@ def test_collector_rejects_more_than_four_hundred_tags(tmp_path: Path) -> None:
             await collect_for_duration(
                 RoyaleClient(http, "test-token"),
                 store,
-                tuple(f"#T{index:03d}" for index in range(401)),
+                tuple(f"#T{index:03d}" for index in range(801)),
                 config(),
                 now=clock.now,
                 monotonic=clock.monotonic,
@@ -271,7 +271,7 @@ def test_collector_rejects_more_than_four_hundred_tags(tmp_path: Path) -> None:
             )
 
     try:
-        with pytest.raises(ValueError, match="1-400"):
+        with pytest.raises(ValueError, match="1-800"):
             asyncio.run(campaign())
     finally:
         store.close()
