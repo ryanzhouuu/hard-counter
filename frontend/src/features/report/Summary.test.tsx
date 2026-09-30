@@ -1,7 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
-import { makeAnalysis, makeSchedule } from "../../test/fixtures";
+import { makeAnalysis, makeBattle, makeSchedule } from "../../test/fixtures";
 import { Summary } from "./Summary";
 
 const insufficient = makeSchedule({
@@ -31,6 +31,31 @@ describe("Summary", () => {
     );
   });
 
+  it("counts upsets inside the window", () => {
+    renderSummary(
+      makeAnalysis({
+        battles: [
+          makeBattle({ outcome: "win", win_probability: 0.3 }),
+          makeBattle({ outcome: "win", win_probability: 0.35 }),
+          makeBattle({ outcome: "loss", win_probability: 0.7 }),
+          makeBattle({ outcome: "win", win_probability: 0.2, in_window: false }),
+          makeBattle({ outcome: "win", win_probability: 0.62 }),
+        ],
+      }),
+    );
+
+    expect(screen.getByText("Upsets").parentElement).toHaveTextContent("Upsets 2 won · 1 lost");
+  });
+
+  it("explains disabled windows only when the report is available", () => {
+    renderSummary(makeAnalysis({ schedule: makeSchedule({ eligible_count: 21 }) }));
+
+    expect(screen.getByText("Only 21 scored battles")).toBeInTheDocument();
+    expect(screen.getByRole("group", { name: "Battles counted" })).toHaveAccessibleDescription(
+      "Only 21 scored battles",
+    );
+  });
+
   it("colors a result below expectation red", () => {
     renderSummary(
       makeAnalysis({
@@ -56,7 +81,7 @@ describe("Summary", () => {
   it("explains a window without enough scored battles", () => {
     renderSummary(makeAnalysis({ schedule: insufficient }));
 
-    expect(screen.getByText("Only 7 scored battles")).toBeInTheDocument();
+    expect(screen.getAllByText("Only 7 scored battles")).toHaveLength(1);
     expect(screen.queryByText(/^Won/)).not.toBeInTheDocument();
   });
 

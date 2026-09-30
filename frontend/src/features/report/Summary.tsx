@@ -1,5 +1,6 @@
-import type { PlayerAnalysis, Schedule } from "../../api/playerAnalysis";
+import type { Battle, PlayerAnalysis, Schedule } from "../../api/playerAnalysis";
 import { percent, signedValue } from "../../lib/format";
+import { UPSET_DEFINITION, upsetOf } from "../../lib/upset";
 import { ExpectationBar } from "./ExpectationBar";
 import type { WindowSize } from "./query";
 import { WindowPicker } from "./WindowPicker";
@@ -22,7 +23,15 @@ function shortfallNote(report: PlayerAnalysis): string {
   return `Only ${count} scored ${count === 1 ? "battle" : "battles"}`;
 }
 
-function Headline({ schedule }: { schedule: Schedule }) {
+function upsetCounts(battles: Battle[]): { won: number; lost: number } {
+  const upsets = battles.filter((battle) => battle.in_window).map(upsetOf);
+  return {
+    won: upsets.filter((upset) => upset === "win").length,
+    lost: upsets.filter((upset) => upset === "loss").length,
+  };
+}
+
+function Headline({ schedule, battles }: { schedule: Schedule; battles: Battle[] }) {
   const { actual_wins, expected_wins, performance_above_expectation, strength_of_schedule } =
     schedule;
   if (
@@ -34,6 +43,7 @@ function Headline({ schedule }: { schedule: Schedule }) {
     return null;
   }
   const delta = signedValue(performance_above_expectation);
+  const upsets = upsetCounts(battles);
   return (
     <>
       <p className="headline num">
@@ -48,27 +58,34 @@ function Headline({ schedule }: { schedule: Schedule }) {
         expected={expected_wins}
         total={schedule.requested_window}
       />
-      <p className="stat num">
-        <span>Avg win chance</span> {percent(1 - strength_of_schedule)}
-      </p>
+      <div className="stats">
+        <p className="stat num">
+          <span>Avg win chance</span> {percent(1 - strength_of_schedule)}
+        </p>
+        <p className="stat num" title={UPSET_DEFINITION}>
+          <span>Upsets</span> {upsets.won} won · {upsets.lost} lost
+        </p>
+      </div>
     </>
   );
 }
 
 function Summary({ report, windowSize, onSelectWindow }: SummaryProps) {
-  const { player, schedule } = report;
+  const { player, schedule, battles } = report;
+  const available = schedule.status === "available";
   return (
     <aside className="summary" aria-label="Summary">
       <h1 className="player-name">{player.name}</h1>
       <p className="player-meta num">{playerMeta(player)}</p>
-      {schedule.status === "available" ? (
-        <Headline schedule={schedule} />
+      {available ? (
+        <Headline schedule={schedule} battles={battles} />
       ) : (
         <p className="headline-note">{shortfallNote(report)}</p>
       )}
       <WindowPicker
         selected={windowSize}
         available={schedule.eligible_count}
+        explainLimit={available}
         onSelect={onSelectWindow}
       />
     </aside>

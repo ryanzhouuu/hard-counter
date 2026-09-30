@@ -28,8 +28,14 @@
   font-weight: 600;
 }
 
-.stat {
+.stats {
+  display: grid;
+  gap: 6px;
   margin: 0 0 24px;
+}
+
+.stat {
+  margin: 0;
   font-size: 15px;
 }
 
@@ -103,9 +109,16 @@
   border: 0;
 }
 
-.window-picker legend {
-  margin-bottom: 6px;
-  padding: 0;
+.window-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.window-note {
+  margin: 8px 0 0;
   color: var(--muted);
   font-size: 12px;
 }
@@ -118,7 +131,8 @@
 }
 
 .segmented button {
-  padding: 6px 14px;
+  min-width: 40px;
+  padding: 6px 12px;
   border: 0;
   border-radius: 7px;
   background: transparent;
@@ -142,6 +156,7 @@
 @media (max-width: 959px) {
   .segmented {
     display: flex;
+    flex: 1;
   }
 
   .segmented button {
