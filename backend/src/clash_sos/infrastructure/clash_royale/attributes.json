@@ -1,5 +1,5 @@
 {
-  "attribute_version": "card-attributes:2026-10-01-r2",
+  "attribute_version": "card-attributes:2026-10-01-r3",
   "summary_columns": ["mean_elixir", "win_condition_count", "building_count", "spell_count", "cycle_count", "air_defense_count", "bait_count"],
   "cards": {
     "archer-queen": {"elixir": 5, "roles": ["air_defense"]},
@@ -38,7 +38,7 @@
     "firecracker": {"elixir": 3, "roles": ["air_defense", "bait"]},
     "fisherman": {"elixir": 3, "roles": []},
     "flying-machine": {"elixir": 4, "roles": ["air_defense"]},
-    "freeze": {"elixir": 4, "roles": ["spell"]},
+    "freeze": {"elixir": 4, "roles": ["spell", "air_defense"]},
     "furnace": {"elixir": 4, "roles": ["air_defense"]},
     "giant": {"elixir": 5, "roles": ["win_condition"]},
     "giant-skeleton": {"elixir": 6, "roles": []},

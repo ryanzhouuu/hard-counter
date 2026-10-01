@@ -39,7 +39,7 @@ def test_current_attributes_cover_roots_and_isolate_balance_changes() -> None:
 
 
 def test_current_air_response_labels_preserve_historical_attributes() -> None:
-    assert CURRENT_CARD_ATTRIBUTES.version == "card-attributes:2026-10-01-r2"
+    assert CURRENT_CARD_ATTRIBUTES.version == "card-attributes:2026-10-01-r3"
     expected = {
         "furnace": {"air_defense"},
         "goblin-hut": {"building", "air_defense"},
@@ -61,3 +61,9 @@ def test_current_rage_has_an_air_damage_role_without_rewriting_june() -> None:
     assert CURRENT_CARD_ATTRIBUTES.cards["rage"].roles == frozenset({"spell", "air_defense"})
     assert CURRENT_CARD_ATTRIBUTES.cards["rage"].elixir == 2
     assert CARD_ATTRIBUTES.cards["rage"].roles == frozenset({"spell"})
+
+
+def test_current_freeze_has_an_air_response_role_without_rewriting_june() -> None:
+    assert CURRENT_CARD_ATTRIBUTES.cards["freeze"].roles == frozenset({"spell", "air_defense"})
+    assert CURRENT_CARD_ATTRIBUTES.cards["freeze"].elixir == 4
+    assert CARD_ATTRIBUTES.cards["freeze"].roles == frozenset({"spell"})

@@ -6,6 +6,7 @@ from json import dumps
 from pathlib import Path
 
 import pytest
+from experiments.matchup_features.responses import answers
 from experiments.mechanics.air_audit import air_audit
 from experiments.mechanics.contracts import MechanicField
 from experiments.mechanics.load import (
@@ -111,6 +112,7 @@ def test_supplied_targeting_facts_close_all_tower_and_freeze_air_gaps() -> None:
     for token in tokens:
         entry = catalog.for_token(token)
         assert entry.flag("targets_air") and entry.flag("targets_ground")
+        assert answers(entry, "airborne")
         if entry.identity != "cannoneer:tower":
             assert entry.field("targets_air").status == "user_reported"
     freeze = next(e for e in catalog.entries.values() if e.identity == "freeze:base")

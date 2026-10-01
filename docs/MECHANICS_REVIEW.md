@@ -1,7 +1,7 @@
 # Mechanics review: October 1, 2026
 
-Current training attributes use `card-attributes:2026-10-01-r2`. This review corrects
-seven coarse roles; it does not certify every card or establish model improvement.
+Current training attributes use `card-attributes:2026-10-01-r3`. This review corrects
+eight coarse roles; it does not certify every card or establish model improvement.
 Costs, role column order, card identities, and base-role inheritance are unchanged.
 
 | Card | Correction | Evidence date / release date |
@@ -13,6 +13,7 @@ Costs, role column order, card identities, and base-role inheritance are unchang
 | Royal Delivery | Add air defense; retain spell | [Supercell balance notes](https://supercell.com/en/games/clashroyale/blog/release-notes/season-14-balance-changes/) describe ground/air area damage and a spawned troop, August 4, 2020. |
 | Goblin Curse | Add air defense; retain spell | [Supercell balance notes](https://supercell.com/en/games/clashroyale/blog/release-notes/october-balance-changes/) explicitly describe damage to Bats, October 8, 2024. Air targeting is inferred from that interaction. |
 | Rage | Add air defense; retain spell | [RoyaleAPI original update preview](https://royaleapi.com/blog/2022-q4-update?lang=en) explicitly confirms instant damage to air units for the December 12, 2022 rework. |
+| Freeze | Add air defense; retain spell | [User-supplied targeting and description](../experiments/mechanics/evidence/3951013bf78e8bb50c5b020f72c7d0b5972d6351c2fcd2fb186571b973e57031.json), October 1, 2026, confirms ground/air damage and freezing. |
 
 These labels mean a card has an air-response channel, not that it stops an air
 push alone. Furnace's direct attack and spawned Fire Spirit are different damage
@@ -29,6 +30,10 @@ linked RoyaleAPI release previews provide original gameplay/stat observations
 for targeting omitted from the announcements. Older balance numbers from these
 sources must not be treated as current level-16 damage or timing measurements.
 
+Manual confirmations also count as known mechanics. They record the supplied
+facts, report date, and a hash of the evidence record without requiring web URLs.
+Descriptions are retained verbatim; they do not establish numeric combat stats.
+
 The `mechanics-partial:2026-10-01-r3` snapshot applies to September 24 through
 October 1. The [September balance notes](https://supercell.com/en/games/clashroyale/blog/release-notes/september-balance-changes-2027/)
 change damage/timing for reviewed cards, not the recorded structural predicates.
@@ -44,10 +49,16 @@ effective January 1, 2024. Freeze damage and control are sourced from the Septem
 2026 balance notes; its targeting is now manually confirmed. Minion Giant's building-only
 targeting excludes air troops from its direct attack channel.
 
+The third revision records manually confirmed ground/air targeting for Tower
+Princess, Dagger Duchess, Royal Chef, and Freeze. Cannoneer's targeting retains
+its published source and is also corroborated in the manual record. Confirmed
+spells have no primary airborne actor; summoned and ability-only threats remain
+separate. All four towers and Freeze pass the ordinary air-targeting audit.
+
 The [public RoyaleAPI bulk export](https://github.com/RoyaleAPI/cr-api-data/commit/d5461b0a59bff33c4da2fc845b07275b66b2d6ff)
 was last updated October 18, 2023 when checked. It is not sufficient evidence for
-current-era completeness. A current export or independently verified current
-mechanics is needed to close the remaining field gaps.
+current-era completeness. A current export, manual confirmations, or published
+mechanics can close the remaining field gaps.
 
 Omitted fields remain unknown. Do not infer a false flag from an empty role set
 or copy every base mechanic onto an evolution or hero. Hero abilities and evolved
