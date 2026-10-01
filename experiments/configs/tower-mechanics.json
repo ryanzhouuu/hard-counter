@@ -1,0 +1,28 @@
+{
+  "study_id": "tower-mechanics",
+  "variants": [
+    {
+      "variant_id": "D0",
+      "feature_groups": [],
+      "nuisance": "none",
+      "architecture": "explicit"
+    },
+    {
+      "variant_id": "D1",
+      "feature_groups": [
+        "categorical"
+      ],
+      "nuisance": "none",
+      "architecture": "explicit"
+    },
+    {
+      "variant_id": "D2",
+      "feature_groups": [
+        "categorical",
+        "quantitative"
+      ],
+      "nuisance": "none",
+      "architecture": "explicit"
+    }
+  ]
+}

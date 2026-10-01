@@ -1,0 +1,27 @@
+{
+  "study_id": "form-mechanics",
+  "variants": [
+    {
+      "variant_id": "C0",
+      "feature_groups": [],
+      "nuisance": "none",
+      "architecture": "explicit"
+    },
+    {
+      "variant_id": "C1",
+      "feature_groups": [
+        "inherited"
+      ],
+      "nuisance": "none",
+      "architecture": "explicit"
+    },
+    {
+      "variant_id": "C2",
+      "feature_groups": [
+        "specific"
+      ],
+      "nuisance": "none",
+      "architecture": "explicit"
+    }
+  ]
+}

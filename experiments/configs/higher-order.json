@@ -1,0 +1,19 @@
+{
+  "study_id": "higher-order",
+  "variants": [
+    {
+      "variant_id": "E0",
+      "feature_groups": [],
+      "nuisance": "none",
+      "architecture": "explicit"
+    },
+    {
+      "variant_id": "E1",
+      "feature_groups": [
+        "patterns"
+      ],
+      "nuisance": "none",
+      "architecture": "explicit"
+    }
+  ]
+}

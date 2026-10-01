@@ -1,0 +1,23 @@
+{
+  "study_id": "player-adjustment",
+  "variants": [
+    {
+      "variant_id": "B0",
+      "feature_groups": [],
+      "nuisance": "none",
+      "architecture": "explicit"
+    },
+    {
+      "variant_id": "B1",
+      "feature_groups": [],
+      "nuisance": "history",
+      "architecture": "explicit"
+    },
+    {
+      "variant_id": "B2",
+      "feature_groups": [],
+      "nuisance": "joint",
+      "architecture": "explicit"
+    }
+  ]
+}

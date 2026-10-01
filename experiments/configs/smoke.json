@@ -1,0 +1,11 @@
+{
+  "study_id": "response-cycle",
+  "smoke_row_cap": 128,
+  "smoke_epoch_cap": 2,
+  "smoke_time_cap": 30.0,
+  "variants": [
+    {
+      "variant_id": "A0"
+    }
+  ]
+}

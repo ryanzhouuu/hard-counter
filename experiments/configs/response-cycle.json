@@ -1,0 +1,42 @@
+{
+  "study_id": "response-cycle",
+  "variants": [
+    {
+      "variant_id": "A0",
+      "feature_groups": [],
+      "nuisance": "none",
+      "architecture": "explicit"
+    },
+    {
+      "variant_id": "A1",
+      "feature_groups": [
+        "response"
+      ],
+      "nuisance": "none",
+      "architecture": "explicit"
+    },
+    {
+      "variant_id": "A2",
+      "feature_groups": [
+        "cycle"
+      ],
+      "nuisance": "none",
+      "architecture": "explicit"
+    },
+    {
+      "variant_id": "A3",
+      "feature_groups": [
+        "response",
+        "cycle"
+      ],
+      "nuisance": "none",
+      "architecture": "explicit"
+    },
+    {
+      "variant_id": "full_attention",
+      "feature_groups": [],
+      "nuisance": "none",
+      "architecture": "attention"
+    }
+  ]
+}
