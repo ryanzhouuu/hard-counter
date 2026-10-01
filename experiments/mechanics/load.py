@@ -15,6 +15,14 @@ from experiments.mechanics.contracts import (
 )
 
 
+def _field_payload(field: MechanicField) -> dict[str, object]:
+    """Keep old catalog digests stable when a field has no manual evidence."""
+    payload = asdict(field)
+    if field.evidence_sha256 is None:
+        payload.pop("evidence_sha256")
+    return payload
+
+
 def to_payload(catalog: MechanicsCatalog) -> dict[str, object]:
     return {
         "version": catalog.version,
@@ -27,7 +35,9 @@ def to_payload(catalog: MechanicsCatalog) -> dict[str, object]:
                 "identity": entry.identity,
                 "kind": entry.kind,
                 "base_identity": entry.base_identity,
-                "fields": {name: asdict(field) for name, field in sorted(entry.fields.items())},
+                "fields": {
+                    name: _field_payload(field) for name, field in sorted(entry.fields.items())
+                },
             }
             for token, entry in sorted(catalog.entries.items())
         ],
@@ -65,7 +75,7 @@ def from_payload(payload: object) -> MechanicsCatalog:
             if not isinstance(name, str) or not isinstance(raw_field, dict):
                 raise ValueError("invalid mechanics field")
             field = cast(dict[str, object], raw_field)
-            if set(field) != {
+            required = {
                 "value",
                 "unit",
                 "status",
@@ -73,7 +83,8 @@ def from_payload(payload: object) -> MechanicsCatalog:
                 "source_effective_date",
                 "level",
                 "inherited_from",
-            }:
+            }
+            if not required <= set(field) or set(field) - required - {"evidence_sha256"}:
                 raise ValueError("invalid field evidence schema")
             value = field["value"]
             if value is not None and type(value) not in {str, bool, int, float}:
@@ -83,6 +94,9 @@ def from_payload(payload: object) -> MechanicsCatalog:
             for key in ("source_url", "source_effective_date", "inherited_from"):
                 if field[key] is not None and not isinstance(field[key], str):
                     raise ValueError("invalid evidence string")
+            evidence = field.get("evidence_sha256")
+            if evidence is not None and not isinstance(evidence, str):
+                raise ValueError("invalid manual evidence hash")
             fields[name] = MechanicField(
                 cast(Value, value),
                 field["unit"],
@@ -91,6 +105,7 @@ def from_payload(payload: object) -> MechanicsCatalog:
                 cast(str | None, field["source_effective_date"]),
                 cast(int | None, field["level"]),
                 cast(str | None, field["inherited_from"]),
+                evidence,
             )
         entries[token] = MechanicsEntry(
             entry["identity"],
@@ -109,6 +124,9 @@ def from_payload(payload: object) -> MechanicsCatalog:
 
 def load(path: str | Path, *, expected_digest: str | None = None) -> MechanicsCatalog:
     catalog = from_payload(loads(Path(path).read_text(encoding="utf-8")))
+    from experiments.mechanics.manual_evidence import verify_reports
+
+    verify_reports(catalog, Path(__file__).parent / "evidence")
     if expected_digest is not None and catalog.digest != expected_digest:
         raise ValueError("mechanics digest mismatch")
     return catalog

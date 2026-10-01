@@ -129,6 +129,13 @@ check covers ordinary channels; ability-only and summoned-unit channels need
 separate verification. Existing exploratory response extraction retains its
 missingness features and does not automatically enforce this strict gate.
 
+Manual facts use `user_reported` status and count as known mechanics. Their
+dated statements are saved in `mechanics/evidence/` and bound by SHA-256; they
+need no publisher URL. Loading verifies the referenced report and exact field
+claims. This status distinguishes manual observations from linked sources without
+discarding either. Optional evidence fields are omitted from older snapshots'
+serialization, preserving their existing digests.
+
 ## Frozen development and candidate reporting
 
 The checked-in configurations are preparation definitions. Before full matrices,

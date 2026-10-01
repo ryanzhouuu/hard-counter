@@ -5,7 +5,7 @@ from types import MappingProxyType
 from typing import Literal
 
 Value = bool | int | float | str | None
-Status = Literal["verified", "unknown", "not_applicable", "synthetic"]
+Status = Literal["verified", "user_reported", "unknown", "not_applicable", "synthetic"]
 FIELD_UNITS: Mapping[str, str] = MappingProxyType(
     {
         **{

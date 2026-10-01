@@ -36,6 +36,7 @@ def code_digest(root: Path) -> str:
             *root.glob("experiments/**/*.py"),
             *root.glob("experiments/configs/*.json"),
             *root.glob("experiments/mechanics/inputs/*.json"),
+            *root.glob("experiments/mechanics/evidence/*.json"),
         )
     )
     for path in paths:

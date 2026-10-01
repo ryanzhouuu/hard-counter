@@ -27,13 +27,20 @@ class MechanicField:
     source_effective_date: str | None = None
     level: int | None = None
     inherited_from: str | None = None
+    evidence_sha256: str | None = None
 
     def __post_init__(self) -> None:
-        if self.status not in {"verified", "unknown", "not_applicable", "synthetic"}:
+        if self.status not in {
+            "verified",
+            "user_reported",
+            "unknown",
+            "not_applicable",
+            "synthetic",
+        }:
             raise ValueError("invalid verification status")
         if self.status in {"unknown", "not_applicable"} and self.value is not None:
             raise ValueError("unknown and inapplicable fields have no value")
-        if self.status in {"verified", "synthetic"} and self.value is None:
+        if self.known and self.value is None:
             raise ValueError("known fields require a value")
         if isinstance(self.value, float) and not isfinite(self.value):
             raise ValueError("mechanics must be finite")
@@ -47,12 +54,23 @@ class MechanicField:
             if not self.source_effective_date:
                 raise ValueError("verified mechanics require a source date")
             date.fromisoformat(self.source_effective_date)
+        if self.status == "user_reported":
+            if self.source_url is not None or not self.source_effective_date:
+                raise ValueError("user reports require a date and no publisher URL")
+            if (
+                not self.evidence_sha256
+                or len(self.evidence_sha256) != 64
+                or any(char not in "0123456789abcdef" for char in self.evidence_sha256)
+            ):
+                raise ValueError("user reports require a saved evidence hash")
+        elif self.evidence_sha256 is not None:
+            raise ValueError("manual evidence hashes belong to user reports")
         if self.level is not None and (type(self.level) is not int or self.level != 16):
             raise ValueError("quantitative mechanics require normalized level 16")
 
     @property
     def known(self) -> bool:
-        return self.status in {"verified", "synthetic"}
+        return self.status in {"verified", "user_reported", "synthetic"}
 
 
 @dataclass(frozen=True)
@@ -162,6 +180,7 @@ class MechanicsCatalog:
                     field.source_effective_date,
                     source.level,
                     field.inherited_from,
+                    field.evidence_sha256,
                 )
         return MechanicsEntry(entry.identity, entry.kind, fields, entry.base_identity)
 
