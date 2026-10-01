@@ -173,7 +173,9 @@ uv run --extra ml python -m experiments.matchup_features.study confirm \
 
 Confirmation verifies frozen code/assets and mode/level/era/vocabulary, rejects
 backfilled or overlapping data, and uses frozen player maps, support masks,
-scales, and temperatures. It never fits or recalibrates. A consumed-population
+scales, and temperatures. It verifies the dependency lock and publishes an
+inventoried manifest last, including when evaluation fails. It never fits or
+recalibrates. A consumed-population
 marker is written before labels are read, so errors or inconclusive results do
 not authorize repeated fixed-sample tests. A new disjoint population or a
 prospectively specified sequential design requires a separate decision.
