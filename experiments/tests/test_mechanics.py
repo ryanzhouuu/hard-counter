@@ -125,6 +125,8 @@ def test_sourced_partial_inventory_covers_official_forms_and_gates_quantitative(
                     assert field.source_url in {
                         "https://royaleapi.com/blog/furnace-rework-2025-august?lang=en",
                         "https://royaleapi.com/blog/season18?lang=en",
+                        "https://royaleapi.com/blog/2022-q4-update?lang=en",
+                        "https://royaleapi.com/blog/cannoneer-january-2024?lang=en",
                     }
                 else:
                     assert urlparse(field.source_url).hostname in {

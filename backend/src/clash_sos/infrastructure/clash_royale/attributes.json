@@ -1,5 +1,5 @@
 {
-  "attribute_version": "card-attributes:2026-10-01",
+  "attribute_version": "card-attributes:2026-10-01-r2",
   "summary_columns": ["mean_elixir", "win_condition_count", "building_count", "spell_count", "cycle_count", "air_defense_count", "bait_count"],
   "cards": {
     "archer-queen": {"elixir": 5, "roles": ["air_defense"]},
@@ -91,7 +91,7 @@
     "poison": {"elixir": 4, "roles": ["spell", "air_defense"]},
     "prince": {"elixir": 5, "roles": []},
     "princess": {"elixir": 3, "roles": ["air_defense", "bait"]},
-    "rage": {"elixir": 2, "roles": ["spell"]},
+    "rage": {"elixir": 2, "roles": ["spell", "air_defense"]},
     "ram-rider": {"elixir": 5, "roles": ["win_condition"]},
     "rascals": {"elixir": 5, "roles": ["air_defense", "bait"]},
     "rocket": {"elixir": 6, "roles": ["spell", "air_defense"]},

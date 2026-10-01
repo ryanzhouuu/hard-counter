@@ -16,9 +16,9 @@ Void to five elixir for current-era training. June inputs retain Void at three.
 Spirit Empress retains the existing three-elixir feature convention for its
 three/six-elixir deployment mechanic. Forms continue sharing base attributes.
 
-The `card-attributes:2026-10-01` revision removes Furnace's obsolete building
+The `card-attributes:2026-10-01-r2` revision removes Furnace's obsolete building
 role and adds air-defense roles for Furnace, Goblin Hut, Zappies, Mother Witch,
-Royal Delivery, and Goblin Curse. The [mechanics review](MECHANICS_REVIEW.md)
+Royal Delivery, Goblin Curse, and Rage. The [mechanics review](MECHANICS_REVIEW.md)
 records evidence and remaining limits. Roles are coarse capability labels, not
 guarantees of effective counters. The building role also includes offensive
 buildings; it must not be used as a defensive-building predicate.
