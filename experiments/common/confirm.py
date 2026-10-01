@@ -42,6 +42,8 @@ def confirm(args: argparse.Namespace, config: StudyConfig) -> None:
         raise ValueError("reporting contract belongs to another frozen candidate")
     if config.population != contract.fit_population or config.prospective != contract.population:
         raise ValueError("reporting configuration population mismatch")
+    if config.rules != frozen.confirmation_rules:
+        raise ValueError("reporting design differs from frozen confirmation rules")
     validate_candidate_population(frozen, contract.population)
     from experiments.common.ensembles import FrozenEnsemble
 
@@ -54,14 +56,14 @@ def confirm(args: argparse.Namespace, config: StudyConfig) -> None:
     if not ensembles:
         raise ValueError("freeze has no inventoried ensemble assets")
     baseline = [e for e in ensembles if e.variant_id.endswith("0")]
-    if len(baseline) != 1 or {s.variant_id for s in frozen.selections} != {
-        e.variant_id
-        for e in ensembles
-        if not e.variant_id.endswith("0") and e.variant_id != "full_attention"
-    }:
-        raise ValueError("freeze requires one baseline and exactly its selected challengers")
-    if config.rules.confirmation == "single" and len(frozen.selections) != 1:
-        raise ValueError("single-challenger design requires exactly one frozen challenger")
+    identities = [ensemble.variant_id for ensemble in ensembles]
+    if (
+        len(identities) != len(set(identities))
+        or len(baseline) != 1
+        or set(frozen.comparison_ids)
+        != {e.variant_id for e in ensembles if not e.variant_id.endswith("0")}
+    ):
+        raise ValueError("freeze requires one baseline and exactly its frozen comparison family")
     for ensemble in ensembles:
         if (
             ensemble.config_sha256
@@ -147,6 +149,8 @@ def confirm(args: argparse.Namespace, config: StudyConfig) -> None:
                     if name != baseline[0].variant_id
                 },
                 "confirmation_design": config.rules.confirmation,
+                "test_alternative": frozen.confirmation_rules.test_alternative,
+                "comparison_family": frozen.comparison_ids,
             }
             from scipy.stats import norm
 

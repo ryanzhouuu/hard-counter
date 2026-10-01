@@ -156,6 +156,13 @@ Candidate selection is an explicit later decision. Use
 variants/penalties, seeds, code hash, an inventory of ensemble assets, freeze time,
 last inspected battle time, and a strictly later reporting start. Keep each
 selected ensemble JSON and its original verified seed-run directories available.
+Pass explicit `confirmation_rules` to `freeze_candidate`; these freeze the full
+comparison rules, including the test alternative and multiplicity correction.
+The reporting configuration must use exactly those rules. Old freezes without
+these required fields must be recreated before collecting reporting outcomes.
+Set `include_attention=True` to register an attention comparison in the tested
+family. `single` permits exactly one comparison in total; including attention
+alongside a mechanics/player challenger requires `holm`.
 For a multiple-study confirmation, `CandidateFreeze.source_configs` can bind
 each ensemble to its original study configuration. Include exactly one shared
 baseline and the selected challengers; additional attention claims must also be

@@ -7,7 +7,13 @@ from typing import Self
 from pydantic import Field, model_validator
 
 from clash_sos.domain.manifests import ManifestModel, Sha256
-from experiments.common.contracts import FileRecord, PopulationIdentity, StudyConfig, fingerprint
+from experiments.common.contracts import (
+    ComparisonRules,
+    FileRecord,
+    PopulationIdentity,
+    StudyConfig,
+    fingerprint,
+)
 from experiments.common.matrix import screen_jobs
 
 
@@ -22,6 +28,8 @@ class CandidateFreeze(ManifestModel):
     source_configs: tuple[tuple[str, Sha256], ...] = ()
     fit_population: PopulationIdentity
     selections: tuple[CandidateSelection, ...]
+    confirmation_rules: ComparisonRules
+    comparison_ids: tuple[str, ...]
     code_sha256: Sha256
     assets: tuple[FileRecord, ...]
     frozen_at: datetime
@@ -53,6 +61,21 @@ class CandidateFreeze(ManifestModel):
             for entry in self.selections
         ):
             raise ValueError("candidate seeds must be nonempty unique nonnegative values")
+        if (
+            self.confirmation_rules.confirmation is None
+            or self.confirmation_rules.test_alternative is None
+        ):
+            raise ValueError("candidate freeze requires preregistered confirmation rules")
+        family = set(self.comparison_ids)
+        if len(family) != len(self.comparison_ids) or family not in (
+            set(ids),
+            {*ids, "full_attention"},
+        ):
+            raise ValueError(
+                "comparison family must contain exactly selections and optional attention"
+            )
+        if self.confirmation_rules.confirmation == "single" and len(family) != 1:
+            raise ValueError("single confirmation requires exactly one comparison")
         return self
 
 
@@ -65,6 +88,8 @@ def freeze_candidate(
     frozen_at: datetime,
     inspected_through: datetime,
     reporting_start: datetime,
+    confirmation_rules: ComparisonRules,
+    include_attention: bool = False,
 ) -> CandidateFreeze:
     """Record a caller's explicit decision without changing the source run stage."""
     if config.stage != "development-frozen" or config.population is None:
@@ -76,12 +101,23 @@ def freeze_candidate(
         or any(penalty not in config.penalties for penalty in selected_penalties.values())
     ):
         raise ValueError("candidate selection must use enabled variants and registered penalties")
+    if include_attention and not any(
+        variant.enabled
+        and variant.architecture == "attention"
+        and variant.variant_id == "full_attention"
+        for variant in config.variants
+    ):
+        raise ValueError("attention confirmation requires a registered enabled reference")
     return CandidateFreeze(
         source_config_sha256=fingerprint(config),
         fit_population=config.population,
         selections=tuple(
             CandidateSelection(variant_id=variant, penalty=penalty, seeds=config.seeds)
             for variant, penalty in sorted(selected_penalties.items())
+        ),
+        confirmation_rules=confirmation_rules,
+        comparison_ids=tuple(
+            sorted((*selected_penalties, *(("full_attention",) if include_attention else ())))
         ),
         code_sha256=code_sha256,
         assets=assets,

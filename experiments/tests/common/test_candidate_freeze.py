@@ -6,7 +6,13 @@ from experiments.common.candidate import (
     freeze_candidate,
     validate_candidate_population,
 )
-from experiments.common.contracts import FileRecord, PopulationIdentity, StudyConfig, Variant
+from experiments.common.contracts import (
+    ComparisonRules,
+    FileRecord,
+    PopulationIdentity,
+    StudyConfig,
+    Variant,
+)
 from experiments.tests.common.research_fixture import HASH
 from experiments.tests.common.test_research_matrix import frozen_config
 
@@ -23,6 +29,9 @@ def candidate() -> CandidateFreeze:
         inspected_through=end,
         frozen_at=end + timedelta(hours=1),
         reporting_start=end + timedelta(hours=2),
+        confirmation_rules=config.rules.model_copy(
+            update={"confirmation": "single", "test_alternative": "two_sided"}
+        ),
     )
 
 
@@ -81,5 +90,70 @@ def test_final_freeze_can_select_one_challenger_from_a_larger_registered_study()
         frozen_at=earlier.frozen_at,
         inspected_through=earlier.inspected_through,
         reporting_start=earlier.reporting_start,
+        confirmation_rules=earlier.confirmation_rules,
     )
     assert [item.variant_id for item in frozen.selections] == ["candidate-0"]
+
+
+def test_candidate_freezes_the_complete_confirmation_rules() -> None:
+    frozen = candidate()
+    assert frozen.confirmation_rules.confirmation == "single"
+    assert frozen.confirmation_rules.test_alternative == "two_sided"
+    assert frozen.comparison_ids == ("candidate-0",)
+
+
+def test_attention_comparison_cannot_hide_in_a_single_test_design() -> None:
+    frozen = candidate()
+    payload = frozen.model_dump()
+    payload["comparison_ids"] = (*frozen.comparison_ids, "full_attention")
+    with pytest.raises(ValueError, match=r"single.*one comparison"):
+        CandidateFreeze.model_validate(payload)
+    payload["confirmation_rules"] = ComparisonRules(
+        confirmation="holm", test_alternative="improvement"
+    )
+    expanded = CandidateFreeze.model_validate(payload)
+    assert len(expanded.comparison_ids) == 2
+    payload["comparison_ids"] = (*expanded.comparison_ids, "unregistered")
+    with pytest.raises(ValueError, match="comparison family"):
+        CandidateFreeze.model_validate(payload)
+
+
+def test_freeze_requires_explicit_rules_and_registered_attention() -> None:
+    frozen = candidate()
+    payload = frozen.model_dump()
+    payload["confirmation_rules"] = ComparisonRules()
+    with pytest.raises(ValueError, match="preregistered confirmation rules"):
+        CandidateFreeze.model_validate(payload)
+    del payload["confirmation_rules"]
+    with pytest.raises(ValueError, match="confirmation_rules"):
+        CandidateFreeze.model_validate(payload)
+    config = frozen_config()
+
+    def with_attention(source: StudyConfig) -> CandidateFreeze:
+        return freeze_candidate(
+            source,
+            {"candidate-0": source.penalties[0]},
+            code_sha256=HASH,
+            assets=frozen.assets,
+            frozen_at=frozen.frozen_at,
+            inspected_through=frozen.inspected_through,
+            reporting_start=frozen.reporting_start,
+            confirmation_rules=frozen.confirmation_rules.model_copy(
+                update={"confirmation": "holm"}
+            ),
+            include_attention=True,
+        )
+
+    with pytest.raises(ValueError, match="registered enabled reference"):
+        with_attention(config)
+    config = StudyConfig.model_validate(
+        {
+            **config.model_dump(),
+            "variants": (
+                *config.variants,
+                Variant(variant_id="full_attention", architecture="attention"),
+            ),
+        }
+    )
+    declared = with_attention(config)
+    assert declared.comparison_ids == ("candidate-0", "full_attention")

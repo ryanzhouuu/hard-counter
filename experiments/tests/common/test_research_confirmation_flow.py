@@ -85,6 +85,9 @@ def test_frozen_ensembles_confirm_once_without_fit_or_calibration(
         frozen_at=frozen_at,
         inspected_through=session.population.end,
         reporting_start=reporting_start,
+        confirmation_rules=config.rules.model_copy(
+            update={"confirmation": "single", "test_alternative": "two_sided"}
+        ),
     )
     freeze_path = reports / "freeze.json"
     freeze_path.write_bytes(canonical_json_bytes(frozen.model_dump(mode="json")))
@@ -98,9 +101,7 @@ def test_frozen_ensembles_confirm_once_without_fit_or_calibration(
             **config.model_dump(),
             "stage": "prospective-reporting",
             "prospective": future,
-            "rules": config.rules.model_copy(
-                update={"confirmation": "single", "test_alternative": "two_sided"}
-            ),
+            "rules": frozen.confirmation_rules,
         }
     )
     args = argparse.Namespace(
@@ -124,6 +125,13 @@ def test_frozen_ensembles_confirm_once_without_fit_or_calibration(
 
     monkeypatch.setattr("experiments.common.confirm.revision", fixture_revision)
     destination = args.output / config.study_id / args.run_id
+    for change in ({"test_alternative": "improvement"}, {"confirmation": "holm"}):
+        changed = StudyConfig.model_validate(
+            {**reporting.model_dump(), "rules": {**reporting.rules.model_dump(), **change}}
+        )
+        with pytest.raises(ValueError, match="frozen confirmation rules"):
+            confirm(args, changed)
+        assert not destination.exists()
     if corrupt_source:
         source.write_text("corrupt")
         with pytest.raises(ValueError):
