@@ -24,6 +24,7 @@ from experiments.common.provenance import code_digest
 from experiments.common.slices import compare_slices
 from experiments.common.statistics import paired_comparison, score_predictions
 from experiments.common.windows import compare_windows, summarize_windows, window_seed_variability
+from experiments.player_adjustment.comparison import player_comparison_report
 
 
 def _directory(
@@ -233,6 +234,8 @@ def comparison_report(
         ),
         "seed_uncertainty": "seed dispersion is not independent evaluation sampling uncertainty",
     }
+    if config.study_id == "player-adjustment":
+        report["player_adjustment"] = player_comparison_report(runs, ensembles, payloads)
     payloads["comparison.json"] = canonical_json_bytes(to_jsonable_python(report)) + b"\n"
     publish_comparison(report_root, payloads)
     return report

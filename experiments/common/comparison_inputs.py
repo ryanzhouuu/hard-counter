@@ -14,6 +14,7 @@ from experiments.common.contracts import RunManifest, StudyConfig, Variant, fing
 from experiments.common.ensembles import SeedRun
 from experiments.common.predictions import Prediction, read_predictions
 from experiments.common.slices import FixedSlices, SliceMetadata, SliceSpec, build_slices
+from experiments.player_adjustment.comparison import load_actual_outputs
 
 
 class RefitCovariate(ManifestModel):
@@ -38,6 +39,9 @@ class ComparisonRun:
     development: tuple[Prediction, ...]
     support: SupportInventory
     asset: SeedRun
+    actual_calibration: tuple[Prediction, ...]
+    actual_development: tuple[Prediction, ...]
+    player_diagnostics: dict[str, object] | None
 
 
 def load_comparison_run(
@@ -156,7 +160,20 @@ def load_comparison_run(
         development_sha256=members["development.json"].sha256,
         run_config_sha256=manifest.config_sha256,
     )
-    return ComparisonRun(manifest, checkpoint, calibration, development, support, asset)
+    actual_cal, actual_dev, diagnostic = load_actual_outputs(
+        directory, manifest, variant, calibration, development
+    )
+    return ComparisonRun(
+        manifest,
+        checkpoint,
+        calibration,
+        development,
+        support,
+        asset,
+        actual_cal,
+        actual_dev,
+        diagnostic,
+    )
 
 
 def slice_metadata(

@@ -19,6 +19,11 @@ from experiments.common.matrix import MatrixJob, confirmation_jobs, screen_jobs
 from experiments.common.predictions import write_predictions
 from experiments.common.provenance import code_digest
 from experiments.common.session import Session, prepare_session
+from experiments.player_adjustment.history import training_history
+from experiments.player_adjustment.model import PlayerModel
+from experiments.player_adjustment.reports import development_diagnostics
+from experiments.player_adjustment.support_contracts import SupportBins
+from pydantic_core import to_jsonable_python
 
 from clash_sos.domain.canonical_dataset import canonical_json_bytes
 
@@ -27,10 +32,21 @@ def comparison_fixture(
     tmp_path: Path,
     *,
     shared: bool = False,
+    player: bool = False,
 ) -> tuple[StudyConfig, Path, Path, Session]:
     initial = StudyConfig(
-        study_id="form-mechanics" if shared else "response-cycle",
+        study_id="player-adjustment"
+        if player
+        else "form-mechanics"
+        if shared
+        else "response-cycle",
         variants=(
+            Variant(variant_id="B0"),
+            Variant(variant_id="B1", nuisance="history"),
+            Variant(variant_id="B2", nuisance="joint"),
+        )
+        if player
+        else (
             Variant(variant_id="C0" if shared else "A0"),
             Variant(
                 variant_id="C1" if shared else "A1",
@@ -38,6 +54,9 @@ def comparison_fixture(
             ),
         ),
         penalties=(0.1, 0.2),
+        player_support_bins=SupportBins(prior_history_edges=(1, 10), deck_switching_edges=(1, 2))
+        if player
+        else None,
     )
     session = prepare_session(
         initial,
@@ -83,7 +102,11 @@ def comparison_fixture(
         }
     )
     models, reports = tmp_path / "models" / config.study_id / "frozen", tmp_path / "reports"
-    selected = {config.variants[1].variant_id: config.penalties[0]}
+    selected = {
+        item.variant_id: config.penalties[0]
+        for item in config.variants
+        if item.feature_groups or item.nuisance != "none"
+    }
     for job in (*screen_jobs(config), *confirmation_jobs(config, selected)):
         local = config
         variant = next(item for item in config.variants if item.variant_id == job.variant_id)
@@ -151,6 +174,11 @@ def write_comparison_run(
     temperature = fit_temperature(
         tuple(float(value) for value in cal_logits), tuple(row.label for row in calibration)
     ).temperature
+    transform: dict[str, object] = {}
+    if variant.nuisance == "history":
+        transform["history"] = training_history(refit)[1].model_dump(mode="json")
+    if isinstance(model, PlayerModel) and model.player_effects is not None:
+        transform["joint"] = model.player_effects.freeze().model_dump(mode="json")
     save_checkpoint(
         destination / "checkpoint.pt",
         config,
@@ -161,7 +189,7 @@ def write_comparison_run(
         recipe.names,
         recipe.formulas,
         result,
-        {},
+        transform,
         (temperature, temperature),
     )
     write_support(destination, access, refit)
@@ -171,6 +199,28 @@ def write_comparison_run(
     write_predictions(
         destination / "development.json", predictions(development, dev_logits, temperature)
     )
+    if variant.nuisance != "none":
+        actual_cal, actual_dev = cal_logits + 0.25, dev_logits - 0.15
+        actual_temperature = fit_temperature(
+            tuple(float(z) for z in actual_cal), tuple(row.label for row in calibration)
+        ).temperature
+        actual_predictions = predictions(development, actual_dev, actual_temperature)
+        write_predictions(
+            destination / "actual-calibration.json",
+            predictions(calibration, actual_cal, actual_temperature),
+        )
+        write_predictions(destination / "actual-development.json", actual_predictions)
+        diagnostic = development_diagnostics(
+            access,
+            model,
+            predictions(development, dev_logits, temperature),
+            actual_predictions,
+            config.player_support_bins,
+            job.penalty,
+        )
+        (destination / "report.json").write_bytes(
+            canonical_json_bytes(to_jsonable_python({"player_diagnostics": diagnostic}))
+        )
     outputs = tuple(file_record(path, destination) for path in sorted(destination.iterdir()))
     manifest = RunManifest(
         run_id=destination.name,

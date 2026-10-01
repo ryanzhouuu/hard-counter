@@ -155,6 +155,11 @@ support-bin counts, nuisance shrinkage, probability stability, observed-outcome
 metrics/calibration, and descriptive development residuals. Controlled player
 configurations must declare `player_support_bins`; the preparation configuration's
 history and deck-switching edges are smoke defaults, not selected thresholds.
+Player comparison reports retain these diagnostics for every selected seed and
+publish separately calibrated actual-outcome ensembles, paired outcome metrics,
+and matchup probability changes. Actual-output files use the
+`actual-ensemble-<variant>-<role>.json` naming pattern and remain diagnostic;
+penalty selection and candidate assets use matchup-only outputs.
 
 Candidate selection is an explicit later decision. Use
 `experiments.common.candidate.freeze_candidate` to record selected registered
