@@ -7,7 +7,13 @@ from hashlib import sha256
 from pathlib import Path
 
 from clash_sos.domain.canonical_dataset import canonical_json_bytes
-from experiments.common.contracts import FileRecord, RunManifest
+from experiments.common.contracts import (
+    FileRecord,
+    PopulationIdentity,
+    RunManifest,
+    StudyConfig,
+    fingerprint,
+)
 
 
 def file_record(path: Path, root: Path, *, row_count: int | None = None) -> FileRecord:
@@ -87,3 +93,43 @@ def resume_matches(
     run = load_run(directory)
     verify_files(input_root, inputs)
     return run.status == "complete" and run.config_sha256 == config_sha256 and run.inputs == inputs
+
+
+def completed_manifest(
+    run_id: str,
+    config: StudyConfig,
+    population: PopulationIdentity,
+    git_sha: str,
+    dirty: str | None,
+    lock: str,
+    status: str,
+    outputs: tuple[FileRecord, ...],
+    runtime: tuple[tuple[str, str], ...],
+    selected: tuple[int, ...],
+    temperatures: tuple[float, ...],
+    scales: tuple[float, ...],
+    failures: tuple[str, ...],
+) -> RunManifest:
+    return RunManifest.model_validate(
+        {
+            "run_id": run_id,
+            "config": config,
+            "config_sha256": fingerprint(config),
+            "git_sha": git_sha,
+            "dirty_sha256": dirty,
+            "lock_sha256": lock,
+            "stage": config.stage,
+            "status": status,
+            "eligible_for_comparison": status == "complete"
+            and config.stage == "development-frozen"
+            and dirty is None,
+            "inputs": population.snapshot_files,
+            "outputs": outputs,
+            "population": population,
+            "runtime": runtime,
+            "selected_epochs": selected,
+            "temperatures": temperatures,
+            "scales": scales,
+            "failures": failures,
+        }
+    )

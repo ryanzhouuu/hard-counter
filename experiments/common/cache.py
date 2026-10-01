@@ -1,5 +1,6 @@
 from hashlib import sha256
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import numpy as np
 from pydantic import Field
@@ -9,7 +10,10 @@ from clash_sos.domain.canonical_dataset import canonical_json_bytes
 from clash_sos.domain.manifests import ManifestModel, Sha256
 from experiments.common.artifacts import file_record, verify_files
 from experiments.common.contracts import FileRecord
-from experiments.common.data_access import ResearchRow
+from experiments.common.data_access import ResearchRow, RoleAccess
+
+if TYPE_CHECKING:
+    from experiments.common.fit import FeatureBuilder
 
 
 class FeatureCacheIdentity(ManifestModel):
@@ -66,3 +70,39 @@ def load_feature_cache(directory: Path, expected: FeatureCacheIdentity) -> np.nd
     if values.shape != (identity.row_count, len(identity.feature_names)):
         raise ValueError("feature cache shape mismatch")
     return values
+
+
+def cache_refit_features(
+    directory: Path,
+    access: "RoleAccess",
+    features: "FeatureBuilder",
+    names: tuple[str, ...],
+    formulas: tuple[str, ...],
+    scales: np.ndarray,
+    encoding_sha256: str,
+    mechanics_sha256: str,
+) -> None:
+    refit = access.read("refit", "fit")
+    rows = (
+        *refit,
+        *access.read("calibration", "calibrate"),
+        *access.read("development", "compare"),
+    )
+    identity = FeatureCacheIdentity(
+        oriented_sha256=oriented_digest(rows),
+        encoding_sha256=encoding_sha256,
+        mechanics_sha256=mechanics_sha256,
+        feature_names=names,
+        formulas=formulas,
+        training_rows_sha256=access.protocol.refit.row_keys_sha256,
+        scales=tuple(float(s) for s in scales),
+        row_keys_sha256=digest_row_keys(r.key for r in rows),
+        row_count=len(rows),
+    )
+    calibration = access.read("calibration", "calibrate")
+    development = access.read("development", "compare")
+    values = np.concatenate(
+        (features(refit, refit), features(refit, calibration), features(refit, development))
+    )
+    write_feature_cache(directory, rows, values, identity)
+    load_feature_cache(directory, identity)
