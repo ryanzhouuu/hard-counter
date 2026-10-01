@@ -27,15 +27,16 @@ from experiments.common.contracts import (
 )
 from experiments.common.data_access import RoleAccess
 from experiments.common.fit import fit_research
+from experiments.common.predictions import read_predictions
 from experiments.common.provenance import code_digest, revision, versions
 from experiments.common.scoring import score_fit
 from experiments.common.statistics import score_predictions
 from experiments.higher_order.features import eligibility
 from experiments.higher_order.features import extract as pattern_features
 from experiments.mechanics.contracts import MechanicsCatalog, MechanicsUnavailable
-from experiments.player_adjustment.diagnostics import training_diagnostics
 from experiments.player_adjustment.history import training_history
 from experiments.player_adjustment.model import PlayerModel
+from experiments.player_adjustment.reports import development_diagnostics
 
 
 def run_variant(
@@ -201,8 +202,18 @@ def run_variant(
                     canonical_json_bytes((recipe.names, recipe.formulas))
                 ).hexdigest(),
             }
-            if variant.nuisance != "none":
-                report["player_diagnostics"] = training_diagnostics(refit).model_dump(mode="json")
+            if config.study_id == "player-adjustment":
+                report["actual_outcome_calibration"] = asdict(actual_temperature)
+                report["player_diagnostics"] = development_diagnostics(
+                    access,
+                    fitted.model,
+                    dev_predictions,
+                    read_predictions(stage / "actual-development.json")
+                    if variant.nuisance != "none"
+                    else dev_predictions,
+                    config.player_support_bins,
+                    penalty,
+                )
             (stage / "report.json").write_bytes(canonical_json_bytes(to_jsonable_python(report)))
         except (ValueError, TimeoutError, RuntimeError, OSError, TypeError) as error:
             status = "time_limited" if isinstance(error, TimeoutError) else "failed"

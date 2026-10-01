@@ -150,6 +150,11 @@ and common final-10/final-25 player windows. Unsupported slices remain labeled.
 Player studies calibrate matchup-only and player-aware outputs separately;
 player-aware predictions are diagnostics, and joint effects remain descriptive
 when deck assignment and player effects are confounded.
+Player run reports include row-keyed evaluation support and missing-history flags,
+support-bin counts, nuisance shrinkage, probability stability, observed-outcome
+metrics/calibration, and descriptive development residuals. Controlled player
+configurations must declare `player_support_bins`; the preparation configuration's
+history and deck-switching edges are smoke defaults, not selected thresholds.
 
 Candidate selection is an explicit later decision. Use
 `experiments.common.candidate.freeze_candidate` to record selected registered

@@ -1,5 +1,9 @@
 {
   "study_id": "player-adjustment",
+  "player_support_bins": {
+    "prior_history_edges": [1, 10],
+    "deck_switching_edges": [1, 2]
+  },
   "variants": [
     {
       "variant_id": "B0",

@@ -52,6 +52,10 @@ def score_fit(
             stage / "actual-development.json",
             predictions(development, dev_z, actual_temperature.temperature),
         )
+        write_predictions(
+            stage / "actual-calibration.json",
+            predictions(calibration, cal_z, actual_temperature.temperature),
+        )
         cal_z, dev_z = cal_match, dev_match
     cal_predictions = predictions(calibration, cal_z, matchup_temperature.temperature)
     dev_predictions = predictions(development, dev_z, matchup_temperature.temperature)

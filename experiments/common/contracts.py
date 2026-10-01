@@ -6,6 +6,7 @@ from pydantic import Field, field_validator, model_validator
 
 from clash_sos.domain.canonical_dataset import canonical_json_bytes
 from clash_sos.domain.manifests import ManifestModel, Sha256, validate_relative_path
+from experiments.player_adjustment.support_contracts import SupportBins
 
 Stage = Literal[
     "preparation/smoke",
@@ -129,6 +130,7 @@ class StudyConfig(ManifestModel):
     smoke_time_cap: float = Field(default=30.0, gt=0)
     slices: tuple[str, ...] = ("day", "tower", "form", "player_novelty", "refit_support")
     rules: ComparisonRules = ComparisonRules()
+    player_support_bins: SupportBins | None = None
 
     @model_validator(mode="after")
     def registry(self) -> Self:
@@ -142,6 +144,8 @@ class StudyConfig(ManifestModel):
         if len(set(self.feature_order)) != len(self.feature_order):
             raise ValueError("feature order must be unique")
         if self.stage != "preparation/smoke":
+            if self.study_id == "player-adjustment" and self.player_support_bins is None:
+                raise ValueError("controlled player studies require preregistered support bins")
             if self.population is None or self.decision_sha256 is None:
                 raise ValueError("advancement requires explicit population and versioned decision")
             if self.schema_sha256 is None or self.feature_definitions_sha256 is None:

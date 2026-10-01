@@ -3,15 +3,16 @@
 from collections import Counter, defaultdict
 from collections.abc import Sequence
 from itertools import pairwise
-from typing import Literal, Self
+from typing import Literal
 
 import numpy as np
-from pydantic import Field, model_validator
+from pydantic import Field
 
 from clash_sos.domain.manifests import ManifestModel
 from experiments.common.data_access import ResearchRow
 from experiments.player_adjustment.history import FrozenHistory
 from experiments.player_adjustment.joint import FrozenPlayerEffects, training_vocabulary
+from experiments.player_adjustment.support_contracts import SupportBins as SupportBins
 
 
 class PlayerSupport(ManifestModel):
@@ -83,18 +84,6 @@ class EvaluationSupport(ManifestModel):
     player_a_missing_history: bool
     player_b_missing_history: bool
     same_training_component: bool | None
-
-
-class SupportBins(ManifestModel):
-    prior_history_edges: tuple[int, ...]
-    deck_switching_edges: tuple[int, ...]
-
-    @model_validator(mode="after")
-    def validate_edges(self) -> Self:
-        for edges in (self.prior_history_edges, self.deck_switching_edges):
-            if not edges or any(edge < 0 for edge in edges) or tuple(sorted(set(edges))) != edges:
-                raise ValueError("support boundaries must be nonnegative, unique, and increasing")
-        return self
 
 
 def support_bin_counts(
