@@ -34,7 +34,7 @@ Manual confirmations also count as known mechanics. They record the supplied
 facts, report date, and a hash of the evidence record without requiring web URLs.
 Descriptions are retained verbatim; they do not establish numeric combat stats.
 
-The `mechanics-partial:2026-10-01-r3` snapshot applies to September 24 through
+The `mechanics-partial:2026-10-01-r4` snapshot applies to September 24 through
 October 1. The [September balance notes](https://supercell.com/en/games/clashroyale/blog/release-notes/september-balance-changes-2027/)
 change damage/timing for reviewed cards, not the recorded structural predicates.
 The snapshot adds the corrected targeting channels, explicitly excludes
@@ -61,14 +61,51 @@ current-era completeness. A current export, manual confirmations, or published
 mechanics can close the remaining field gaps.
 
 Omitted fields remain unknown. Do not infer a false flag from an empty role set
-or copy every base mechanic onto an evolution or hero. Hero abilities and evolved
-deployment effects need explicit activation semantics before they can count as
-ordinary defensive channels. Spirit Empress keeps conditional three/six cost
+or copy every base mechanic onto an evolution or hero. Paid Hero abilities and
+spawned/death stages need separate activation semantics. Explicitly sourced
+automatic effects on evolved deployment can establish an ordinary channel.
+Spirit Empress keeps conditional three/six cost
 metadata and unknown unconditional airborne status. Tower deployment costs remain
 inapplicable; missing tower damage and recharge measurements remain unknown.
 
-Rage's control absence, spawned-unit damage channels, and unaudited
-form/tower capabilities still need field-level verification. The partial catalog
-is a preparation input, not evidence that a complete threat/response experiment
-is ready. Freeze reviewed inputs and regenerate schemas/caches before any future
-model comparison; retain historical catalog snapshots and experiment artifacts.
+The fourth revision completes ordinary air predicates for 185 of 186 identities.
+Primary evidence is retained where available; remaining flags use the
+[Clash Royale Wiki](https://clashroyale.fandom.com/wiki/Cards)'s explicit targeting,
+transport, type, and effect descriptions. These are community observations,
+not publisher confirmations. Their field dates record review on October 1, 2026,
+not a claimed balance-change date. Earlier snapshots and existing verified/manual
+facts remain unchanged. No quantitative combat measurements are inferred.
+
+`targets_air` includes initially deployed attack components and intrinsic direct
+effects: backpack Spear Goblins, Ram Rider's rider, Goblinstein's Doctor,
+Goblin Machine's rocket, and Electro Giant's reflection. Automatic evolved effects
+also count when explicitly sourced: [Cannon's deployment barrage](https://royaleapi.com/blog/cannon-evolution-new-card-2024-november?lang=en)
+hits air despite its ground-only regular attack. Summoned children, death effects,
+and paid Hero abilities remain separate. A channel indicates possible response,
+not guaranteed defensive success or availability on every cycle.
+
+`airborne` describes the primary ordinary deployment, including
+[Evolved Royal Hogs' initial flight](https://royaleapi.com/blog/royal-hogs-evolution-2025-november?lang=en).
+It does not promise flight for the unit's entire lifetime. [Hero Wizard](https://royaleapi.com/blog/hero-wizard-january-2026?lang=en)
+is ground in this channel; his paid flight ability remains separate. Buildings are
+verified non-airborne; spells have no primary actor and are inapplicable.
+
+`spell_control` means restricting enemy movement or actions, including slow,
+stun, freeze, displacement, or forced retargeting. Friendly buffs, damage
+amplification, and death conversion do not qualify. Rage and Goblin Curse therefore
+have damage without control. [Royal Delivery's removed knockback](https://supercell.com/en/games/clashroyale/blog/release-notes/season-14-balance-changes/)
+and [Poison's restored movement slowdown](https://supercell.com/en/games/clashroyale/blog/release-notes/summer-update-balance-changes-1-2/)
+are explicitly sourced.
+
+[Spirit Empress](https://royaleapi.com/blog/spirit-empress-new-card-2025-july?lang=en)
+is ground-only at three Elixir and flies/targets air at six. The new evidence
+categories `airborne_condition` and `targets_air_condition` both record
+`available_elixir_at_least_6`; her unconditional booleans remain unknown because
+deck identities do not identify Elixir at deployment. The full-population strict
+air gate still rejects this identity. Every other identity passes the ordinary
+air gate; deployment-cost and quantitative tower gates remain separate.
+
+The partial catalog is a preparation input. Freeze reviewed inputs and regenerate
+schemas/caches before model comparison; retain historical catalog snapshots and
+experiment artifacts. Spawned channels, ability activation, costs, and numerical
+combat measurements still require their own evidence.
