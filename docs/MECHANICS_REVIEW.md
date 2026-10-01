@@ -34,7 +34,7 @@ Manual confirmations also count as known mechanics. They record the supplied
 facts, report date, and a hash of the evidence record without requiring web URLs.
 Descriptions are retained verbatim; they do not establish numeric combat stats.
 
-The `mechanics-partial:2026-10-01-r4` snapshot applies to September 24 through
+The `mechanics-partial:2026-10-01-r5` snapshot applies to September 24 through
 October 1. The [September balance notes](https://supercell.com/en/games/clashroyale/blog/release-notes/september-balance-changes-2027/)
 change damage/timing for reviewed cards, not the recorded structural predicates.
 The snapshot adds the corrected targeting channels, explicitly excludes
@@ -104,6 +104,13 @@ categories `airborne_condition` and `targets_air_condition` both record
 deck identities do not identify Elixir at deployment. The full-population strict
 air gate still rejects this identity. Every other identity passes the ordinary
 air gate; deployment-cost and quantitative tower gates remain separate.
+
+The fifth revision records Spirit Empress as `airborne_mode: hybrid`. This optional
+category accepts `ground`, `air`, or `hybrid`; hybrid describes her alternative
+ground/air deployments. It is a verified classification derived from the sourced
+form descriptions, not an assertion of the form deployed in any particular battle.
+The fourth revision remains frozen, and the hybrid label does not override the
+unconditional flags or satisfy the strict static air gate.
 
 The partial catalog is a preparation input. Freeze reviewed inputs and regenerate
 schemas/caches before model comparison; retain historical catalog snapshots and

@@ -100,6 +100,12 @@ class MechanicsEntry:
                 raise ValueError(f"{name} requires a category")
             if name == "cost_kind" and field.known and field.value not in {"fixed", "conditional"}:
                 raise ValueError("unregistered deployment cost kind")
+            if (
+                name == "airborne_mode"
+                and field.known
+                and field.value not in {"ground", "air", "hybrid"}
+            ):
+                raise ValueError("unregistered airborne mode")
             if name == "activation_cycles" and field.known and type(field.value) is not int:
                 raise ValueError("activation cycles require whole deployments")
             if field.inherited_from and not field.known:

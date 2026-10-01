@@ -15,6 +15,7 @@ from experiments.mechanics.load import bind_tokens, load, load_partial_catalog
     [
         ("r2", "d6d591a71788a55b4f0d22d4ae0ebe1961c4c3a953095e8198554f6aef2bccc3"),
         ("r3", "3918a9a5ba83eab0e7e26d557bb8aad12a2a060d967832c9eb358d1c4dd0a09d"),
+        ("r4", "e9cc00058f54661e418a57556c7481d97366138d91b082dc8da488e6b221550d"),
     ],
 )
 def test_reviewed_october_revisions_remain_frozen(revision: str, digest: str) -> None:
@@ -46,6 +47,10 @@ def test_spirit_empress_records_the_condition_without_claiming_deployment_state(
     entry = next(
         e for e in load_partial_catalog().entries.values() if e.identity == "spirit-empress:base"
     )
+    mode = entry.field("airborne_mode")
+    assert mode.known
+    assert mode.value == "hybrid"
+    assert mode.source_effective_date == "2025-07-07"
     for name in ("airborne", "targets_air"):
         assert entry.field(name).status == "unknown"
         condition = entry.field(f"{name}_condition")
