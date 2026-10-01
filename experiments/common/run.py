@@ -74,6 +74,8 @@ def run_variant(
         try:
             if not variant.enabled:
                 raise MechanicsUnavailable(variant.disabled_reason or "disabled")
+            if config.stage == "development-frozen" and catalog.synthetic:
+                raise MechanicsUnavailable("synthetic mechanics cannot enter controlled fitting")
             if config.population is not None and config.population != population:
                 raise ValueError("frozen population identity does not match loaded inputs")
             if config.mechanics_sha256 is not None and config.mechanics_sha256 != catalog.digest:

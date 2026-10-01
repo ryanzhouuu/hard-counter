@@ -6,8 +6,7 @@ from dataclasses import dataclass
 from experiments.mechanics.contracts import MechanicsEntry
 
 FAMILIES = ("airborne", "multi_unit", "building_targeting")
-REQUIRED_FIELDS = (
-    *FAMILIES,
+ANSWER_FIELDS = (
     "targets_air",
     "targets_ground",
     "area_damage",
@@ -16,6 +15,10 @@ REQUIRED_FIELDS = (
     "spell_damage",
     "spell_control",
     "building_disruption",
+)
+REQUIRED_FIELDS = (
+    *FAMILIES,
+    *ANSWER_FIELDS,
     "cost_kind",
     "deploy_cost",
 )
@@ -64,10 +67,8 @@ def summarize(
     spells = tuple(e for e in candidates if e.kind == "card" and e.flag("spell"))
     towers = tuple(e for e in candidates if e.kind == "tower")
     costs = [cost for e in (*deployable, *spells) if (cost := fixed_cost(e)) is not None]
-    unknown = sum(
-        e.field(name).status == "unknown"
-        for e in (*attackers[:8], *defenders)
-        for name in (family, "targets_air", "area_damage", "defensive_building", "spell")
+    unknown = sum(e.field(family).status == "unknown" for e in attackers[:8]) + sum(
+        e.field(name).status == "unknown" for e in defenders for name in ANSWER_FIELDS
     )
     return ResponseSummary(
         threats, deployable, spells, towers, min(costs) if costs else None, unknown
@@ -107,7 +108,12 @@ def directed(
                 "max(threat_count - 1, 0) * exactly one deployable answer",
             ),
             ("response_context", s.threats * any_response, "threat_count * any known response"),
-            ("unknown_fields", s.unknown, "count(required categorical fields marked unknown)"),
+            (
+                "unknown_fields",
+                s.unknown,
+                f"count(unknown attacker {family}) + "
+                f"count(unknown opposing answer fields {ANSWER_FIELDS})",
+            ),
         )
         for name, value, formula in entries:
             names.append(f"response.{family}.{name}")

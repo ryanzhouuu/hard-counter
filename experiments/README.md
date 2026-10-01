@@ -113,6 +113,11 @@ an explicit unavailable reason. Synthetic completeness is not evidence of real
 catalog completeness. Mirror, conditional costs, form activation, and tower
 deploy-cost inapplicability have separate representations.
 
+Synthetic mechanics are accepted only with synthetic preparation fixtures;
+real snapshot adapters and controlled fits reject them. Response missingness
+counts unknown attacking threat fields and opposing answer predicates separately,
+so unknown card capabilities survive side-swap antisymmetrization.
+
 ## Frozen development and candidate reporting
 
 The checked-in configurations are preparation definitions. Before full matrices,

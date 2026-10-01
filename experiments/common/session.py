@@ -75,6 +75,8 @@ def prepare_session(
     catalog = bind_tokens(
         load(mechanics) if mechanics else load_partial_catalog(), input_schema.identity_vocab
     )
+    if catalog.synthetic:
+        raise ValueError("synthetic mechanics cannot be used with real snapshots")
     return Session(access, population, catalog, input_schema, dataset, cache)
 
 

@@ -54,6 +54,38 @@ def test_response_channels_pressure_and_cost_hand_calculation() -> None:
     assert dict(zip(names, values, strict=True))["response.multi_unit.unanswered_exposure"] == 2
 
 
+@pytest.mark.parametrize(
+    "predicate", ["targets_ground", "spell_damage", "spell_control", "building_disruption"]
+)
+def test_response_features_distinguish_unknown_answer_predicates_from_false(
+    predicate: str,
+) -> None:
+    catalog = synthetic_catalog()
+    attackers = [catalog.for_token(i) for i in PAIR[0]]
+    defenders = [catalog.for_token(i) for i in PAIR[1]]
+    fields = dict(defenders[7].fields)
+    fields[predicate] = replace(fields[predicate], value=False)
+    absent = [*defenders[:7], replace(defenders[7], fields=fields), defenders[8]]
+    missing = [
+        *defenders[:7],
+        replace(defenders[7], fields={**fields, predicate: unknown(predicate)}),
+        defenders[8],
+    ]
+    names, values, _ = directed(attackers, absent)
+    unknown_names, unknown_values, _ = directed(attackers, missing)
+    assert names == unknown_names
+    assert values != unknown_values
+    for family in ("airborne", "multi_unit", "building_targeting"):
+        index = names.index(f"response.{family}.unknown_fields")
+        assert unknown_values[index] == values[index] + 1
+    entries = dict(catalog.entries)
+    entries[PAIR[1][7]] = missing[7]
+    absent_entries = {**catalog.entries, PAIR[1][7]: absent[7]}
+    assert matchup_extract(PAIR, replace(catalog, entries=entries)) != matchup_extract(
+        PAIR, replace(catalog, entries=absent_entries)
+    )
+
+
 def test_cycle_excludes_threat_conditional_cards_and_tower() -> None:
     catalog = synthetic_catalog()
     cards = [catalog.for_token(i) for i in [6, 1, 4, 3, 2, 7, 8, 9, 13]]
