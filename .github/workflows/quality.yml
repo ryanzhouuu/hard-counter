@@ -31,8 +31,8 @@ jobs:
         run: uv run --extra ml pyright
       - name: Run pytest
         run: uv run --extra ml pytest
-      - name: Smoke experiment discovery
-        run: uv run --extra ml python -m experiments
+      - name: Smoke all research studies
+        run: uv run --extra ml python -m experiments --synthetic
 
   frontend:
     name: Frontend quality
