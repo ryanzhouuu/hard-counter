@@ -36,7 +36,7 @@ def test_reviewed_air_channels_have_verified_evidence(identity: str) -> None:
 
 def test_review_preserves_unknowns_forms_and_conditional_costs() -> None:
     catalog = load_partial_catalog()
-    assert catalog.version == "mechanics-partial:2026-10-01-r3"
+    assert catalog.version == "mechanics-partial:2026-10-01-r4"
     entries = {e.identity: e for e in catalog.entries.values()}
     identities = {entry.card.identity_key for entry in CURRENT_CARD_CATALOG.entries}
     identities.update(entry.identity for entry in CURRENT_TOWER_CATALOG.entries)
@@ -48,14 +48,14 @@ def test_review_preserves_unknowns_forms_and_conditional_costs() -> None:
     assert not answers(entries["mother-witch:base"], "multi_unit")
     assert entries["furnace:base"].field("area_damage").status == "unknown"
     assert not answers(entries["furnace:base"], "building_targeting")
-    assert entries["furnace:evolution"].field("targets_air").status == "unknown"
+    assert entries["furnace:evolution"].flag("targets_air")
     assert entries["furnace:evolution"].flag("spawns_units")
     assert entries["spirit-empress:base"].field("airborne").status == "unknown"
     assert fixed_cost(entries["spirit-empress:base"]) is None
     assert entries["minion-giant:base"].flag("airborne")
     assert entries["minion-giant:base"].flag("building_targeting")
     assert entries["ice-wizard:hero"].flag("conditional")
-    assert entries["ice-wizard:hero"].field("targets_air").status == "unknown"
+    assert entries["ice-wizard:hero"].flag("targets_air")
     assert entries["rage:base"].flag("targets_air")
 
 

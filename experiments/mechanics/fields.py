@@ -34,6 +34,8 @@ FIELD_UNITS: Mapping[str, str] = MappingProxyType(
         "cost_kind": "category",
         "deploy_cost": "elixir",
         "conditional_cost": "category",
+        "airborne_condition": "category",
+        "targets_air_condition": "category",
         "activation_cycles": "deployments",
         "ability_cost": "elixir",
         "damage_per_hit": "damage",

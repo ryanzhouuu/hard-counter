@@ -126,12 +126,10 @@ def test_sourced_partial_inventory_covers_official_forms_and_gates_quantitative(
                 assert field.status == "verified"
                 assert field.source_url
                 if urlparse(field.source_url).hostname == "royaleapi.com":
-                    assert field.source_url in {
-                        "https://royaleapi.com/blog/furnace-rework-2025-august?lang=en",
-                        "https://royaleapi.com/blog/season18?lang=en",
-                        "https://royaleapi.com/blog/2022-q4-update?lang=en",
-                        "https://royaleapi.com/blog/cannoneer-january-2024?lang=en",
-                    }
+                    assert urlparse(field.source_url).path.startswith(("/blog/", "/card/"))
+                elif urlparse(field.source_url).hostname == "clashroyale.fandom.com":
+                    assert urlparse(field.source_url).path.startswith("/wiki/")
+                    assert field.source_effective_date == "2026-10-01"
                 else:
                     assert urlparse(field.source_url).hostname in {
                         "supercell.com",

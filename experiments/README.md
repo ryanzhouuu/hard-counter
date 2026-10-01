@@ -104,7 +104,7 @@ joint mirroring against the native cache. Attention runs create their own
 network-specific schema/protocol/cache and verify identical oriented populations.
 Do not use the production training command to search research variants.
 
-The default [mechanics input](mechanics/inputs/2026-10-01-partial-r3.json) records
+The default [mechanics input](mechanics/inputs/2026-10-01-partial-r4.json) records
 field-level evidence and explicit unknowns. The [mechanics review](../docs/MECHANICS_REVIEW.md)
 documents corrected capabilities, original release-preview sources, and remaining
 coverage limits. September inputs remain frozen. Supply `--mechanics` for another
@@ -136,9 +136,13 @@ claims. This status distinguishes manual observations from linked sources withou
 discarding either. Optional evidence fields are omitted from older snapshots'
 serialization, preserving their existing digests.
 
-The third October revision includes manually confirmed targeting for the other
-three towers and Freeze. Confirmed spells have no primary airborne actor; their
-airborne flag is inapplicable. Summoned or ability-only threats remain separate.
+The fourth October revision covers ordinary air predicates for 185 identities,
+using primary sources and explicitly documented community Wiki evidence. Wiki
+field dates record review on October 1, 2026. Earlier snapshots and manual tower/
+Freeze evidence remain frozen. Confirmed spells have no primary airborne actor.
+Spirit Empress retains unknown unconditional flags: `airborne_condition` and
+`targets_air_condition` record `available_elixir_at_least_6`. These evidence
+categories do not resolve deployment state or bypass the strict air gate.
 
 ## Frozen development and candidate reporting
 
