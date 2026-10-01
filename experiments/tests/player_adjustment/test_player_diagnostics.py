@@ -2,8 +2,10 @@ import pytest
 from experiments.player_adjustment.diagnostics import (
     SupportBins,
     evaluation_support,
+    matchup_probability_stability,
     residual_player_diagnostic,
     shrinkage_diagnostics,
+    support_bin_counts,
     training_diagnostics,
 )
 from experiments.player_adjustment.history import training_history
@@ -56,5 +58,3 @@ def test_frozen_support_bins_and_probability_stability() -> None:
     assert stability["mean_absolute_probability_change"] == pytest.approx(0.15)
     with pytest.raises(ValueError, match="aligned"):
         matchup_probability_stability([0.2], [])
-    (matchup_probability_stability,)
-    (support_bin_counts,)

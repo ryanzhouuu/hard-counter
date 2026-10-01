@@ -103,7 +103,7 @@ def support_bin_counts(
     diagnostics: TrainingDiagnostics,
     bins: SupportBins,
 ) -> dict[str, tuple[int, ...]]:
-    """Intervals include their lower boundary; count both oriented player appearances."""
+    """Bins include lower bounds; seen_pair order is neither, B-only, A-only, both."""
     prior = {entry.player: entry.count for entry in history.players}
     switches = {entry.player: entry.deck_switches for entry in diagnostics.players}
     counts = {
