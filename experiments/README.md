@@ -187,9 +187,14 @@ Confirmation verifies frozen code/assets and mode/level/era/vocabulary, rejects
 backfilled or overlapping data, and uses frozen player maps, support masks,
 scales, and temperatures. It verifies the dependency lock and publishes an
 inventoried manifest last, including when evaluation fails. It never fits or
-recalibrates. A consumed-population
-marker is written before labels are read, so errors or inconclusive results do
-not authorize repeated fixed-sample tests. A new disjoint population or a
+recalibrates. A population reservation is written before labels are read to
+`data/experiments/reporting-consumption.sqlite3` in the repository root,
+independent of `--output`, run IDs, and freeze filenames. Event reservations
+also reject overlapping populations before scoring. Keep this ledger with the
+research workspace; copying a freeze or changing its candidate does not reset
+consumption. Failed and interrupted reservations remain consumed, so errors or
+inconclusive results do not authorize repeated fixed-sample tests. A new disjoint
+population or a
 prospectively specified sequential design requires a separate decision.
 
 ## Readiness and remaining decisions

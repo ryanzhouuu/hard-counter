@@ -1,10 +1,12 @@
 import argparse
 import json
+import sqlite3
 from datetime import UTC, datetime
 from hashlib import sha256
 from pathlib import Path
 
 import pytest
+from experiments.common import reporting_consumption
 from experiments.common.artifacts import file_record, load_run
 from experiments.common.candidate import freeze_candidate
 from experiments.common.comparison import comparison_report
@@ -27,6 +29,10 @@ def test_frozen_ensembles_confirm_once_without_fit_or_calibration(
     monkeypatch: pytest.MonkeyPatch,
     corrupt_source: bool,
 ) -> None:
+    def consumption_path(_root: Path) -> Path:
+        return tmp_path / "consumption.db"
+
+    monkeypatch.setattr(reporting_consumption, "registry_path", consumption_path)
     config, models, reports, session = comparison_fixture(tmp_path)
     comparison_report(config, {"A1": 0.1}, models, reports)
     frozen_at = datetime(2026, 9, 2, tzinfo=UTC)
@@ -139,8 +145,16 @@ def test_frozen_ensembles_confirm_once_without_fit_or_calibration(
         failed = load_run(destination)
         assert failed.status == "failed" and failed.failures
         assert not failed.eligible_for_comparison
+        with sqlite3.connect(tmp_path / "consumption.db") as connection:
+            assert connection.execute("SELECT status FROM populations").fetchone() == ("failed",)
         args.run_id = "retry"
         with pytest.raises(FileExistsError):
+            confirm(args, reporting)
+        copied = freeze_path.with_name("copied-freeze.json")
+        copied.write_bytes(freeze_path.read_bytes())
+        args.freeze = copied
+        args.output = tmp_path / "another-output"
+        with pytest.raises(FileExistsError, match="consumed"):
             confirm(args, reporting)
         return
     confirm(args, reporting)
@@ -152,8 +166,16 @@ def test_frozen_ensembles_confirm_once_without_fit_or_calibration(
     result = json.loads(result_path.read_bytes())
     assert result["metrics"]["A0"]["metrics"]["row_count"] == 1
     assert "A1" in result["comparisons"]
-    consumed = freeze_path.with_suffix(".reporting-consumed.json")
-    assert json.loads(consumed.read_bytes())["status"] == "complete"
+    assert result["comparison_family"] == ["A1"]
+    assert result["test_alternative"] == "two_sided"
+    with sqlite3.connect(tmp_path / "consumption.db") as connection:
+        assert connection.execute("SELECT status FROM populations").fetchone() == ("complete",)
     args.run_id = "second"
     with pytest.raises(FileExistsError):
+        confirm(args, reporting)
+    copied = freeze_path.with_name("copied-freeze.json")
+    copied.write_bytes(freeze_path.read_bytes())
+    args.freeze = copied
+    args.output = tmp_path / "another-output"
+    with pytest.raises(FileExistsError, match="consumed"):
         confirm(args, reporting)

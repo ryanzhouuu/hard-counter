@@ -7,6 +7,7 @@ from experiments.common.candidate import CandidateFreeze
 from experiments.common.contracts import FileRecord, RunManifest, StudyConfig, fingerprint
 from experiments.common.data_access import ReportingContract
 from experiments.common.provenance import code_digest, revision, versions
+from experiments.common.reporting_consumption import registry_path
 
 
 def finish_confirmation(
@@ -38,6 +39,8 @@ def finish_confirmation(
             ("candidate_sha256", fingerprint(frozen)),
             ("candidate_source", str(freeze_path.resolve())),
             ("operation", "prospective-reporting-no-fit"),
+            ("consumption_registry", str(registry_path(Path.cwd()).resolve())),
+            ("consumption_identity", contract.population.row_keys_sha256),
         ),
         (),
         (),

@@ -16,6 +16,11 @@ from experiments.common.data_access import ReportingContract
 from experiments.common.predictions import Prediction
 from experiments.common.prospective_io import load_reporting_jsonl
 from experiments.common.provenance import code_digest, revision
+from experiments.common.reporting_consumption import (
+    finish_consumption,
+    reserve_events,
+    reserve_reporting,
+)
 from experiments.common.statistics import holm_adjust, paired_comparison, score_predictions
 
 
@@ -99,16 +104,10 @@ def confirm(args: argparse.Namespace, config: StudyConfig) -> None:
                 if file_record(path / name, path).sha256 != digest:
                     raise ValueError("frozen seed asset changed")
     destination = args.output / config.study_id / args.run_id
-    marker = freeze_path.with_suffix(".reporting-consumed.json")
     failure: Exception | None = None
     row_count = 0
     with publication(destination) as stage:
-        with marker.open("xb") as consumed:
-            consumed.write(
-                canonical_json_bytes(
-                    {"population": contract.population.model_dump(mode="json"), "status": "started"}
-                )
-            )
+        reserve_reporting(Path.cwd(), frozen, contract.population)
         try:
             first = load_checkpoint(Path(ensembles[0].seed_runs[0].directory) / "checkpoint.pt")
             access = load_reporting_jsonl(
@@ -118,6 +117,7 @@ def confirm(args: argparse.Namespace, config: StudyConfig) -> None:
                 row_cap=args.row_cap or config.smoke_row_cap,
             )
             rows = access.read("reporting", "report")
+            reserve_events(Path.cwd(), contract.population, tuple(row.event_key for row in rows))
             row_count = len(rows)
             outputs: dict[str, tuple[Prediction, ...]] = {}
             for ensemble in ensembles:
@@ -195,14 +195,9 @@ def confirm(args: argparse.Namespace, config: StudyConfig) -> None:
             failure,
         )
     if failure is not None:
+        finish_consumption(Path.cwd(), contract.population, "failed", destination / "failure.json")
         raise failure
-    marker.write_bytes(
-        canonical_json_bytes(
-            {
-                "population": contract.population.model_dump(mode="json"),
-                "status": "complete",
-                "report": str((destination / "confirmation.json").resolve()),
-            }
-        )
+    finish_consumption(
+        Path.cwd(), contract.population, "complete", destination / "confirmation.json"
     )
     print(json.dumps({"report": str(destination / "confirmation.json"), "rows": row_count}))
