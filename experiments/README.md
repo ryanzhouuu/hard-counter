@@ -104,7 +104,7 @@ joint mirroring against the native cache. Attention runs create their own
 network-specific schema/protocol/cache and verify identical oriented populations.
 Do not use the production training command to search research variants.
 
-The default [mechanics input](mechanics/inputs/2026-10-01-partial-r2.json) records
+The default [mechanics input](mechanics/inputs/2026-10-01-partial-r3.json) records
 field-level evidence and explicit unknowns. The [mechanics review](../docs/MECHANICS_REVIEW.md)
 documents corrected capabilities, original release-preview sources, and remaining
 coverage limits. September inputs remain frozen. Supply `--mechanics` for another
@@ -135,6 +135,10 @@ need no publisher URL. Loading verifies the referenced report and exact field
 claims. This status distinguishes manual observations from linked sources without
 discarding either. Optional evidence fields are omitted from older snapshots'
 serialization, preserving their existing digests.
+
+The third October revision includes manually confirmed targeting for the other
+three towers and Freeze. Confirmed spells have no primary airborne actor; their
+airborne flag is inapplicable. Summoned or ability-only threats remain separate.
 
 ## Frozen development and candidate reporting
 

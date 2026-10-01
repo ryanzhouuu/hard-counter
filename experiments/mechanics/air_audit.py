@@ -10,7 +10,8 @@ def required_air_fields(entry: MechanicsEntry, *, include_cost: bool = False) ->
     fields = ["targets_air"]
     if entry.kind == "tower":
         return tuple(fields)
-    fields.append("airborne")
+    if not entry.flag("spell"):
+        fields.append("airborne")
     if entry.flag("targets_air"):
         fields.append("spell")
         if entry.flag("spell"):

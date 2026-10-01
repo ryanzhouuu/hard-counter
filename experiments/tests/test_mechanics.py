@@ -119,6 +119,10 @@ def test_sourced_partial_inventory_covers_official_forms_and_gates_quantitative(
     for entry in catalog.entries.values():
         for field in entry.fields.values():
             if field.known:
+                if field.status == "user_reported":
+                    assert field.source_url is None and field.evidence_sha256
+                    assert field.source_effective_date
+                    continue
                 assert field.status == "verified"
                 assert field.source_url
                 if urlparse(field.source_url).hostname == "royaleapi.com":

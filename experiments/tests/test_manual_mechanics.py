@@ -6,8 +6,15 @@ from json import dumps
 from pathlib import Path
 
 import pytest
+from experiments.mechanics.air_audit import air_audit
 from experiments.mechanics.contracts import MechanicField
-from experiments.mechanics.load import from_payload, load, synthetic_catalog, to_payload
+from experiments.mechanics.load import (
+    from_payload,
+    load,
+    load_partial_catalog,
+    synthetic_catalog,
+    to_payload,
+)
 from experiments.mechanics.manual_evidence import verify_reports
 
 
@@ -93,3 +100,18 @@ def test_manual_facts_cannot_lose_provenance_or_claim_publisher_attribution(
 )
 def test_old_catalog_hashes_survive_manual_evidence_support(filename: str, digest: str) -> None:
     assert load(Path("experiments/mechanics/inputs") / filename).digest == digest
+
+
+def test_supplied_targeting_facts_close_all_tower_and_freeze_air_gaps() -> None:
+    catalog = load_partial_catalog()
+    tokens = [
+        t for t, e in catalog.entries.items() if e.kind == "tower" or e.identity == "freeze:base"
+    ]
+    assert air_audit(catalog, tokens) == {}
+    for token in tokens:
+        entry = catalog.for_token(token)
+        assert entry.flag("targets_air") and entry.flag("targets_ground")
+        if entry.identity != "cannoneer:tower":
+            assert entry.field("targets_air").status == "user_reported"
+    freeze = next(e for e in catalog.entries.values() if e.identity == "freeze:base")
+    assert freeze.field("airborne").status == "not_applicable"

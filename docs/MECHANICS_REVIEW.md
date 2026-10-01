@@ -29,7 +29,7 @@ linked RoyaleAPI release previews provide original gameplay/stat observations
 for targeting omitted from the announcements. Older balance numbers from these
 sources must not be treated as current level-16 damage or timing measurements.
 
-The `official-static-partial:2026-10-01-r2` snapshot applies to September 24 through
+The `mechanics-partial:2026-10-01-r3` snapshot applies to September 24 through
 October 1. The [September balance notes](https://supercell.com/en/games/clashroyale/blog/release-notes/september-balance-changes-2027/)
 change damage/timing for reviewed cards, not the recorded structural predicates.
 The snapshot adds the corrected targeting channels, explicitly excludes
@@ -41,7 +41,7 @@ unconditional answer. The September and first October catalogs remain byte-for-b
 The second October revision also records Rage's air damage and
 [Cannoneer's air/ground targeting](https://royaleapi.com/blog/cannoneer-january-2024?lang=en),
 effective January 1, 2024. Freeze damage and control are sourced from the September
-2026 balance notes; its targeting remains unknown. Minion Giant's building-only
+2026 balance notes; its targeting is now manually confirmed. Minion Giant's building-only
 targeting excludes air troops from its direct attack channel.
 
 The [public RoyaleAPI bulk export](https://github.com/RoyaleAPI/cr-api-data/commit/d5461b0a59bff33c4da2fc845b07275b66b2d6ff)
@@ -56,7 +56,7 @@ ordinary defensive channels. Spirit Empress keeps conditional three/six cost
 metadata and unknown unconditional airborne status. Tower deployment costs remain
 inapplicable; missing tower damage and recharge measurements remain unknown.
 
-Rage's control absence, Freeze targeting, spawned-unit damage channels, and unaudited
+Rage's control absence, spawned-unit damage channels, and unaudited
 form/tower capabilities still need field-level verification. The partial catalog
 is a preparation input, not evidence that a complete threat/response experiment
 is ready. Freeze reviewed inputs and regenerate schemas/caches before any future

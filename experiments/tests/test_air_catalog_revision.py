@@ -21,7 +21,7 @@ def test_original_october_snapshot_is_frozen_and_new_sources_keep_unknowns() -> 
     assert entries["rage:base"].flag("targets_air")
     assert answers(entries["rage:base"], "airborne")
     assert entries["freeze:base"].flag("spell_control")
-    assert entries["freeze:base"].field("targets_air").status == "unknown"
+    assert entries["freeze:base"].field("targets_air").status == "user_reported"
     assert entries["cannoneer:tower"].flag("targets_air")
     assert answers(entries["cannoneer:tower"], "airborne")
     assert entries["cannoneer:tower"].field("damage_per_hit").status == "unknown"

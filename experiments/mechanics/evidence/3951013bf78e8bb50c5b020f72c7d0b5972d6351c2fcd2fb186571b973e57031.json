@@ -1,0 +1,34 @@
+{
+  "claims": {
+    "cannoneer:tower": {
+      "targets_air": true,
+      "targets_ground": true
+    },
+    "dagger-duchess:tower": {
+      "targets_air": true,
+      "targets_ground": true
+    },
+    "freeze:base": {
+      "targets_air": true,
+      "targets_ground": true
+    },
+    "royal-chef:tower": {
+      "targets_air": true,
+      "targets_ground": true
+    },
+    "tower-princess:tower": {
+      "targets_air": true,
+      "targets_ground": true
+    }
+  },
+  "context": "User supplied targeting confirmations and card descriptions during the mechanics audit.",
+  "descriptions": {
+    "dagger-duchess:tower": "This Royal throws low Damage daggers until she is fully charged, when she will throw all of her daggers at one target for high Damage! Oh, one more thing. Don't call her a Princess.",
+    "freeze:base": "Freezes and damages enemy troops and buildings, making them unable to move or attack. Everybody chill.",
+    "royal-chef:tower": "Royal Chef cooks a mean Pancake and throws it to your Troop with the most Hitpoints, increasing their Level by 1.",
+    "tower-princess:tower": "The gold standard for Tower Troops. A Tower Princess can defend against anything, one arrow at a time."
+  },
+  "evidence_version": "manual-mechanics-evidence:v1",
+  "reported_date": "2026-10-01",
+  "source_kind": "user_report"
+}
