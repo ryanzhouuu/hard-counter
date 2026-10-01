@@ -67,6 +67,9 @@ class Variant(ManifestModel):
     feature_groups: tuple[str, ...] = ()
     nuisance: Literal["none", "history", "joint"] = "none"
     architecture: Literal["explicit", "attention"] = "explicit"
+    schema_sha256: Sha256 | None = None
+    feature_sha256: Sha256 | None = None
+    feature_names: tuple[str, ...] = ()
     enabled: bool = True
     disabled_reason: str | None = None
 
@@ -88,6 +91,7 @@ class ComparisonRules(ManifestModel):
     maximum_brier_regression: float | None = Field(default=None, ge=0)
     maximum_daily_regression: float | None = Field(default=None, ge=0)
     confirmation: Literal["single", "holm"] | None = None
+    test_alternative: Literal["two_sided", "improvement"] | None = None
 
 
 class OptimizerConfig(ManifestModel):
@@ -121,7 +125,7 @@ class StudyConfig(ManifestModel):
     prospective: PopulationIdentity | None = None
     decision_sha256: Sha256 | None = None
     smoke_row_cap: int = Field(default=128, ge=12)
-    smoke_epoch_cap: int = Field(default=2, gt=0)
+    smoke_epoch_cap: int = Field(default=8, gt=0)
     smoke_time_cap: float = Field(default=30.0, gt=0)
     slices: tuple[str, ...] = ("day", "tower", "form", "player_novelty", "refit_support")
     rules: ComparisonRules = ComparisonRules()
@@ -145,7 +149,9 @@ class StudyConfig(ManifestModel):
             if self.rules.practical_margin is None or self.rules.maximum_brier_regression is None:
                 raise ValueError("frozen stages require comparison thresholds")
         if self.stage == "prospective-reporting" and (
-            self.prospective is None or self.rules.confirmation is None
+            self.prospective is None
+            or self.rules.confirmation is None
+            or self.rules.test_alternative is None
         ):
             raise ValueError("reporting requires prospective population and confirmation design")
         return self

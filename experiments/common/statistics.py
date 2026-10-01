@@ -135,3 +135,23 @@ def paired_comparison(
         dyadic_interval(log_differences, players_a, players_b) if len(aligned) > 1 else None,
         dyadic_interval(brier_differences, players_a, players_b) if len(aligned) > 1 else None,
     )
+
+
+def holm_adjust(pvalues: dict[str, float | None]) -> dict[str, float | None]:
+    """Keep unsupported tests in the predeclared family without claiming significance."""
+    if any(
+        value is not None and (not isfinite(value) or not 0 <= value <= 1)
+        for value in pvalues.values()
+    ):
+        raise ValueError("p-values must be finite and within zero/one")
+    numeric = {name: 1.0 if value is None else value for name, value in pvalues.items()}
+    ordered = sorted(numeric, key=lambda name: numeric[name])
+    adjusted: dict[str, float | None] = {}
+    previous = 0.0
+    for index, name in enumerate(ordered):
+        value = pvalues[name]
+        previous = max(
+            previous, min(1.0, (len(ordered) - index) * (1.0 if value is None else value))
+        )
+        adjusted[name] = None if value is None else previous
+    return adjusted

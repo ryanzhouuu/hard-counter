@@ -72,3 +72,12 @@ def test_paired_statistics_align_reordered_population_and_singleton() -> None:
     assert result.log_loss is not None
     assert result.log_loss.mean_difference == pytest.approx(-log(0.7) + log(0.5))
     assert paired_comparison(candidate[:1], baseline[1:]).log_loss is None
+
+
+def test_holm_keeps_unsupported_tests_in_the_registered_family() -> None:
+    from experiments.common.statistics import holm_adjust
+
+    assert holm_adjust({"a": 0.01, "b": 0.04, "c": 0.03}) == {"a": 0.03, "c": 0.06, "b": 0.06}
+    assert holm_adjust({"a": 0.01, "b": None}) == {"a": 0.02, "b": None}
+    with pytest.raises(ValueError):
+        holm_adjust({"a": float("nan")})
