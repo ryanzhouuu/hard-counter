@@ -120,6 +120,15 @@ real snapshot adapters and controlled fits reject them. Response missingness
 counts unknown attacking threat fields and opposing answer predicates separately,
 so unknown card capabilities survive side-swap antisymmetrization.
 
+An unknown spell classification does not establish a deployable response. Tower
+answers use their separate kind and never receive a deployment cost. Before an
+air-only comparison, call `mechanics.air_audit.require_air_mechanics` on the
+population's bound tokens. `air_audit` lists incomplete identities and fields;
+`include_cost=True` adds the separate deployment-cost gate. This preparation
+check covers ordinary channels; ability-only and summoned-unit channels need
+separate verification. Existing exploratory response extraction retains its
+missingness features and does not automatically enforce this strict gate.
+
 ## Frozen development and candidate reporting
 
 The checked-in configurations are preparation definitions. Before full matrices,

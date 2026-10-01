@@ -35,11 +35,14 @@ class ResponseSummary:
 
 
 def answers(entry: MechanicsEntry, family: str) -> bool:
+    """Count known channels; an unknown spell type cannot establish a troop answer."""
     if family not in FAMILIES:
         raise ValueError("unsupported threat family")
     if family == "airborne":
         return entry.flag("targets_air") and (
-            not entry.flag("spell") or entry.flag("spell_damage") or entry.flag("spell_control")
+            entry.kind == "tower"
+            or entry.field("spell").value is False
+            or (entry.flag("spell") and (entry.flag("spell_damage") or entry.flag("spell_control")))
         )
     if family == "multi_unit":
         return entry.flag("area_damage")
@@ -63,7 +66,9 @@ def summarize(
 ) -> ResponseSummary:
     threats = sum(entry.flag(family) for entry in attackers[:8])
     candidates = tuple(entry for entry in defenders if answers(entry, family))
-    deployable = tuple(e for e in candidates if e.kind == "card" and not e.flag("spell"))
+    deployable = tuple(
+        e for e in candidates if e.kind == "card" and e.field("spell").value is False
+    )
     spells = tuple(e for e in candidates if e.kind == "card" and e.flag("spell"))
     towers = tuple(e for e in candidates if e.kind == "tower")
     costs = [cost for e in (*deployable, *spells) if (cost := fixed_cost(e)) is not None]
