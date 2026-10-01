@@ -36,3 +36,22 @@ def test_current_attributes_cover_roots_and_isolate_balance_changes() -> None:
         CURRENT_CARD_ATTRIBUTES.for_identity("valkyrie:hero") == CARD_ATTRIBUTES.cards["valkyrie"]
     )
     assert CURRENT_CARD_ATTRIBUTES.for_identity("spirit-empress:base").elixir == 3
+
+
+def test_current_air_response_labels_preserve_historical_attributes() -> None:
+    assert CURRENT_CARD_ATTRIBUTES.version == "card-attributes:2026-10-01"
+    expected = {
+        "furnace": {"air_defense"},
+        "goblin-hut": {"building", "air_defense"},
+        "zappies": {"air_defense"},
+        "mother-witch": {"air_defense"},
+        "royal-delivery": {"spell", "air_defense"},
+        "goblin-curse": {"spell", "air_defense"},
+    }
+    for root, roles in expected.items():
+        current = CURRENT_CARD_ATTRIBUTES.cards[root]
+        assert current.roles == frozenset(roles)
+        assert current.elixir == CARD_ATTRIBUTES.cards[root].elixir
+        assert "air_defense" not in CARD_ATTRIBUTES.cards[root].roles
+    assert CARD_ATTRIBUTES.version == "card-attributes:2026-06"
+    assert CARD_ATTRIBUTES.cards["furnace"].roles == frozenset({"building"})

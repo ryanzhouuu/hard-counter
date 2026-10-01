@@ -16,6 +16,17 @@ Void to five elixir for current-era training. June inputs retain Void at three.
 Spirit Empress retains the existing three-elixir feature convention for its
 three/six-elixir deployment mechanic. Forms continue sharing base attributes.
 
+The `card-attributes:2026-10-01` revision removes Furnace's obsolete building
+role and adds air-defense roles for Furnace, Goblin Hut, Zappies, Mother Witch,
+Royal Delivery, and Goblin Curse. The [mechanics review](MECHANICS_REVIEW.md)
+records evidence and remaining limits. Roles are coarse capability labels, not
+guarantees of effective counters. The building role also includes offensive
+buildings; it must not be used as a defensive-building predicate.
+
+Attribute changes participate in schema and encoding hashes. Prepare a fresh
+schema and cache directory for corrected inputs. Frozen schemas, caches, model
+artifacts, and the packaged June attributes keep their original labels.
+
 `clash_royale/towers.json` separately catalogs Tower Princess, Cannoneer,
 Dagger Duchess, and Royal Chef with their official API IDs and rarity-relative
 level offsets. They have no deploy elixir cost and occupy a separate tower slot.

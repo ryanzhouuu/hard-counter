@@ -1,5 +1,5 @@
 {
-  "attribute_version": "card-attributes:2026-09-26",
+  "attribute_version": "card-attributes:2026-10-01",
   "summary_columns": ["mean_elixir", "win_condition_count", "building_count", "spell_count", "cycle_count", "air_defense_count", "bait_count"],
   "cards": {
     "archer-queen": {"elixir": 5, "roles": ["air_defense"]},
@@ -39,18 +39,18 @@
     "fisherman": {"elixir": 3, "roles": []},
     "flying-machine": {"elixir": 4, "roles": ["air_defense"]},
     "freeze": {"elixir": 4, "roles": ["spell"]},
-    "furnace": {"elixir": 4, "roles": ["building"]},
+    "furnace": {"elixir": 4, "roles": ["air_defense"]},
     "giant": {"elixir": 5, "roles": ["win_condition"]},
     "giant-skeleton": {"elixir": 6, "roles": []},
     "giant-snowball": {"elixir": 2, "roles": ["spell", "air_defense"]},
     "goblin-barrel": {"elixir": 3, "roles": ["win_condition", "spell", "bait"]},
     "goblin-cage": {"elixir": 4, "roles": ["building"]},
-    "goblin-curse": {"elixir": 2, "roles": ["spell"]},
+    "goblin-curse": {"elixir": 2, "roles": ["spell", "air_defense"]},
     "goblin-demolisher": {"elixir": 4, "roles": []},
     "goblin-drill": {"elixir": 4, "roles": ["win_condition", "building"]},
     "goblin-gang": {"elixir": 3, "roles": ["bait"]},
     "goblin-giant": {"elixir": 6, "roles": ["win_condition"]},
-    "goblin-hut": {"elixir": 4, "roles": ["building"]},
+    "goblin-hut": {"elixir": 4, "roles": ["building", "air_defense"]},
     "goblin-machine": {"elixir": 5, "roles": ["air_defense"]},
     "goblins": {"elixir": 2, "roles": ["cycle", "bait"]},
     "goblinstein": {"elixir": 5, "roles": ["win_condition"]},
@@ -83,7 +83,7 @@
     "mirror": {"elixir": null, "roles": ["spell"]},
     "monk": {"elixir": 5, "roles": []},
     "mortar": {"elixir": 4, "roles": ["win_condition", "building"]},
-    "mother-witch": {"elixir": 4, "roles": []},
+    "mother-witch": {"elixir": 4, "roles": ["air_defense"]},
     "musketeer": {"elixir": 4, "roles": ["air_defense"]},
     "night-witch": {"elixir": 4, "roles": []},
     "pekka": {"elixir": 7, "roles": []},
@@ -96,7 +96,7 @@
     "rascals": {"elixir": 5, "roles": ["air_defense", "bait"]},
     "rocket": {"elixir": 6, "roles": ["spell", "air_defense"]},
     "ronin": {"elixir": 5, "roles": []},
-    "royal-delivery": {"elixir": 3, "roles": ["spell"]},
+    "royal-delivery": {"elixir": 3, "roles": ["spell", "air_defense"]},
     "royal-ghost": {"elixir": 3, "roles": []},
     "royal-giant": {"elixir": 6, "roles": ["win_condition"]},
     "royal-hogs": {"elixir": 5, "roles": ["win_condition"]},
@@ -124,6 +124,6 @@
     "wizard": {"elixir": 5, "roles": ["air_defense"]},
     "x-bow": {"elixir": 6, "roles": ["win_condition", "building"]},
     "zap": {"elixir": 2, "roles": ["spell", "air_defense"]},
-    "zappies": {"elixir": 4, "roles": []}
+    "zappies": {"elixir": 4, "roles": ["air_defense"]}
   }
 }
