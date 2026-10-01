@@ -4,10 +4,10 @@ Current training attributes use `card-attributes:2026-10-01`. This review correc
 six coarse roles; it does not certify every card or establish model improvement.
 Costs, role column order, card identities, and base-role inheritance are unchanged.
 
-| Card | Correction | Evidence and mechanic effective date |
+| Card | Correction | Evidence date / release date |
 | --- | --- | --- |
 | Furnace | Remove building; add air defense | [Supercell rework](https://supercell.com/en/games/clashroyale/blog/release-notes/new-season-fired-up/), August 4, 2025; [RoyaleAPI original gameplay preview](https://royaleapi.com/blog/furnace-rework-2025-august?lang=en) specifies ground troop and ground/air targeting. |
-| Goblin Hut | Add air defense; retain building | [Supercell](https://supercell.com/en/games/clashroyale/blog/release-notes/new-season-fired-up/) explicitly describes the reworked anti-air building, August 4, 2025. |
+| Goblin Hut | Add air defense; retain building | [Supercell](https://supercell.com/en/games/clashroyale/blog/release-notes/new-season-fired-up/) confirms the reworked anti-air building as of August 4, 2025. |
 | Zappies | Add air defense | [Supercell balance update](https://supercell.com/en/games/clashroyale/blog/release-notes/balance-update-coming-1-24/) adds ground and air targeting, January 24, 2018. |
 | Mother Witch | Add air defense | [RoyaleAPI original release preview](https://royaleapi.com/blog/season18?lang=en) lists ground and air targets for the December 7, 2020 release. |
 | Royal Delivery | Add air defense; retain spell | [Supercell balance notes](https://supercell.com/en/games/clashroyale/blog/release-notes/season-14-balance-changes/) describe ground/air area damage and a spawned troop, August 4, 2020. |
@@ -22,11 +22,20 @@ six role columns.
 ## Research mechanics
 
 Research uses a separate versioned, field-level catalog. Each verified field
-records its source URL, mechanic effective date, unit, and normalization level
+records its source URL, effective evidence date, unit, and normalization level
 where applicable. Supercell announcements provide publisher evidence; the two
 linked RoyaleAPI release previews provide original gameplay/stat observations
 for targeting omitted from the announcements. Older balance numbers from these
 sources must not be treated as current level-16 damage or timing measurements.
+
+The `official-static-partial:2026-10-01` snapshot applies to September 24 through
+October 1. The [September balance notes](https://supercell.com/en/games/clashroyale/blog/release-notes/september-balance-changes-2027/)
+change damage/timing for reviewed cards, not the recorded structural predicates.
+The snapshot adds the six corrected targeting channels, explicitly excludes
+Furnace from defensive buildings, records Royal Delivery's separate spell and
+spawn capabilities, and records Minion Giant as airborne and building-targeting.
+Hero Ice Wizard is marked conditional without treating his ability as an
+unconditional answer. The September catalog remains byte-for-byte unchanged.
 
 Omitted fields remain unknown. Do not infer a false flag from an empty role set
 or copy every base mechanic onto an evolution or hero. Hero abilities and evolved

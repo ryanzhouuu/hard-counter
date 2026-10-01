@@ -1,6 +1,7 @@
 from dataclasses import replace
 from json import dumps
 from pathlib import Path
+from urllib.parse import urlparse
 
 import pytest
 from experiments.mechanics.contracts import (
@@ -119,7 +120,17 @@ def test_sourced_partial_inventory_covers_official_forms_and_gates_quantitative(
         for field in entry.fields.values():
             if field.known:
                 assert field.status == "verified"
-                assert field.source_url and "supercell.com" in field.source_url
+                assert field.source_url
+                if urlparse(field.source_url).hostname == "royaleapi.com":
+                    assert field.source_url in {
+                        "https://royaleapi.com/blog/furnace-rework-2025-august?lang=en",
+                        "https://royaleapi.com/blog/season18?lang=en",
+                    }
+                else:
+                    assert urlparse(field.source_url).hostname in {
+                        "supercell.com",
+                        "support.clashroyale.com",
+                    }
                 assert field.source_effective_date
     with pytest.raises(ValueError, match="unavailable"):
         require_quantitative(catalog, towers)

@@ -104,8 +104,10 @@ joint mirroring against the native cache. Attention runs create their own
 network-specific schema/protocol/cache and verify identical oriented populations.
 Do not use the production training command to search research variants.
 
-The default [mechanics input](mechanics/inputs/2026-09-30-partial.json) records
-publisher evidence and explicit unknowns. Supply `--mechanics` for another
+The default [mechanics input](mechanics/inputs/2026-10-01-partial.json) records
+field-level evidence and explicit unknowns. The [mechanics review](../docs/MECHANICS_REVIEW.md)
+documents corrected capabilities, original release-preview sources, and remaining
+coverage limits. September inputs remain frozen. Supply `--mechanics` for another
 reviewed catalog. Its applicability must cover the population for mechanics
 variants. Unknown categorical fields have registered missingness representations;
 quantitative tower descriptors and predicates requiring verified values fail with
