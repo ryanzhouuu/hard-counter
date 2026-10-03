@@ -34,7 +34,7 @@ Manual confirmations also count as known mechanics. They record the supplied
 facts, report date, and a hash of the evidence record without requiring web URLs.
 Descriptions are retained verbatim; they do not establish numeric combat stats.
 
-The `mechanics-partial:2026-10-02-r6` snapshot applies to September 24 through
+The `mechanics-partial:2026-10-02-r7` snapshot applies to September 24 through
 October 1. The [September balance notes](https://supercell.com/en/games/clashroyale/blog/release-notes/september-balance-changes-2027/)
 change damage/timing for reviewed cards, not the recorded structural predicates.
 The snapshot adds the corrected targeting channels, explicitly excludes
@@ -167,6 +167,12 @@ superseded. Spirit Empress has no paid ability: `ability_usage` and `ability_cos
 are inapplicable, separate from her conditional deployment cost. No damage,
 duration, range, or activation-frequency measurements are added. These catalog
 fields do not alter the ordinary response predicates or strict static air audit.
+
+The seventh revision records Spirit Empress's deployed actor as a troop
+(`spell: false`), using the original preview's troop classification. Its internal
+spell entry selects which troop form to deploy; this does not make the deployed
+actor a direct spell response. The sixth revision remains frozen. This closes
+the classification evidence needed by the conditional-aware hybrid audit.
 
 The partial catalog is a preparation input. Freeze reviewed inputs and regenerate
 schemas/caches before model comparison; retain historical catalog snapshots and

@@ -143,3 +143,13 @@ def test_conditional_capabilities_require_boolean_values() -> None:
             "card",
             {"conditional_air_damage": MechanicField("yes", "flag", "synthetic")},
         )
+
+
+def test_hybrid_actor_classification_preserves_the_sixth_revision() -> None:
+    previous = load("experiments/mechanics/inputs/2026-10-02-partial-r6.json")
+    current = load_partial_catalog()
+    for token, old in previous.entries.items():
+        assert all(current.for_token(token).field(n) == f for n, f in old.fields.items())
+    entry = next(e for e in current.entries.values() if e.identity == "spirit-empress:base")
+    assert entry.field("spell").known and entry.field("spell").value is False
+    assert entry.field("spell").source_url == entry.field("airborne_mode").source_url
