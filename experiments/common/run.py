@@ -1,4 +1,5 @@
 from dataclasses import asdict
+from datetime import UTC
 from hashlib import sha256
 from pathlib import Path
 from time import monotonic
@@ -85,8 +86,8 @@ def run_variant(
                 variant.feature_groups
                 and not catalog.synthetic
                 and (
-                    population.start.date().isoformat() < catalog.era_start
-                    or population.end.date().isoformat() > catalog.era_end
+                    population.start.astimezone(UTC).date().isoformat() < catalog.era_start
+                    or population.end.astimezone(UTC).date().isoformat() > catalog.era_end
                 )
             ):
                 raise MechanicsUnavailable("population is outside mechanics applicability bounds")

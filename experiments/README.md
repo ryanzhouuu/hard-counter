@@ -186,7 +186,8 @@ projectile eligibility remain distinct categories. These counts describe
 potential channels, not defensive success or observed activation.
 
 `validate` and smoke readiness reports include `mechanics.air_audits` for strict
-static, conditional-aware, and conditional-aware plus cost gates. Unreviewed
+static, conditional-aware, and conditional-aware plus cost gates. Era checks
+and daily readiness covariates use UTC, independent of the host timezone. Unreviewed
 conditional capabilities remain visible in field coverage and feature missingness.
 Compatibility failures make these readiness statuses unavailable even when the
 reported air-field gaps are empty. Rebuild feature caches and freeze new feature

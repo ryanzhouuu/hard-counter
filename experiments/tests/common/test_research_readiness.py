@@ -1,11 +1,13 @@
 import json
 from dataclasses import replace
+from datetime import timedelta, timezone
 from typing import cast
 
+import pytest
 from experiments.common.data_access import RoleAccess
 from experiments.common.readiness import readiness
 from experiments.mechanics.contracts import MechanicsCatalog, MechanicsEntry, unknown
-from experiments.mechanics.load import synthetic_catalog
+from experiments.mechanics.load import load_partial_catalog, synthetic_catalog
 from experiments.tests.common.research_fixture import protocol, rows
 
 
@@ -72,3 +74,26 @@ def test_air_readiness_cannot_pass_when_a_population_identity_is_missing() -> No
     mechanics = cast(dict[str, object], report["mechanics"])
     audits = cast(dict[str, dict[str, object]], mechanics["air_audits"])
     assert all(audit["status"] == "unavailable" for audit in audits.values())
+
+
+@pytest.mark.parametrize("offset", [-5, 14])
+def test_era_checks_and_daily_covariates_use_utc(offset: int) -> None:
+    catalog = replace(load_partial_catalog(), era_start="2026-01-01", era_end="2026-01-01")
+    tower_tokens = [t for t, entry in catalog.entries.items() if entry.kind == "tower"]
+    population = tuple(
+        replace(row, tokens=tuple((*side[:8], tower_tokens[side[8] - 13]) for side in row.tokens))
+        for row in rows()
+    )
+    expected = readiness(RoleAccess(protocol(population), population), catalog)
+    local = timezone(timedelta(hours=offset))
+    shifted = tuple(
+        replace(row, key=(row.key[0].astimezone(local), *row.key[1:])) for row in population
+    )
+    actual = readiness(RoleAccess(protocol(shifted), shifted), catalog)
+    assert actual == expected
+    mechanics = cast(dict[str, object], actual["mechanics"])
+    assert mechanics["compatibility_issues"] == []
+    outside = replace(catalog, era_start="2026-01-02", era_end="2026-01-02")
+    rejected = readiness(RoleAccess(protocol(shifted), shifted), outside)
+    issues = cast(dict[str, object], rejected["mechanics"])["compatibility_issues"]
+    assert "population battle dates exceed verified mechanics era" in cast(list[str], issues)

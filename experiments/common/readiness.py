@@ -2,7 +2,7 @@
 
 from collections import Counter, defaultdict
 from collections.abc import Sequence
-from datetime import date
+from datetime import UTC, date
 from hashlib import sha256
 
 from clash_sos.domain.attention_schema import AttentionCardSchema
@@ -36,7 +36,7 @@ def _covariates(rows: Sequence[ResearchRow], catalog: MechanicsCatalog) -> dict[
             players[player] += 1
             lineups[lineup] += 1
             player_lineups[player].add(lineup)
-            first_seen.setdefault(player, row.key[0].date().isoformat())
+            first_seen.setdefault(player, row.key[0].astimezone(UTC).date().isoformat())
             for token in tokens:
                 entry = catalog.entries.get(token)
                 if entry is None:
@@ -48,9 +48,15 @@ def _covariates(rows: Sequence[ResearchRow], catalog: MechanicsCatalog) -> dict[
     return {
         "row_count": len(rows),
         "distinct_timestamps": len({row.key[0] for row in rows}),
-        "first_timestamp": min(row.key[0] for row in rows).isoformat() if rows else None,
-        "last_timestamp": max(row.key[0] for row in rows).isoformat() if rows else None,
-        "daily_rows": dict(sorted(Counter(row.key[0].date().isoformat() for row in rows).items())),
+        "first_timestamp": min(row.key[0] for row in rows).astimezone(UTC).isoformat()
+        if rows
+        else None,
+        "last_timestamp": max(row.key[0] for row in rows).astimezone(UTC).isoformat()
+        if rows
+        else None,
+        "daily_rows": dict(
+            sorted(Counter(row.key[0].astimezone(UTC).date().isoformat() for row in rows).items())
+        ),
         "player_count": len(players),
         "repeated_player_count": sum(count > 1 for count in players.values()),
         "players_with_multiple_lineups": sum(len(values) > 1 for values in player_lineups.values()),
@@ -109,7 +115,7 @@ def readiness(
             issues.add(f"mechanics/schema identity mismatch at token {token}")
     if not catalog.synthetic and any(
         not date.fromisoformat(catalog.era_start)
-        <= row.key[0].date()
+        <= row.key[0].astimezone(UTC).date()
         <= date.fromisoformat(catalog.era_end)
         for row in rows
     ):
