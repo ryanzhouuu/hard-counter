@@ -161,6 +161,17 @@ and the strict static audit retain their meaning. Feature extraction does not ye
 consume the new conditional fields. See the mechanics review for evidence and
 category definitions.
 
+Use `air_audit(..., include_conditional=True)` or
+`require_air_mechanics(..., include_conditional=True)` to audit ordinary
+predicates plus recorded positive conditional channels. This mode accepts a
+documented six-Elixir hybrid only with matching conditions, flight/damage
+capabilities, non-spell classification, and the flying-form response scope.
+It checks trigger, scope, control type, and paid-ability usage metadata;
+`include_cost=True` also requires paid-ability cost independently of deployment
+cost. The default strict static gate continues to require ordinary booleans.
+Unreviewed conditional capabilities remain coverage unknowns: passing the
+conditional-aware gate does not certify an exhaustive ability inventory.
+
 ## Frozen development and candidate reporting
 
 The checked-in configurations are preparation definitions. Before full matrices,
