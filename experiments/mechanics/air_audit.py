@@ -31,7 +31,7 @@ def required_air_fields(
             if entry.flag(capability):
                 fields.extend(channel_fields(entry, capability, include_cost=include_cost))
     if include_cost:
-        fields.append("cost_kind")
+        fields.extend(("cost_kind", "ordinary_cycle"))
         if entry.field("cost_kind").value == "fixed":
             fields.append("deploy_cost")
         elif entry.field("cost_kind").value == "conditional":

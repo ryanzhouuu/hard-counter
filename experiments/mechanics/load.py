@@ -227,7 +227,7 @@ def synthetic_catalog() -> MechanicsCatalog:
 
 
 def load_partial_catalog() -> MechanicsCatalog:
-    return load(Path(__file__).parent / "inputs" / "2026-10-02-partial-r7.json")
+    return load(Path(__file__).parent / "inputs" / "2026-10-02-partial-r8.json")
 
 
 def bind_tokens(catalog: MechanicsCatalog, identities: tuple[str, ...]) -> MechanicsCatalog:

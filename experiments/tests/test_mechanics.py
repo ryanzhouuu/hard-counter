@@ -130,6 +130,13 @@ def test_sourced_partial_inventory_covers_official_forms_and_gates_quantitative(
                 elif urlparse(field.source_url).hostname == "clashroyale.fandom.com":
                     assert urlparse(field.source_url).path.startswith("/wiki/")
                     assert field.source_effective_date in {"2026-10-01", "2026-10-02"}
+                elif urlparse(field.source_url).hostname == "github.com":
+                    assert urlparse(field.source_url).path == (
+                        "/RoyaleAPI/cr-api-data/blob/"
+                        "d5461b0a59bff33c4da2fc845b07275b66b2d6ff/docs/json/cards.json"
+                    )
+                elif urlparse(field.source_url).hostname == "ingame.help.supercellsupport.com":
+                    assert urlparse(field.source_url).path.startswith("/clash-royale/en/articles/")
                 else:
                     assert urlparse(field.source_url).hostname in {
                         "supercell.com",

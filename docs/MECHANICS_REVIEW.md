@@ -178,3 +178,35 @@ The partial catalog is a preparation input. Freeze reviewed inputs and regenerat
 schemas/caches before model comparison; retain historical catalog snapshots and
 experiment artifacts. Spawned channels, ability activation, costs, and numerical
 combat measurements still require their own evidence.
+
+The eighth revision completes deployment-cost and ordinary hand-cycle metadata
+for all 182 card/form identities. It preserves every earlier field and the
+September 24–October 1 applicability window. There are 180 fixed-cost identities
+and two conditional identities: Mirror (`previous_card_plus_one`) and Spirit
+Empress (`ground_3_air_6`). Neither receives a fixed `deploy_cost`; their field is
+inapplicable. Tower cost and cycle fields remain inapplicable. Paid abilities are
+separate expenditures; Elixir Golem's later opponent payout and Collector's
+production are not deployment costs.
+
+Fixed costs were compared with the existing attribute table against the pinned
+[RoyaleAPI card constants](https://github.com/RoyaleAPI/cr-api-data/blob/d5461b0a59bff33c4da2fc845b07275b66b2d6ff/docs/json/cards.json).
+Those constants are an older baseline, not a current complete card list. Newer
+cards use their original previews or current RoyaleAPI card pages, with explicit
+community Wiki evidence for Suspicious Bush. Goblin Hut uses its current four
+Elixir value, and Void uses the official
+[August 2026 five-Elixir rework](https://supercell.com/en/games/clashroyale/blog/news/final-august-balance-changes-826/).
+Card forms explicitly inherit the reviewed base deployment cost, independently
+of ability cost and Evolution activation counts. The field date for this cost
+and cycle review is October 2; it does not assert a balance change on that day.
+
+`ordinary_cycle` describes hand rotation, not the coarse low-cost `cycle` role
+in production attributes. All current card/form identities, including Mirror,
+use ordinary rotation. The
+[October 2025 update](https://supercell.com/en/games/clashroyale/blog/release-notes/october-update-2025/)
+removed Champions' three-card cycle and allowed their duplication with Mirror.
+The four-cheapest-card return feature remains a static deployment-cost proxy:
+it filters to known fixed costs, excluding Mirror and Spirit Empress, and does
+not model the actual hand, ability use, or Evolution activation. A cost-aware
+audit also requires known ordinary-cycle applicability. The conditional-aware
+cost gate now passes the complete catalog; the strict static gate still reports
+Spirit Empress's intentionally unknown unconditional targeting/flight flags.

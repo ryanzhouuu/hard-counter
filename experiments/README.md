@@ -104,7 +104,7 @@ joint mirroring against the native cache. Attention runs create their own
 network-specific schema/protocol/cache and verify identical oriented populations.
 Do not use the production training command to search research variants.
 
-The default [mechanics input](mechanics/inputs/2026-10-02-partial-r7.json) records
+The default [mechanics input](mechanics/inputs/2026-10-02-partial-r8.json) records
 field-level evidence and explicit unknowns. The [mechanics review](../docs/MECHANICS_REVIEW.md)
 documents corrected capabilities, original release-preview sources, and remaining
 coverage limits. September inputs remain frozen. Supply `--mechanics` for another
@@ -168,7 +168,10 @@ documented six-Elixir hybrid only with matching conditions, flight/damage
 capabilities, non-spell classification, and the flying-form response scope.
 It checks trigger, scope, control type, and paid-ability usage metadata;
 `include_cost=True` also requires paid-ability cost independently of deployment
-cost. The default strict static gate continues to require ordinary booleans.
+cost, and known ordinary hand-cycle applicability. The eighth catalog revision
+completes these fields for all 182 card/form identities; Mirror and Spirit
+Empress retain conditional costs and are excluded from fixed-cost return proxies.
+The default strict static gate continues to require ordinary booleans.
 Unreviewed conditional capabilities remain coverage unknowns: passing the
 conditional-aware gate does not certify an exhaustive ability inventory.
 
