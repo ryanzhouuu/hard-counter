@@ -104,7 +104,7 @@ joint mirroring against the native cache. Attention runs create their own
 network-specific schema/protocol/cache and verify identical oriented populations.
 Do not use the production training command to search research variants.
 
-The default [mechanics input](mechanics/inputs/2026-10-01-partial-r5.json) records
+The default [mechanics input](mechanics/inputs/2026-10-02-partial-r6.json) records
 field-level evidence and explicit unknowns. The [mechanics review](../docs/MECHANICS_REVIEW.md)
 documents corrected capabilities, original release-preview sources, and remaining
 coverage limits. September inputs remain frozen. Supply `--mechanics` for another
@@ -148,6 +148,18 @@ The fifth revision explicitly classifies Spirit Empress with the optional
 `airborne_mode: hybrid` category. Allowed modes are `ground`, `air`, and `hybrid`;
 hybrid means deployment can produce either form. Her sourced conditions still
 describe which form appears, and the static booleans retain their existing meaning.
+
+The sixth revision adds potential conditional air channels for Spirit Empress,
+Hero Wizard, Hero Ice Golem, Hero Giant, Mighty Miner, and Monk. The flags
+`conditional_airborne`, `conditional_air_damage`, `conditional_air_control`, and
+`conditional_air_reflection` describe capability, never observed activation.
+`conditional_air_trigger`, `conditional_air_response_scope`, and
+`conditional_air_control_kind` retain trigger, eligible targets, and effect type;
+`ability_usage` records single-use per deployment separately from `ability_cost`.
+Only reviewed effects are populated; omitted effects stay unknown. Ordinary flags
+and the strict static audit retain their meaning. Feature extraction does not yet
+consume the new conditional fields. See the mechanics review for evidence and
+category definitions.
 
 ## Frozen development and candidate reporting
 

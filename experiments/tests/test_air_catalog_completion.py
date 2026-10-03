@@ -108,7 +108,7 @@ def test_community_evidence_records_review_dates_without_replacing_manual_facts(
         if field.source_url and "clashroyale.fandom.com" in field.source_url
     ]
     assert community
-    assert all(field.source_effective_date == "2026-10-01" for field in community)
+    assert all(field.source_effective_date in {"2026-10-01", "2026-10-02"} for field in community)
     freeze = next(e for e in catalog.entries.values() if e.identity == "freeze:base")
     assert freeze.field("targets_air").status == "user_reported"
     assert freeze.field("targets_air").evidence_sha256

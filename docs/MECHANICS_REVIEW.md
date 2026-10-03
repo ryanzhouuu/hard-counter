@@ -1,4 +1,4 @@
-# Mechanics review: October 1, 2026
+# Mechanics review: October 2, 2026
 
 Current training attributes use `card-attributes:2026-10-01-r3`. This review corrects
 eight coarse roles; it does not certify every card or establish model improvement.
@@ -34,7 +34,7 @@ Manual confirmations also count as known mechanics. They record the supplied
 facts, report date, and a hash of the evidence record without requiring web URLs.
 Descriptions are retained verbatim; they do not establish numeric combat stats.
 
-The `mechanics-partial:2026-10-01-r5` snapshot applies to September 24 through
+The `mechanics-partial:2026-10-02-r6` snapshot applies to September 24 through
 October 1. The [September balance notes](https://supercell.com/en/games/clashroyale/blog/release-notes/september-balance-changes-2027/)
 change damage/timing for reviewed cards, not the recorded structural predicates.
 The snapshot adds the corrected targeting channels, explicitly excludes
@@ -111,6 +111,62 @@ ground/air deployments. It is a verified classification derived from the sourced
 form descriptions, not an assertion of the form deployed in any particular battle.
 The fourth revision remains frozen, and the hybrid label does not override the
 unconditional flags or satisfy the strict static air gate.
+
+The sixth revision adds the following conditional channels, reviewed October 2.
+Earlier snapshots and all their field values remain frozen. The supported
+September 24–October 1 population window is unchanged.
+
+| Identity | Conditional capability | Trigger | Response scope | Ability cost |
+| --- | --- | --- | --- | --- |
+| Spirit Empress | Flight and air damage | Available Elixir at least 6 on deployment | `flying_form_attack` | Inapplicable; deployment costs remain 3/6 |
+| Hero Wizard | Flight, air damage, and pull | Paid ability | `enhanced_attack_area` | 1 |
+| Hero Ice Golem | Air damage and slow | Paid ability | `moving_area` | 2 |
+| Hero Giant | Selected air troop damage, throw, and stun | Paid ability | `selected_troop_ground_only_splash` | 2 |
+| Mighty Miner | Air damage and knockback | Paid ability | `departure_bomb_area` | 1 |
+| Monk | Eligible incoming projectile reflection | Paid ability | `eligible_incoming_projectiles` | 1 |
+
+The optional flags `conditional_airborne`, `conditional_air_damage`,
+`conditional_air_control`, and `conditional_air_reflection` describe potential
+channels. `conditional_air_trigger` accepts `available_elixir_at_least_6` or
+`paid_ability`. `conditional_air_response_scope` accepts the six values above;
+`conditional_air_control_kind` accepts `pull`, `slow`, `throw_and_stun`, or
+`knockback`. Omitted capabilities remain unknown, including Monk's direct air
+damage. Reflection is its own restricted channel, not a universal air answer.
+Hero Wizard's conditional attack augments his existing ordinary air targeting;
+it must not add another card-level air-answer count. Deck identities cannot
+establish deployment form, ability use, valid targets, or remaining ability uses.
+
+Structural effects and Hero costs use the original developer-build observations:
+[Spirit Empress](https://royaleapi.com/blog/spirit-empress-new-card-2025-july?lang=en),
+[Wizard](https://royaleapi.com/blog/hero-wizard-january-2026),
+[Ice Golem](https://royaleapi.com/blog/hero-ice-golem-january-2026), and
+[Giant](https://royaleapi.com/blog/hero-giant-december-2025?lang=en).
+The Giant's stun is corroborated by the
+[official update](https://supercell.com/en/games/clashroyale/blog/release-notes/december-update-2025/).
+Giant's landing splash affects ground troops only, even when the selected troop
+was flying. Ice Golem's current `slow` uses the
+[August 4 rework](https://supercell.com/en/games/clashroyale/blog/news/final-august-balance-changes-826/);
+its earlier [knockback removal](https://supercell.com/en/games/clashroyale/blog/release-notes/april26-balance-changes/)
+also applies. Original freeze/knockback descriptions are not current effects.
+
+Mighty Miner's bomb air eligibility and knockback use explicit community
+[Wiki observations](https://clashroyale.fandom.com/wiki/Mighty_Miner), reviewed
+October 2; their field date is the review date. Its 1-Elixir ability cost uses the
+[official April 8, 2022 change](https://supercell.com/en/games/clashroyale/blog/release-notes/balance-changes-april-2022/).
+Monk's reflection toward the projectile's source uses the
+[original gameplay preview](https://royaleapi.com/blog/monk-new-card?lang=en)
+and [official description](https://supercell.com/en/games/clashroyale/blog/release-notes/new-update-october-2022/).
+The [December 2025 Firecracker exception](https://supercell.com/en/games/clashroyale/blog/release-notes/december-update-2025/)
+shows why eligible projectile reflection is restricted. Monk's ability cost uses
+the [official December 2022 update](https://supercell.com/en/games/clashroyale/blog/release-notes/balance-changes-2).
+
+For all five paid-ability candidates, `ability_usage: single_use_per_deployment`
+uses the [August 4, 2026 rule](https://supercell.com/en/games/clashroyale/blog/news/final-august-balance-changes-826/),
+which applies to Heroes and Champions except Boss Bandit. Older cooldown text is
+superseded. Spirit Empress has no paid ability: `ability_usage` and `ability_cost`
+are inapplicable, separate from her conditional deployment cost. No damage,
+duration, range, or activation-frequency measurements are added. These catalog
+fields do not alter the ordinary response predicates or strict static air audit.
 
 The partial catalog is a preparation input. Freeze reviewed inputs and regenerate
 schemas/caches before model comparison; retain historical catalog snapshots and

@@ -9,6 +9,7 @@ from math import isfinite
 from types import MappingProxyType
 from typing import Literal, cast
 
+from experiments.mechanics.fields import CONDITIONAL_CATEGORIES
 from experiments.mechanics.fields import FIELD_UNITS as FIELD_UNITS
 from experiments.mechanics.fields import Status as Status
 from experiments.mechanics.fields import Value as Value
@@ -108,6 +109,12 @@ class MechanicsEntry:
                 raise ValueError("unregistered airborne mode")
             if name == "activation_cycles" and field.known and type(field.value) is not int:
                 raise ValueError("activation cycles require whole deployments")
+            if (
+                name in CONDITIONAL_CATEGORIES
+                and field.known
+                and field.value not in CONDITIONAL_CATEGORIES[name]
+            ):
+                raise ValueError(f"unregistered conditional category: {name}")
             if field.inherited_from and not field.known:
                 raise ValueError("field inheritance requires verified applicability")
             if name == "damage_per_hit" and field.known and field.level != 16:

@@ -129,7 +129,7 @@ def test_sourced_partial_inventory_covers_official_forms_and_gates_quantitative(
                     assert urlparse(field.source_url).path.startswith(("/blog/", "/card/"))
                 elif urlparse(field.source_url).hostname == "clashroyale.fandom.com":
                     assert urlparse(field.source_url).path.startswith("/wiki/")
-                    assert field.source_effective_date == "2026-10-01"
+                    assert field.source_effective_date in {"2026-10-01", "2026-10-02"}
                 else:
                     assert urlparse(field.source_url).hostname in {
                         "supercell.com",
