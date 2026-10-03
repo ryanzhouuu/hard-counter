@@ -110,6 +110,16 @@ def run_variant(
                 penalty=penalty,
                 scale_features=recipe.scale,
             )
+            (stage / "fit-diagnostics.json").write_bytes(
+                canonical_json_bytes(
+                    {
+                        "selected_epoch": fitted.selected_epoch,
+                        "selection_training_losses": fitted.selection_training_losses,
+                        "watch_losses": fitted.watch_losses,
+                        "refit_training_losses": fitted.refit_training_losses,
+                    }
+                )
+            )
             cache_refit_features(
                 stage / "feature-cache",
                 access,

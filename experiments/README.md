@@ -75,6 +75,14 @@ finite gradients, swap error, and calibration status. Smoke metrics describe
 execution and correctness; they cannot select penalties, promote a stage, or
 support an improvement claim.
 
+Runs reaching calibration retain `fit-diagnostics.json` with selection/refit
+training losses and watch losses, including when calibration fails. Each calibrated
+output retains `<output>-calibration-raw.json` and
+`<output>-calibration-diagnostics.json` with raw row-keyed scores, a temperature
+loss curve, outcome alignment, and fit status. These are diagnostic evidence.
+Boundary and unidentified temperatures still fail the run; rejected calibrations do not
+publish calibrated predictions or a usable checkpoint.
+
 ## Replacing synthetic inputs
 
 Use an immutable official snapshot built by the existing dataset preparation

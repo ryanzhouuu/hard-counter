@@ -2,7 +2,8 @@ from pathlib import Path
 
 import torch
 
-from experiments.common.calibration import TemperatureFit, fit_temperature
+from experiments.common.calibration import TemperatureFit
+from experiments.common.calibration_diagnostics import fit_recorded_temperature
 from experiments.common.checkpoints import predictions
 from experiments.common.components import Components
 from experiments.common.data_access import RoleAccess
@@ -24,8 +25,11 @@ def score_fit(
     dev_x = recipe.builder(refit, development) / fitted.scales
     cal_z = predict_logits(fitted.model, calibration, cal_x)
     dev_z = predict_logits(fitted.model, development, dev_x)
-    actual_temperature = fit_temperature(
-        tuple(float(z) for z in cal_z), tuple(r.label for r in calibration)
+    actual_temperature = fit_recorded_temperature(
+        stage,
+        calibration,
+        cal_z,
+        output="actual" if isinstance(fitted.model, PlayerModel) else "matchup",
     )
     matchup_temperature = actual_temperature
     if isinstance(fitted.model, PlayerModel):
@@ -45,8 +49,8 @@ def score_fit(
                 .cpu()
                 .numpy()
             )
-        matchup_temperature = fit_temperature(
-            tuple(float(z) for z in cal_match), tuple(r.label for r in calibration)
+        matchup_temperature = fit_recorded_temperature(
+            stage, calibration, cal_match, output="matchup"
         )
         write_predictions(
             stage / "actual-development.json",

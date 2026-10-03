@@ -28,6 +28,8 @@ class FitResult:
     rows_per_second: float
     peak_memory_bytes: int
     device: str
+    selection_training_losses: tuple[float, ...] = ()
+    refit_training_losses: tuple[float, ...] = ()
 
 
 def fit_research(
@@ -54,6 +56,7 @@ def fit_research(
         model.parameter_groups(config.weight_decay), lr=config.learning_rate
     )
     losses: list[float] = []
+    training_losses: list[float] = []
     trained = 0
     best, selected = float("inf"), 0
 
@@ -105,7 +108,7 @@ def fit_research(
         return total / len(rows)
 
     for number in range(1, config.max_epochs + 1):
-        epoch(model, fit_rows, values / scales, number, optimizer)
+        training_losses.append(epoch(model, fit_rows, values / scales, number, optimizer))
         loss = epoch(model, watch_rows, watch_values, number, None)
         losses.append(loss)
         if loss < best:
@@ -120,8 +123,11 @@ def fit_research(
     refit_optimizer = torch.optim.AdamW(
         refit.parameter_groups(config.weight_decay), lr=config.learning_rate
     )
+    refit_losses: list[float] = []
     for number in range(1, selected + 1):
-        epoch(refit, refit_rows, refit_values / refit_scales, number, refit_optimizer)
+        refit_losses.append(
+            epoch(refit, refit_rows, refit_values / refit_scales, number, refit_optimizer)
+        )
     refit.eval()
     elapsed = monotonic() - started
     if elapsed >= config.time_limit_seconds:
@@ -137,6 +143,8 @@ def fit_research(
         trained / elapsed,
         int(peak if sys.platform == "darwin" else peak * 1024),
         runtime.device,
+        tuple(training_losses),
+        tuple(refit_losses),
     )
 
 
