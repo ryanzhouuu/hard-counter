@@ -1,5 +1,6 @@
 {
   "study_id": "response-cycle",
+  "version": 2,
   "variants": [
     {
       "variant_id": "A0",
@@ -29,6 +30,12 @@
         "response",
         "cycle"
       ],
+      "nuisance": "none",
+      "architecture": "explicit"
+    },
+    {
+      "variant_id": "A4",
+      "feature_groups": ["response", "cycle", "conditional_air"],
       "nuisance": "none",
       "architecture": "explicit"
     },

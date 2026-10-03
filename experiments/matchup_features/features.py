@@ -2,6 +2,7 @@
 
 from collections.abc import Sequence
 
+from experiments.matchup_features import conditional_air as conditional_features
 from experiments.matchup_features import cycle, responses
 from experiments.mechanics.contracts import FeatureResult, MechanicsCatalog, decode_pair, difference
 
@@ -12,12 +13,18 @@ def extract(
     *,
     response: bool = True,
     cost: bool = True,
+    conditional_air: bool = False,
 ) -> FeatureResult:
+    """Append optional conditional channels while retaining the ordinary response/cost registry."""
     left, right = decode_pair(tokens, catalog)
     names: list[str] = []
     values: list[float] = []
     formulas: list[str] = []
-    for enabled, extractor in ((response, responses.directed), (cost, cycle.directed)):
+    for enabled, extractor in (
+        (response, responses.directed),
+        (cost, cycle.directed),
+        (conditional_air, conditional_features.directed),
+    ):
         if enabled:
             order, forward, definitions = extractor(left, right)
             _, reverse, _ = extractor(right, left)

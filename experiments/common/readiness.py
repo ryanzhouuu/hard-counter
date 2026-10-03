@@ -11,6 +11,7 @@ from experiments.common.data_access import ResearchRow, RoleAccess
 from experiments.common.protocol import require_search
 from experiments.higher_order.features import extract as pattern_features
 from experiments.higher_order.patterns import PATTERNS
+from experiments.mechanics.air_audit import air_audit
 from experiments.mechanics.contracts import FIELD_UNITS, MechanicsCatalog, MechanicsUnavailable
 
 
@@ -86,6 +87,7 @@ def readiness(
     )
     tokens = sorted({token for row in rows for side in row.tokens for token in side})
     coverage: dict[str, dict[str, str]] = {}
+    audited: list[int] = []
     issues: set[str] = set()
     for token in tokens:
         entry = catalog.entries.get(token)
@@ -100,6 +102,7 @@ def readiness(
             coverage[entry.identity] = {name: "unknown" for name in FIELD_UNITS}
             continue
         coverage[entry.identity] = {name: resolved.field(name).status for name in FIELD_UNITS}
+        audited.append(token)
         if schema is not None and (
             token >= len(schema.identity_vocab) or schema.identity_vocab[token] != entry.identity
         ):
@@ -124,6 +127,17 @@ def readiness(
         for pattern, value in zip(PATTERNS, features.values, strict=True):
             support[pattern.name] += int(value != 0)
     unknown = sum(status == "unknown" for fields in coverage.values() for status in fields.values())
+    air_reports: dict[str, object] = {}
+    for name, conditional, cost in (
+        ("static", False, False),
+        ("conditional", True, False),
+        ("conditional_cost", True, True),
+    ):
+        gaps = air_audit(catalog, audited, include_conditional=conditional, include_cost=cost)
+        air_reports[name] = {
+            "status": "unavailable" if gaps or issues else "available",
+            "gaps": gaps,
+        }
     return {
         "population": _covariates(rows, catalog),
         "roles": {
@@ -138,6 +152,7 @@ def readiness(
             "coverage": coverage,
             "unknown_field_count": unknown,
             "compatibility_issues": sorted(issues),
+            "air_audits": air_reports,
         },
         "patterns": {
             "refit_support": support,

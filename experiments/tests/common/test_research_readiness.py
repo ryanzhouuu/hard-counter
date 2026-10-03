@@ -1,9 +1,10 @@
 import json
 from dataclasses import replace
+from typing import cast
 
 from experiments.common.data_access import RoleAccess
 from experiments.common.readiness import readiness
-from experiments.mechanics.contracts import MechanicsCatalog, MechanicsEntry
+from experiments.mechanics.contracts import MechanicsCatalog, MechanicsEntry, unknown
 from experiments.mechanics.load import synthetic_catalog
 from experiments.tests.common.research_fixture import protocol, rows
 
@@ -47,3 +48,27 @@ def test_readiness_keeps_missing_mechanics_and_unavailable_patterns_visible() ->
     assert isinstance(patterns, dict)
     assert patterns["status"] == "unavailable"
     assert patterns["disabled_reasons"]
+
+
+def test_readiness_reports_cost_gaps_separately_from_air_predicates() -> None:
+    population = rows()
+    catalog = synthetic_catalog()
+    entry = catalog.for_token(2)
+    changed = replace(entry, fields={**entry.fields, "deploy_cost": unknown("deploy_cost")})
+    catalog = replace(catalog, entries={**catalog.entries, 2: changed})
+    report = readiness(RoleAccess(protocol(population), population), catalog)
+    mechanics = cast(dict[str, object], report["mechanics"])
+    audits = cast(dict[str, dict[str, object]], mechanics["air_audits"])
+    assert audits["static"]["status"] == audits["conditional"]["status"] == "available"
+    assert audits["conditional_cost"]["gaps"] == {entry.identity: ("deploy_cost",)}
+    assert audits["conditional_cost"]["status"] == "unavailable"
+
+
+def test_air_readiness_cannot_pass_when_a_population_identity_is_missing() -> None:
+    population = rows()
+    catalog = synthetic_catalog()
+    catalog = replace(catalog, entries={t: e for t, e in catalog.entries.items() if t != 13})
+    report = readiness(RoleAccess(protocol(population), population), catalog)
+    mechanics = cast(dict[str, object], report["mechanics"])
+    audits = cast(dict[str, dict[str, object]], mechanics["air_audits"])
+    assert all(audit["status"] == "unavailable" for audit in audits.values())

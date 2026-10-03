@@ -16,7 +16,7 @@ from clash_sos.domain.card_attributes import CardAttribute, CardAttributeTable
 from clash_sos.domain.card_catalog import CardCatalog, CardCatalogEntry
 from clash_sos.domain.tower_catalog import TowerCatalog, TowerEntry
 from experiments.common.data_access import ResearchRow, RoleAccess
-from experiments.mechanics.contracts import MechanicsCatalog, MechanicsEntry
+from experiments.mechanics.contracts import MechanicField, MechanicsCatalog, MechanicsEntry
 from experiments.mechanics.load import bind_tokens, synthetic_catalog
 
 START = datetime(2026, 9, 1, tzinfo=UTC)
@@ -31,6 +31,21 @@ def _schema() -> tuple[MechanicsCatalog, AttentionCardSchema]:
     entries[10] = replace(entries[10], fields=form_fields)
     for token in range(17, 21):
         entries[token] = replace(entries[6], identity=f"fixture-{token}:base")
+    entries[9] = replace(
+        entries[9],
+        fields={
+            **entries[9].fields,
+            **{
+                name: MechanicField(value, unit, "synthetic")
+                for name, value, unit in (
+                    ("conditional_airborne", True, "flag"),
+                    ("conditional_air_damage", True, "flag"),
+                    ("conditional_air_trigger", "available_elixir_at_least_6", "category"),
+                    ("conditional_air_response_scope", "flying_form_attack", "category"),
+                )
+            },
+        },
+    )
     catalog = replace(catalog, entries=entries)
     cards: list[CardCatalogEntry] = []
     attributes: dict[str, CardAttribute] = {}

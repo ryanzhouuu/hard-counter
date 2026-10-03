@@ -157,9 +157,9 @@ Hero Wizard, Hero Ice Golem, Hero Giant, Mighty Miner, and Monk. The flags
 `conditional_air_control_kind` retain trigger, eligible targets, and effect type;
 `ability_usage` records single-use per deployment separately from `ability_cost`.
 Only reviewed effects are populated; omitted effects stay unknown. Ordinary flags
-and the strict static audit retain their meaning. Feature extraction does not yet
-consume the new conditional fields. See the mechanics review for evidence and
-category definitions.
+and the strict static audit retain their meaning. Feature extraction consumes
+the new fields when the `conditional_air` feature group is enabled. See the
+mechanics review for evidence and category definitions.
 
 Use `air_audit(..., include_conditional=True)` or
 `require_air_mechanics(..., include_conditional=True)` to audit ordinary
@@ -171,6 +171,24 @@ It checks trigger, scope, control type, and paid-ability usage metadata;
 cost. The default strict static gate continues to require ordinary booleans.
 Unreviewed conditional capabilities remain coverage unknowns: passing the
 conditional-aware gate does not certify an exhaustive ability inventory.
+
+Response/cycle variant A4 enables `response`, `cycle`, and `conditional_air`;
+A3 retains the ordinary response/cycle registry for comparison. The new group
+registers separate potential flight, damage, control, and reflection counts,
+unavailable-channel counts, trigger/scope/control categories, ability-cost
+summaries, and interactions with opposing ordinary/conditional air threats.
+Additional response cards count each card once and exclude existing ordinary
+air answers such as Hero Wizard. Giant's selected-troop restriction and Monk's
+projectile eligibility remain distinct categories. These counts describe
+potential channels, not defensive success or observed activation.
+
+`validate` and smoke readiness reports include `mechanics.air_audits` for strict
+static, conditional-aware, and conditional-aware plus cost gates. Unreviewed
+conditional capabilities remain visible in field coverage and feature missingness.
+Compatibility failures make these readiness statuses unavailable even when the
+reported air-field gaps are empty. Rebuild feature caches and freeze new feature
+names/hashes before controlled comparisons; historical checkpoints retain their
+original feature-group definitions.
 
 ## Frozen development and candidate reporting
 
@@ -192,9 +210,11 @@ again. Comparison reports and ensemble assets are published once.
 
 Run response/cycle first. Other studies reuse its A0 runs under the same run ID,
 population, optimizer, seed registry, and code revision. The new-fit budgets are
-A: 21, B: 10, C: 10, D: up to 10, and E: 5 (up to 56 total); disabling the
+A: 26, B: 10, C: 10, D: up to 10, and E: 5 (up to 61 total); disabling the
 quantitative tower branch reduces D to five. These budgets count fits containing
 watch selection and deterministic restart/refit, rather than epochs.
+With A4 disabled, A retains its previous 21-fit budget. A4 adds one bounded smoke
+fit and five full comparison fits only after a new protocol and budget are frozen.
 
 Comparisons retain every seed and use the same aggregation for all models:
 average raw seed probabilities, convert to logits, then fit one positive

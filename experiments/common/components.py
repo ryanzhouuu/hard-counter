@@ -85,6 +85,7 @@ def components(
                 catalog,
                 response="response" in groups,
                 cost="cycle" in groups,
+                conditional_air="conditional_air" in groups,
             )
         if config.study_id == "form-mechanics":
             return form_features(row.tokens, catalog, inherited="inherited" in groups)
