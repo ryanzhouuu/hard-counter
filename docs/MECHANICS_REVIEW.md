@@ -210,3 +210,8 @@ not model the actual hand, ability use, or Evolution activation. A cost-aware
 audit also requires known ordinary-cycle applicability. The conditional-aware
 cost gate now passes the complete catalog; the strict static gate still reports
 Spirit Empress's intentionally unknown unconditional targeting/flight flags.
+
+The ninth revision extends the declared research applicability window to
+September 24–October 5, 2026, inclusive in UTC. This date-scope extension preserves
+all eighth-revision mechanics entries, source dates, and unknown fields.
+Earlier snapshots remain frozen; new research sessions default to the ninth revision.

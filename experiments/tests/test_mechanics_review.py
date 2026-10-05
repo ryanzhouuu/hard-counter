@@ -36,7 +36,7 @@ def test_reviewed_air_channels_have_verified_evidence(identity: str) -> None:
 
 def test_review_preserves_unknowns_forms_and_conditional_costs() -> None:
     catalog = load_partial_catalog()
-    assert catalog.version == "mechanics-partial:2026-10-02-r8"
+    assert catalog.version == "mechanics-partial:2026-10-05-r9"
     entries = {e.identity: e for e in catalog.entries.values()}
     identities = {entry.card.identity_key for entry in CURRENT_CARD_CATALOG.entries}
     identities.update(entry.identity for entry in CURRENT_TOWER_CATALOG.entries)

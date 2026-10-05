@@ -92,7 +92,7 @@ def test_revision_preserves_every_existing_field_and_ordinary_response() -> None
         "07cb7b8f3bc96a4d4847f2adb600f1fdc213dbff73308d5c630d4f7a0b78605a"
     )
     previous = load(path)
-    current = load_partial_catalog()
+    current = load("experiments/mechanics/inputs/2026-10-02-partial-r6.json")
     assert current.era_start == previous.era_start
     assert current.era_end == previous.era_end
     assert set(current.entries) == set(previous.entries)

@@ -20,7 +20,8 @@ def test_cost_revision_preserves_the_previous_snapshot_and_every_field() -> None
     assert sha256(path.read_bytes()).hexdigest() == (
         "7ef2757a7cd68227d7541a5ae2099beb9ec4c43e5d16e5da2807bbe8136f1d84"
     )
-    previous, current = load(path), load_partial_catalog()
+    previous = load(path)
+    current = load("experiments/mechanics/inputs/2026-10-02-partial-r8.json")
     assert (current.era_start, current.era_end) == (previous.era_start, previous.era_end)
     for token, old in previous.entries.items():
         assert all(current.for_token(token).field(n) == f for n, f in old.fields.items())
