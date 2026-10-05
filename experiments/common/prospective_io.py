@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from clash_sos.domain.attention_dataset import TowerBattleRowV2
+from clash_sos.domain.attention_dataset import official_row_type
 from clash_sos.domain.attention_schema import AttentionCardSchema
 from experiments.common.artifacts import file_record
 from experiments.common.data_access import ReportAccess, ReportingContract, ResearchRow
@@ -20,8 +20,12 @@ def load_reporting_jsonl(
 ) -> ReportAccess:
     if row_cap <= 0:
         raise ValueError("reporting source loading requires a positive row cap")
-    if schema.canonical_schema_version != "official-ranked16-schema:v2":
-        raise ValueError("current prospective rows require the frozen official v2 schema")
+    if schema.canonical_schema_version not in {
+        "official-ranked16-schema:v2",
+        "official-ranked16-schema:v3",
+    }:
+        raise ValueError("current prospective rows require the frozen official v2 or v3 schema")
+    row_type = official_row_type(schema.canonical_schema_version)
     population = contract.population
     expected_files = population.snapshot_files
     if (
@@ -37,7 +41,7 @@ def load_reporting_jsonl(
                 raise ValueError("prospective JSONL row exceeds byte limit")
             if len(rows) >= row_cap:
                 raise ValueError("prospective source exceeds row cap")
-            row = TowerBattleRowV2.model_validate_json(line)
+            row = row_type.model_validate_json(line)
             rows.append(encode_official_row(row, schema, population.mirror_seed))
     if expected_files[0].row_count is not None and len(rows) != expected_files[0].row_count:
         raise ValueError("prospective row count differs from reporting inventory")

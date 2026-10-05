@@ -103,6 +103,7 @@ class AttentionCardSchema(ManifestModel):
         "kaggle-v6-ranked16-schema:v1",
         "official-ranked16-schema:v1",
         "official-ranked16-schema:v2",
+        "official-ranked16-schema:v3",
     ] = CANONICAL_SCHEMA_VERSION
     tower_catalog: TowerCatalog | None = None
     balance_era_id: str = Field(default=BALANCE_ERA_ID, min_length=1)
@@ -142,7 +143,11 @@ class AttentionCardSchema(ManifestModel):
         )
         valid_canonical = (
             self.canonical_schema_version
-            in {"official-ranked16-schema:v1", "official-ranked16-schema:v2"}
+            in {
+                "official-ranked16-schema:v1",
+                "official-ranked16-schema:v2",
+                "official-ranked16-schema:v3",
+            }
             if tower_identities
             else self.canonical_schema_version == CANONICAL_SCHEMA_VERSION
         )
@@ -269,7 +274,7 @@ def build_attention_schema(
     balance_era_id: str = BALANCE_ERA_ID,
     tower_catalog: TowerCatalog | None = None,
     official_schema_version: Literal[
-        "official-ranked16-schema:v1", "official-ranked16-schema:v2"
+        "official-ranked16-schema:v1", "official-ranked16-schema:v2", "official-ranked16-schema:v3"
     ] = "official-ranked16-schema:v1",
 ) -> AttentionCardSchema:
     """Freeze catalog identities and attributes into the selected input layout."""

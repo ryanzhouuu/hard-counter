@@ -4,7 +4,7 @@ from datetime import datetime
 from hashlib import sha256
 from pathlib import Path
 from shutil import rmtree
-from typing import Literal, cast
+from typing import cast
 from uuid import uuid4
 
 from clash_sos.application.attention_protocol_resolve import (
@@ -13,7 +13,7 @@ from clash_sos.application.attention_protocol_resolve import (
 )
 from clash_sos.application.dataset_staging import StagingConfig
 from clash_sos.domain.attention_cache import CacheFile
-from clash_sos.domain.attention_dataset import AttentionDatasetManifest
+from clash_sos.domain.attention_dataset import AttentionDatasetManifest, OfficialSchemaVersion
 from clash_sos.domain.attention_protocol import AttentionProtocol, AttentionSlice, Partition
 from clash_sos.domain.attention_schema import AttentionCardSchema
 from clash_sos.domain.canonical_dataset import canonical_json_bytes
@@ -90,7 +90,7 @@ def prepare_official_attention_dataset(
         )
         manifest = AttentionDatasetManifest(
             canonical_schema_version=cast(
-                Literal["official-ranked16-schema:v1", "official-ranked16-schema:v2"],
+                OfficialSchemaVersion,
                 schema.canonical_schema_version,
             ),
             dataset_version=dataset_version,

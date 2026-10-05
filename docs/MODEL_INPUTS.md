@@ -124,24 +124,27 @@ continuous polling when repeated cycles are needed for diagnosis. Adjust
 timing from observed overlap and API errors. The SQLite database at
 `data/collector/official.sqlite` retains normalized match variants, poll state,
 and conflicts. `collect report` shows status, rejection, failure, and possible
-gap counts. Exports include only conflict-free, eligible current-mode matches;
-older-mode eligible matches are counted as skipped. The JSONL file is a
+gap counts. Exports include only conflict-free, eligible matches from either
+ranked API mode, preserving each battle's recorded name. The JSONL file is a
 temporary bridge to preparation. Give each export a new destination; publishing
 a Parquet snapshot leaves SQLite untouched.
 
 `dataset prepare-official-attention` accepts normalized JSONL, one
-`TowerBattleRow` per line. It does not accept raw API battle-log JSON. Each row
-uses the canonical winner-first battle fields, `source_id="official-api"`, the
+`TowerBattleRowV3` per line by default. It does not accept raw API battle-log JSON.
+Each row uses the canonical winner-first battle fields, `source_id="official-api"`, the
 selected dataset version and era, eight distinct supported card identities per
 side, and normalized card levels of 16. Both `side_a_tower` and `side_b_tower`
 must be supported `:tower` identities with their corresponding
 `side_a_tower_level` and `side_b_tower_level` equal to 16. Record towers from
 the battle's `supportCards`; never substitute the current player profile or
 assume Tower Princess. API rarity-relative levels must be normalized first.
-Current official Path of Legends logs use `Ranked1v1_NewArena2`; the default
-`official-ranked16-schema:v2` preserves that value. The older
-`official-ranked16-schema:v1` remains available through `--official-schema-version`
-for snapshots containing `Ranked1v1_NewArena`.
+Official Path of Legends logs use both `Ranked1v1_NewArena` and
+`Ranked1v1_NewArena2`. The default `official-ranked16-schema:v3` accepts both
+and preserves their original values. Mode names do not determine the balance era;
+choose the export window and era separately. Frozen single-mode contracts remain
+available through `--official-schema-version`: v1 accepts only
+`Ranked1v1_NewArena`, and v2 accepts only `Ranked1v1_NewArena2`. Existing snapshots
+and caches retain their contracts; prepare new snapshots and protocols for v3.
 
 `event_key` and `fingerprint` identify the source battle. Repeated fingerprints
 or event keys fail preparation, including conflicting observations. The retained

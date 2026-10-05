@@ -6,7 +6,7 @@ from pathlib import Path
 import duckdb
 import polars as pl
 
-from clash_sos.domain.attention_dataset import TowerBattleRow, TowerBattleRowV2
+from clash_sos.domain.attention_dataset import official_row_type
 from clash_sos.domain.attention_schema import AttentionCardSchema
 from clash_sos.domain.canonical_dataset import CANONICAL_SCHEMA
 from clash_sos.infrastructure.kaggle_v6.staging_io import polars_schema
@@ -25,12 +25,7 @@ def write_snapshot_parts(
     """Validate each row under the selected official mode contract before writing."""
     if batch_rows < 1:
         raise ValueError("snapshot batch size must be positive")
-    if schema.canonical_schema_version == "official-ranked16-schema:v2":
-        row_type = TowerBattleRowV2
-    elif schema.canonical_schema_version == "official-ranked16-schema:v1":
-        row_type = TowerBattleRow
-    else:
-        raise ValueError("snapshot requires an official schema version")
+    row_type = official_row_type(schema.canonical_schema_version)
     directory.mkdir()
     columns = {
         **polars_schema(CANONICAL_SCHEMA),

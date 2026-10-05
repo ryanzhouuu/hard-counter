@@ -2,12 +2,13 @@
 
 from datetime import datetime
 from pathlib import Path
-from typing import Annotated, Literal
+from typing import Annotated
 
 import typer
 
 from clash_sos.application.attention_dataset_prepare import prepare_official_attention_dataset
 from clash_sos.application.dataset_staging import StagingConfig
+from clash_sos.domain.attention_dataset import OfficialSchemaVersion
 from clash_sos.domain.attention_schema import AttentionModelConfig, build_attention_schema
 from clash_sos.infrastructure.clash_royale.catalog import (
     CURRENT_CARD_ATTRIBUTES,
@@ -36,8 +37,8 @@ def prepare_official_attention(
     validation_end: Annotated[datetime, typer.Option(parser=parse_snapshot_datetime)],
     end: Annotated[datetime, typer.Option(parser=parse_snapshot_datetime)],
     official_schema_version: Annotated[
-        Literal["official-ranked16-schema:v1", "official-ranked16-schema:v2"], typer.Option()
-    ] = "official-ranked16-schema:v2",
+        OfficialSchemaVersion, typer.Option()
+    ] = "official-ranked16-schema:v3",
     network_config: Annotated[Path | None, typer.Option()] = None,
     watch_fraction: float = 0.1,
     mirror_seed: int = 0,

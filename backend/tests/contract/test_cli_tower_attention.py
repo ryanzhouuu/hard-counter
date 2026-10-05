@@ -170,11 +170,14 @@ def test_official_preparation_cli_rejects_naive_bounds(tmp_path: Path) -> None:
     assert not (tmp_path / "dataset").exists()
 
 
-def test_official_preparation_cli_defaults_to_current_ranked_schema(tmp_path: Path) -> None:
+@pytest.mark.parametrize("mode", ["Ranked1v1_NewArena", "Ranked1v1_NewArena2"])
+def test_official_preparation_cli_defaults_to_mixed_ranked_schema(
+    tmp_path: Path, mode: str
+) -> None:
     source = tmp_path / "current.jsonl"
     write_tower_source(
         source,
-        tuple(row.model_copy(update={"mode": "Ranked1v1_NewArena2"}) for row in tower_rows()),
+        tuple(row.model_copy(update={"mode": mode}) for row in tower_rows()),
     )
     result = runner.invoke(
         app,
@@ -203,4 +206,4 @@ def test_official_preparation_cli_defaults_to_current_ranked_schema(tmp_path: Pa
     )
     assert result.exit_code == 0, result.output
     manifest = loads((tmp_path / "current-dataset" / "manifest.json").read_text())
-    assert manifest["canonical_schema_version"] == "official-ranked16-schema:v2"
+    assert manifest["canonical_schema_version"] == "official-ranked16-schema:v3"

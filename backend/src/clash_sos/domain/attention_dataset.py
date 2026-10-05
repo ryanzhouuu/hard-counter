@@ -10,6 +10,24 @@ from clash_sos.domain.attention_protocol import Partition
 from clash_sos.domain.canonical_dataset import CanonicalBattleRow
 from clash_sos.domain.manifests import ManifestModel
 
+OfficialSchemaVersion = Literal[
+    "official-ranked16-schema:v1",
+    "official-ranked16-schema:v2",
+    "official-ranked16-schema:v3",
+]
+
+
+def official_ranked_modes(version: str) -> tuple[str, ...]:
+    """Keep frozen single-mode contracts distinct from the mixed ranked contract."""
+    modes = {
+        "official-ranked16-schema:v1": ("Ranked1v1_NewArena",),
+        "official-ranked16-schema:v2": ("Ranked1v1_NewArena2",),
+        "official-ranked16-schema:v3": ("Ranked1v1_NewArena", "Ranked1v1_NewArena2"),
+    }
+    if version not in modes:
+        raise ValueError("snapshot requires an official schema version")
+    return modes[version]
+
 
 class TowerBattleRow(CanonicalBattleRow):
     """Preserve the original official ranked mode in published v1 snapshots."""
@@ -43,11 +61,37 @@ class TowerBattleRowV2(CanonicalBattleRow):
         return self
 
 
+class TowerBattleRowV3(CanonicalBattleRow):
+    """Preserve either ranked API name without using it to infer the balance era."""
+
+    side_a_tower: str = Field(pattern=r"^[a-z0-9-]+:tower$")
+    side_b_tower: str = Field(pattern=r"^[a-z0-9-]+:tower$")
+    side_a_tower_level: Literal[16]
+    side_b_tower_level: Literal[16]
+
+    @model_validator(mode="after")
+    def require_official_ranked_source(self) -> Self:
+        if self.source_id != "official-api" or self.mode not in official_ranked_modes(
+            "official-ranked16-schema:v3"
+        ):
+            raise ValueError("v3 tower battles require an official ranked mode")
+        return self
+
+
+def official_row_type(
+    version: str,
+) -> type[TowerBattleRow] | type[TowerBattleRowV2] | type[TowerBattleRowV3]:
+    official_ranked_modes(version)
+    return {
+        "official-ranked16-schema:v1": TowerBattleRow,
+        "official-ranked16-schema:v2": TowerBattleRowV2,
+        "official-ranked16-schema:v3": TowerBattleRowV3,
+    }[version]
+
+
 class AttentionDatasetManifest(ManifestModel):
     manifest_type: Literal["attention_dataset"] = "attention_dataset"
-    canonical_schema_version: Literal[
-        "official-ranked16-schema:v1", "official-ranked16-schema:v2"
-    ] = "official-ranked16-schema:v1"
+    canonical_schema_version: OfficialSchemaVersion = "official-ranked16-schema:v1"
     dataset_version: str = Field(min_length=1)
     balance_era_id: str = Field(min_length=1)
     catalog_version: str = Field(min_length=1)

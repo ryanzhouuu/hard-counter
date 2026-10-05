@@ -6,7 +6,7 @@ from os import link
 from pathlib import Path
 from uuid import uuid4
 
-from clash_sos.domain.attention_dataset import TowerBattleRowV2
+from clash_sos.domain.attention_dataset import TowerBattleRowV3, official_ranked_modes
 from clash_sos.domain.canonical_dataset import deck_content_hash
 from clash_sos.infrastructure.clash_royale.collector_normalize import (
     CollectedBattle,
@@ -14,12 +14,12 @@ from clash_sos.infrastructure.clash_royale.collector_normalize import (
 )
 from clash_sos.infrastructure.clash_royale.collector_store import CollectorStore
 
-CURRENT_RANKED_MODE = "Ranked1v1_NewArena2"
+EXPORT_RANKED_MODES = official_ranked_modes("official-ranked16-schema:v3")
 
 
 @dataclass(frozen=True)
 class ExportResult:
-    """Count written matches and older-mode matches outside the v2 snapshot."""
+    """Count written matches and unsupported modes outside the v3 snapshot."""
 
     written: int
     skipped_mode: int
@@ -48,13 +48,13 @@ def _snapshot_row(
     balance_era_id: str,
     filename: str,
     row_number: int,
-) -> TowerBattleRowV2:
+) -> TowerBattleRowV3:
     """Verify the collector's normalized payload against the training row contract."""
     if battle.winner_tag is None or battle.exclusion_reason is not None:
         raise ValueError("only eligible decisive battles may be exported")
     winner = next(side for side in battle.sides if side.tag == battle.winner_tag)
     loser = next(side for side in battle.sides if side.tag != battle.winner_tag)
-    return TowerBattleRowV2.model_validate(
+    return TowerBattleRowV3.model_validate(
         {
             "dataset_version": dataset_version,
             "source_id": "official-api",
@@ -81,7 +81,7 @@ def export_collected_matches(
     start: datetime,
     end: datetime,
 ) -> ExportResult:
-    """Atomically publish v2 JSONL without modifying retained collection state."""
+    """Atomically publish v3 JSONL without modifying retained collection state."""
     if not dataset_version or not balance_era_id:
         raise ValueError("dataset version and balance era are required")
     if destination.exists():
@@ -92,7 +92,7 @@ def export_collected_matches(
     try:
         with temporary.open("x") as output:
             for _, battle in store.export_battles(start, end):
-                if battle.mode != CURRENT_RANKED_MODE:
+                if battle.mode not in EXPORT_RANKED_MODES:
                     skipped_mode += 1
                     continue
                 row = _snapshot_row(

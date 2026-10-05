@@ -9,8 +9,7 @@ from clash_sos.application.dataset_staging import StagingConfig
 from clash_sos.domain.attention_cache import CachePartition
 from clash_sos.domain.attention_dataset import (
     AttentionDatasetManifest,
-    TowerBattleRow,
-    TowerBattleRowV2,
+    official_row_type,
 )
 from clash_sos.domain.attention_protocol import AttentionProtocol, AttentionSlice
 from clash_sos.domain.attention_schema import AttentionCardSchema
@@ -59,11 +58,7 @@ def _partition_rows(
             payload: dict[str, object] = dict(zip(names, record, strict=True))
             ordinal = payload.pop("cache_ordinal")
             player_a, player_b = payload.pop("cache_player_a"), payload.pop("cache_player_b")
-            source = (
-                TowerBattleRowV2.model_validate(payload)
-                if schema.canonical_schema_version == "official-ranked16-schema:v2"
-                else TowerBattleRow.model_validate(payload)
-            )
+            source = official_row_type(schema.canonical_schema_version).model_validate(payload)
             if source.dataset_version != cache.manifest.protocol.dataset_version:
                 raise ValueError("canonical row dataset version disagrees with frozen protocol")
             row = encode_official_row(source, schema, cache.manifest.protocol.mirror_seed)

@@ -178,7 +178,7 @@ def export_collector(
     end: Annotated[datetime, typer.Option(parser=parse_snapshot_datetime)],
     database: Path = DEFAULT_DATABASE,
 ) -> None:
-    """Freeze eligible current-mode matches in a deterministic JSONL export."""
+    """Freeze eligible matches from both ranked modes without relabeling them."""
     if not database.is_file():
         raise typer.BadParameter("collector database does not exist")
     store = CollectorStore(database)

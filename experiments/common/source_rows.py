@@ -3,7 +3,12 @@
 from datetime import datetime
 from hashlib import sha256
 
-from clash_sos.domain.attention_dataset import TowerBattleRow, TowerBattleRowV2
+from clash_sos.domain.attention_dataset import (
+    TowerBattleRow,
+    TowerBattleRowV2,
+    TowerBattleRowV3,
+    official_ranked_modes,
+)
 from clash_sos.domain.attention_protocol import digest_row_keys
 from clash_sos.domain.attention_schema import AttentionCardSchema
 from clash_sos.domain.canonical_dataset import canonical_json_bytes
@@ -14,16 +19,14 @@ from experiments.common.data_access import ResearchRow, validate_rows
 
 
 def encode_official_row(
-    source: TowerBattleRow | TowerBattleRowV2,
+    source: TowerBattleRow | TowerBattleRowV2 | TowerBattleRowV3,
     schema: AttentionCardSchema,
     mirror_seed: int,
 ) -> ResearchRow:
-    expected_mode = (
-        "Ranked1v1_NewArena2"
-        if schema.canonical_schema_version == "official-ranked16-schema:v2"
-        else "Ranked1v1_NewArena"
-    )
-    if source.mode != expected_mode or source.balance_era_id != schema.balance_era_id:
+    if (
+        source.mode not in official_ranked_modes(schema.canonical_schema_version)
+        or source.balance_era_id != schema.balance_era_id
+    ):
         raise ValueError("official row mode or era is incompatible with frozen schema")
     if schema.tower_catalog is None or mirror_seed < 0:
         raise ValueError("official encoding requires frozen towers and nonnegative mirror seed")
@@ -77,9 +80,9 @@ def population_identity(
             "row_keys_sha256": digest_row_keys(row.key for row in rows),
             "event_mapping_sha256": event_mapping_digest(rows),
             "oriented_sha256": oriented_digest(rows),
-            "mode": "Ranked1v1_NewArena2"
-            if schema.canonical_schema_version == "official-ranked16-schema:v2"
-            else "Ranked1v1_NewArena",
+            "mode": "pathOfLegend"
+            if schema.canonical_schema_version == "official-ranked16-schema:v3"
+            else official_ranked_modes(schema.canonical_schema_version)[0],
             "era": schema.balance_era_id,
             "mirror_seed": mirror_seed,
             "start": start,

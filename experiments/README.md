@@ -265,8 +265,12 @@ baseline and the selected challengers; additional attention claims must also be
 predeclared.
 
 Prepare a physically separate future JSONL inventory of validated
-`TowerBattleRowV2` rows and a `ReportingContract`; do not manufacture training
-partitions. Bind its population and the candidate digest in a
+`TowerBattleRowV3` rows and a `ReportingContract`; do not manufacture training
+partitions. V3 preserves both ranked API names and identifies their accepted
+population as `pathOfLegend`. Its frozen schema, era, and inventories still bind
+the population. Existing v2 candidates and reporting inputs retain their original
+single-mode contract; switching to v3 requires newly frozen schemas and candidates.
+Bind its population and the candidate digest in a
 `prospective-reporting` configuration. Specify `rules.confirmation` as `single`
 or `holm`, and `rules.test_alternative` as `two_sided` or `improvement` before
 reporting data exist. Then run:

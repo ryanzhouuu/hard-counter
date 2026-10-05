@@ -1,4 +1,4 @@
-"""Export retained matches through the official v2 snapshot contract."""
+"""Export ranked matches while retaining conflict and eligibility exclusions."""
 
 from collections import Counter
 from copy import deepcopy
@@ -130,17 +130,20 @@ def test_export_excludes_collisions_and_ineligible_matches(tmp_path: Path) -> No
     original = battle()
     changed = deepcopy(original)
     changed["opponent"][0]["crowns"] = 4
-    old_mode = deepcopy(original)
-    old_mode["battleTime"] = "20260928T120000.000Z"
-    old_mode["gameMode"]["name"] = "Ranked1v1_NewArena"
+    alternate_mode = deepcopy(original)
+    alternate_mode["battleTime"] = "20260928T120000.000Z"
+    alternate_mode["gameMode"]["name"] = "Ranked1v1_NewArena"
+    non_max = deepcopy(original)
+    non_max["battleTime"] = "20260929T120000.000Z"
+    non_max["team"][0]["cards"][0]["level"] -= 1
     try:
         store.record_poll(
             "#ABC",
-            [normalize_battle(original, "#ABC"), normalize_battle(old_mode, "#ABC")],
+            [normalize_battle(raw, "#ABC") for raw in (original, alternate_mode, non_max)],
             Counter(),
             observed_at=END,
             next_due=END,
-            log_length=2,
+            log_length=3,
         )
         store.record_poll(
             "#DEF",
@@ -150,18 +153,30 @@ def test_export_excludes_collisions_and_ineligible_matches(tmp_path: Path) -> No
             next_due=END,
             log_length=1,
         )
-        destination = tmp_path / "empty.jsonl"
+        destination = tmp_path / "eligible.jsonl"
+        result = export_collected_matches(
+            store,
+            destination,
+            dataset_version="tiny",
+            balance_era_id="2026-09",
+            start=START,
+            end=END,
+        )
+        assert (result.written, result.skipped_mode) == (1, 0)
+        assert '"mode":"Ranked1v1_NewArena"' in destination.read_text()
+        assert store.summary()["matches_conflicted"] == 1
+        assert store.summary()["matches_ineligible"] == 1
+        assert store.summary()["variants"] == 4
+        empty = tmp_path / "empty.jsonl"
         with pytest.raises(ValueError, match="no eligible current-ranked"):
             export_collected_matches(
                 store,
-                destination,
+                empty,
                 dataset_version="tiny",
                 balance_era_id="2026-09",
                 start=START,
-                end=END,
+                end=datetime(2026, 9, 28, tzinfo=UTC),
             )
-        assert not destination.exists()
-        assert store.summary()["matches_conflicted"] == 1
-        assert store.summary()["variants"] == 3
+        assert not empty.exists()
     finally:
         store.close()
