@@ -26,3 +26,9 @@ matchup predictions. Failed calibration retains its raw evidence but supplies
 no calibrated output or eligible full-score selection loss. Full-score loss is
 a diagnostic selection target, not evidence of equal-skill identification.
 Reports include UTC days, seen-player counts, and descriptive history support.
+
+Trial artifacts bind the model and optimizer settings, seed, optional shuffle
+seed, frozen population, encoding, protocol, source revision, code digest, and
+lockfile hash. Each output is inventoried. Publication is atomic and exclusive;
+resume rejects changed inputs or output corruption. Failed/time-limited trials
+remain inspectable and cannot be silently overwritten or promoted.
