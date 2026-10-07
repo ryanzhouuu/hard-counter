@@ -39,3 +39,10 @@ the same verified session and source code. Negative controls permute labels
 separately within selection-fit and watch populations, reuse those labels for
 refit, and preserve real calibration/development outcomes. The original source
 inventory stays intact; the shuffle seed and transformed refit digest are saved.
+
+Recovery tests use sampled binary outcomes, correlated deck assignments, and
+many one-game players. They check the known matchup logit before and after
+full-score calibration. A separate construction demonstrates two different
+matchup/player decompositions with identical observed logits when players never
+switch decks. Passing recovery in the supported simulation does not resolve
+confounding in an observational dataset.
