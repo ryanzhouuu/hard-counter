@@ -59,3 +59,32 @@ unavailable calibrations are excluded, and fixed grid order breaks exact ties.
 
 Batch execution freezes the grid and decisions, checkpoints its cumulative runtime,
 verifies completed trials on resume, and refuses concurrent publishers.
+
+Run the bounded batch with explicit frozen search inputs:
+
+```sh
+uv run --extra ml python -m experiments.model_diagnostics \
+  --dataset data/processed/your-snapshot \
+  --protocol data/experiments/inputs/search-protocol.json \
+  --schema data/experiments/inputs/explicit-schema.json \
+  --cache data/experiments/inputs/cache \
+  --mechanics experiments/mechanics/inputs/2026-10-05-partial-r9.json \
+  --row-cap 40000 --output data/experiments/model-diagnostics/your-run
+```
+
+Add `--check` to verify inputs and role counts without training. Search input
+loading excludes physical test/reporting rows. CPU training uses two Torch
+threads. Models, predictions, reports, and manifests live under `trials/` in the
+output directory. The batch definition freezes the grid, selection rule, input
+identity, and eight-hour budget before fitting. `progress.json` checkpoints
+accumulated runtime; a resume verifies completed trial inventories and decisions,
+and does not reset the budget. A new trial starts only when its full fit time
+limit fits within the remaining budget. Serialization/verification may add some
+overhead beyond the fit time limit. Concurrent publishers are refused.
+
+A completed batch writes `summary.md` and `summary.json` with seed-specific paired
+comparisons, constant-50% scores, learning curves, UTC day and history slices,
+and both skill-removed calibration conventions. Seeds are reported separately;
+they are not independent battle samples or a fitted ensemble. Intervals are
+exploratory, conditional on the trained models, and omit day/meta dependence.
+These assets cannot be passed to the existing candidate promotion flow.

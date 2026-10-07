@@ -206,6 +206,13 @@ The ninth catalog revision extends declared applicability through October 5, 202
 inclusive in UTC. It preserves the eighth revision's entries and field evidence.
 Existing runs retain their original catalogs and hashes.
 
+## Capacity and player diagnostics
+
+The separate [diagnostic batch](model_diagnostics/README.md) screens main-effects
+and regularized pair models, followed by player controls and seed checks. It
+compares full-score and skill-removed calibration without changing the existing
+study or candidate-selection contracts. Its outputs remain exploratory.
+
 ## Frozen development and candidate reporting
 
 The checked-in configurations are preparation definitions. Before full matrices,
