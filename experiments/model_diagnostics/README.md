@@ -46,3 +46,16 @@ full-score calibration. A separate construction demonstrates two different
 matchup/player decompositions with identical observed logits when players never
 switch decks. Passing recovery in the supported simulation does not resolve
 confounding in an observational dataset.
+
+The staged schedule contains thirteen baseline settings: an exact optimizer
+reference (20 epochs, patience 3), four main-effects settings, and eight pair
+settings. Main models use card L2 0.01/0.1; pair models use card L2 0.01 and pair
+L2 0.001/0.01/0.1/1. Both search learning rates 0.001/0.003. Other optimizer
+settings are bound in the batch definition (defaults: 80 epochs, patience 8).
+The retained backbone gets history/joint controls at player L2 0.001/0.01/0.1.
+One training-label shuffle and two extra seeds for each of three finalists bring
+the cap to 26 fits. Full calibrated outcome loss selects diagnostic settings;
+unavailable calibrations are excluded, and fixed grid order breaks exact ties.
+
+Batch execution freezes the grid and decisions, checkpoints its cumulative runtime,
+verifies completed trials on resume, and refuses concurrent publishers.
