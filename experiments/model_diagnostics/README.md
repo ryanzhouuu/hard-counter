@@ -32,3 +32,10 @@ seed, frozen population, encoding, protocol, source revision, code digest, and
 lockfile hash. Each output is inventoried. Publication is atomic and exclusive;
 resume rejects changed inputs or output corruption. Failed/time-limited trials
 remain inspectable and cannot be silently overwritten or promoted.
+
+`trial.run_trial` uses the existing watch-selection/restart-refit loop and checks
+checkpoint reload and side-swap parity before completion. `load_model` requires
+the same verified session and source code. Negative controls permute labels
+separately within selection-fit and watch populations, reuse those labels for
+refit, and preserve real calibration/development outcomes. The original source
+inventory stays intact; the shuffle seed and transformed refit digest are saved.
