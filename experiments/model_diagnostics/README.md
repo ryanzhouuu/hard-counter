@@ -19,3 +19,10 @@ the existing explicit model and zero objective penalty for reproduction.
 Use `recipe` with `fit_research`, `penalty=0`, and `scale_features=False` so
 player IDs and past-rating differences retain their original interpretation.
 All preprocessing and player vocabularies restart on refit rows only.
+
+`scoring.evaluate` fits temperatures only on calibration rows and publishes raw,
+full-score calibrated, shared-temperature matchup, and separately calibrated
+matchup predictions. Failed calibration retains its raw evidence but supplies
+no calibrated output or eligible full-score selection loss. Full-score loss is
+a diagnostic selection target, not evidence of equal-skill identification.
+Reports include UTC days, seen-player counts, and descriptive history support.
