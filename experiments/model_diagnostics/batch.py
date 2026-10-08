@@ -152,3 +152,6 @@ def _execute(
     except (ValueError, RuntimeError, OSError) as error:
         result["reason"] = str(error)
         return save("incomplete")
+    except KeyboardInterrupt:
+        save("interrupted")
+        raise

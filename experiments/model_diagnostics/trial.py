@@ -47,7 +47,10 @@ def shuffled_training(access: RoleAccess, seed: int | None) -> RoleAccess:
 
 
 def load_model(directory: Path, session: Session, root: Path) -> DiagnosticModel:
+    """Reject failed validation or timed-out trials; calibration failure permits raw scoring."""
     manifest = load_trial(directory)
+    if manifest.status in ("failed", "time_limited"):
+        raise ValueError(f"cannot load model from {manifest.status} trial")
     spec = manifest.inputs.spec
     expected = bind_inputs(session, spec, root)
     load_trial(directory, expected)

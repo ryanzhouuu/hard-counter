@@ -88,3 +88,24 @@ def test_default_fit_reproduces_existing_training_loop(tmp_path: Path) -> None:
     )
     assert before.selected_epoch == after.selected_epoch
     np.testing.assert_array_equal(before.watch_losses, after.watch_losses)
+
+
+@pytest.mark.parametrize("failure", [ValueError("parity failed"), TimeoutError("deadline")])
+def test_load_model_rejects_failed_trials_with_saved_checkpoints(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, failure: Exception
+) -> None:
+    current = session(tmp_path)
+
+    def reject_validation(*args: object, **kwargs: object) -> float:
+        raise failure
+
+    monkeypatch.setattr(trial, "swap_error", reject_validation)
+    directory = tmp_path / "rejected"
+    manifest = trial.run_trial(
+        directory, current, TrialSpec(optimizer=OptimizerConfig(max_epochs=1)), Path.cwd()
+    )
+    expected_status = "time_limited" if isinstance(failure, TimeoutError) else "failed"
+    assert manifest.status == expected_status
+    assert (directory / "checkpoint.pt").is_file()
+    with pytest.raises(ValueError, match=f"cannot load model from {expected_status} trial"):
+        trial.load_model(directory, current, Path.cwd())

@@ -35,8 +35,9 @@ remain inspectable and cannot be silently overwritten or promoted.
 
 `trial.run_trial` uses the existing watch-selection/restart-refit loop and checks
 checkpoint reload and side-swap parity before completion. `load_model` requires
-the same verified session and source code. Negative controls permute labels
-separately within selection-fit and watch populations, reuse those labels for
+the same verified session and source code, and rejects failed or time-limited
+trials. Calibration-failed trials remain loadable for raw scoring. Negative
+controls permute labels separately within selection-fit and watch populations, reuse those labels for
 refit, and preserve real calibration/development outcomes. The original source
 inventory stays intact; the shuffle seed and transformed refit digest are saved.
 
@@ -78,8 +79,10 @@ threads. Models, predictions, reports, and manifests live under `trials/` in the
 output directory. The batch definition freezes the grid, selection rule, input
 identity, and eight-hour budget before fitting. `progress.json` checkpoints
 accumulated runtime; a resume verifies completed trial inventories and decisions,
-and does not reset the budget. A new trial starts only when its full fit time
-limit fits within the remaining budget. Serialization/verification may add some
+and does not reset the budget. Ctrl-C saves elapsed runtime before propagating
+the interruption, so an interrupted fit counts against the resumed budget.
+A new trial starts only when its full fit time limit fits within the remaining
+budget. Serialization/verification may add some
 overhead beyond the fit time limit. Concurrent publishers are refused.
 
 A completed batch writes `summary.md` and `summary.json` with seed-specific paired
