@@ -1,5 +1,5 @@
 {
-  "catalog_version": "official-cards:2026-09-26",
+  "catalog_version": "official-cards:2026-10-12",
   "entries": [
     [0, "knight", "knight", "base"],
     [1, "archers", "archers", "base"],
@@ -182,6 +182,8 @@
     [178, "evo elite barbarians", "elite-barbarians", "evolution"],
     [179, "hero valkyrie", "valkyrie", "hero"],
     [180, "hero berserker", "berserker", "hero"],
-    [181, "hero ice wizard", "ice-wizard", "hero"]
+    [181, "hero ice wizard", "ice-wizard", "hero"],
+    [182, "evo electro giant", "electro-giant", "evolution"],
+    [183, "hero electro wizard", "electro-wizard", "hero"]
   ]
 }

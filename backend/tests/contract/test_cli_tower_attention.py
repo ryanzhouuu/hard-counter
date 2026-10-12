@@ -87,7 +87,7 @@ def test_official_snapshot_cli_trains_reloads_and_scores_towers(tmp_path: Path) 
     )
     assert trained.exit_code == 0, trained.output
     manifest, schema, _ = load_attention_artifact(artifact)
-    assert schema.input_size == 9 and len(schema.identity_vocab) == 186
+    assert schema.input_size == 9 and len(schema.identity_vocab) == 188
     assert CardAttributeTable.from_payload(schema.attribute_snapshot).cards["void"].elixir == 5
     assert manifest.probability_interpretation == schema.probability_interpretation
     evaluation = loads((artifact / "evaluation.json").read_bytes())

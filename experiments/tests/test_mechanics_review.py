@@ -40,7 +40,8 @@ def test_review_preserves_unknowns_forms_and_conditional_costs() -> None:
     entries = {e.identity: e for e in catalog.entries.values()}
     identities = {entry.card.identity_key for entry in CURRENT_CARD_CATALOG.entries}
     identities.update(entry.identity for entry in CURRENT_TOWER_CATALOG.entries)
-    assert set(entries) == identities
+    assert set(entries) < identities
+    assert identities - set(entries) == {"electro-giant:evolution", "electro-wizard:hero"}
     assert not entries["furnace:base"].flag("defensive_building")
     assert entries["furnace:base"].field("defensive_building").known
     assert entries["goblin-hut:base"].flag("defensive_building")

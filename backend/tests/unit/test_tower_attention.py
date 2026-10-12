@@ -33,7 +33,7 @@ def tower_schema(*, neural: bool = True) -> AttentionCardSchema:
 def test_v2_keeps_towers_outside_deck_and_freezes_their_lookup() -> None:
     schema = tower_schema()
     cards = tuple(entry.card.identity_key for entry in CURRENT_CARD_CATALOG.entries[:8])
-    assert schema.input_size == 9 and len(schema.identity_vocab) == 186
+    assert schema.input_size == 9 and len(schema.identity_vocab) == 188
     assert schema.schema_version == "attention-card-schema:v2"
     assert AttentionCardSchema.model_validate_json(schema.model_dump_json()) == schema
     encoded = schema.encode_side(cards, tower="cannoneer:tower", tower_level=16)

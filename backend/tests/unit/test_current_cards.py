@@ -18,10 +18,12 @@ def test_current_catalog_preserves_june_and_adds_released_forms() -> None:
         "valkyrie:hero",
         "berserker:hero",
         "ice-wizard:hero",
+        "electro-giant:evolution",
+        "electro-wizard:hero",
     }
     assert old <= current
     assert len(KAGGLE_V6_CARDS.entries) == 176
-    assert len(CURRENT_CARD_CATALOG.entries) == 182
+    assert len(CURRENT_CARD_CATALOG.entries) == 184
 
 
 def test_current_attributes_cover_roots_and_isolate_balance_changes() -> None:

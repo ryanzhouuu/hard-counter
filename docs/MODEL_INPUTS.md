@@ -7,10 +7,16 @@ the packaged June defaults. Official snapshot preparation uses current inputs.
 
 ## Catalog snapshots
 
-The packaged `infrastructure/clash_royale/cards.json` snapshot includes the 182
-deck identities released through September 26, 2026: the June identities plus
+The packaged `infrastructure/clash_royale/cards.json` snapshot includes 184
+deck identities as of October 12, 2026: the June identities plus
 Ronin, Minion Giant, Elite Barbarians Evolution, and Hero Valkyrie, Berserker,
-and Ice Wizard. The Kaggle catalog retains its original 176 identities.
+and Ice Wizard, followed by Electro Giant Evolution and Hero Electro Wizard
+from [the October release](https://support.supercell.com/clash-royale/en/articles/watts-new-october-2026.html).
+The October forms append source IDs 182 and 183 without renumbering earlier
+entries. Recent official battle logs confirm `evolutionLevel=1` for Electro Giant
+Evolution and `evolutionLevel=2` for Hero Electro Wizard, using their existing
+base API IDs and rarity-relative level offsets. The Kaggle catalog retains its
+original 176 identities.
 Its companion `clash_royale/attributes.json` adds Ronin and Minion Giant and sets
 Void to five elixir for current-era training. June inputs retain Void at three.
 Spirit Empress retains the existing three-elixir feature convention for its
@@ -41,6 +47,12 @@ Source IDs are lookup positions in this mapping, not model tokens. Model tokens
 index the artifact's sorted card/form vocabulary. Adding identities may change
 token numbers, so each artifact keeps its exact catalog, attributes, vocabulary,
 feature definitions, and weights together.
+
+The partial mechanics research snapshot remains frozen at 182 card identities
+and does not yet cover these two October forms. Its feature studies require a
+separately reviewed mechanics revision before using a vocabulary containing them.
+Current collection and pair-model dataset preparation use the updated identity
+catalog; existing frozen datasets and model vocabularies keep their exact inputs.
 
 ## Schema validation
 
@@ -123,7 +135,11 @@ rejections, and possible gaps. `collect run` remains available for bounded
 continuous polling when repeated cycles are needed for diagnosis. Adjust
 timing from observed overlap and API errors. The SQLite database at
 `data/collector/official.sqlite` retains normalized match variants, poll state,
-and conflicts. `collect report` shows status, rejection, failure, and possible
+and conflicts. Battles rejected before normalization (including unknown card
+forms) retain only rejection counts, not raw payloads. A mapping update can
+recover them only by fetching them again while they remain in an API battle log,
+or from a separately retained raw response. Normalized but ineligible variants
+remain stored. `collect report` shows status, rejection, failure, and possible
 gap counts. Exports include only conflict-free, eligible matches from either
 ranked API mode, preserving each battle's recorded name. The JSONL file is a
 temporary bridge to preparation. Give each export a new destination; publishing
