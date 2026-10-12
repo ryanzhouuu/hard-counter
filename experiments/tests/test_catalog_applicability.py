@@ -18,7 +18,8 @@ def test_applicability_revision_preserves_october_second_evidence() -> None:
     assert sha256(path.read_bytes()).hexdigest() == (
         "9a345c1b1f9db63b723c092c175eb185b1c5ca6d1e9d027a59af3509a94009e6"
     )
-    previous, current = load(path), load_partial_catalog()
+    previous = load(path)
+    current = load("experiments/mechanics/inputs/2026-10-05-partial-r9.json")
     assert current.version == "mechanics-partial:2026-10-05-r9"
     assert (current.era_start, current.era_end) == ("2026-09-24", "2026-10-05")
     assert previous.era_end == "2026-10-01"

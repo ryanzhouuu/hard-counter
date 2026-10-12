@@ -69,7 +69,7 @@ uv run --extra ml python -m experiments.model_diagnostics \
   --protocol data/experiments/inputs/search-protocol.json \
   --schema data/experiments/inputs/explicit-schema.json \
   --cache data/experiments/inputs/cache \
-  --mechanics experiments/mechanics/inputs/2026-10-05-partial-r9.json \
+  --mechanics experiments/mechanics/inputs/2026-10-12-partial-r10.json \
   --row-cap 40000 --output data/experiments/model-diagnostics/your-run
 ```
 

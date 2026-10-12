@@ -214,4 +214,39 @@ Spirit Empress's intentionally unknown unconditional targeting/flight flags.
 The ninth revision extends the declared research applicability window to
 September 24–October 5, 2026, inclusive in UTC. This date-scope extension preserves
 all eighth-revision mechanics entries, source dates, and unknown fields.
-Earlier snapshots remain frozen; new research sessions default to the ninth revision.
+Earlier snapshots remain frozen.
+
+## Swarm and splash review: October 12, 2026
+
+New research sessions default to `mechanics-partial:2026-10-12-r10`. It adds only
+`multi_unit` and `area_damage`, preserving earlier evidence and the September
+24–October 5 applicability window. Review dates do not extend that window.
+
+`multi_unit` requires at least two independently targetable troops in ordinary
+deployment, including Goblin Barrel's delivered Goblins and Goblinstein's
+[two separate actors](https://royaleapi.com/blog/goblinstein-new-card-2024-october).
+Mounted riders, passive summons, death spawns, and paid abilities do not count.
+`area_damage` covers direct area/line attacks, spell damage, and automatic
+deployment damage. It excludes death damage, spawned actors, paid abilities,
+targeted chains, separate pellets, and targeted multi-strikes such as Lightning.
+Thus Electro Wizard's deployment Zap qualifies; Electro Dragon and Hunter do not.
+Wall Breakers' intrinsic attack qualifies; Skeleton Barrel's death damage does not.
+
+Forms are reviewed separately. Evolved Cannon's
+[deployment barrage](https://royaleapi.com/blog/cannon-evolution-new-card-2024-november?lang=fr),
+Battle Ram's [charging damage](https://royaleapi.com/blog/battle-ram-evolution-2024-april),
+and Royal Giant's [recoil damage](https://royaleapi.com/blog/evolved-royal-giant-2023-q2-update?lang=en)
+establish splash channels. Evolved Elite Barbarians'
+[Rage areas only buff allies](https://royaleapi.com/blog/elite-barbarians-evolution-august-2026?lang=nl).
+Hero inheritance uses previews explicitly retaining ordinary base behavior;
+paid effects remain excluded. Per-field URLs identify original gameplay previews
+or community Wiki observations. New field dates are October 12 review dates,
+not balance-change dates; existing evidence dates remain intact.
+
+Swarm coverage is 180/182 cards/forms (33 true, 147 false); splash coverage is
+180/182 (71 true, 109 false). Mirror remains unknown in both fields. Clone's
+swarm count depends on the board. Minion Giant's preview does not establish
+splash behavior, so it remains unknown. All four tower splash flags are verified
+false; their card-deployment swarm flags are inapplicable. The response features
+use these coarse capabilities without proving target eligibility, timing, or
+successful defense. No numeric combat measurements or outcome-based labels are added.

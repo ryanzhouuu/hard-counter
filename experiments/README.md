@@ -112,7 +112,7 @@ joint mirroring against the native cache. Attention runs create their own
 network-specific schema/protocol/cache and verify identical oriented populations.
 Do not use the production training command to search research variants.
 
-The default [mechanics input](mechanics/inputs/2026-10-05-partial-r9.json) records
+The default [mechanics input](mechanics/inputs/2026-10-12-partial-r10.json) records
 field-level evidence and explicit unknowns. The [mechanics review](../docs/MECHANICS_REVIEW.md)
 documents corrected capabilities, original release-preview sources, and remaining
 coverage limits. September inputs remain frozen. Supply `--mechanics` for another
@@ -122,6 +122,14 @@ quantitative tower descriptors and predicates requiring verified values fail wit
 an explicit unavailable reason. Synthetic completeness is not evidence of real
 catalog completeness. Mirror, conditional costs, form activation, and tower
 deploy-cost inapplicability have separate representations.
+
+Swarm (`multi_unit`) means at least two independently targetable troops in the
+ordinary deployment. Splash (`area_damage`) covers direct area/line attacks,
+spell damage, and automatic deployment damage. Passive summons, death effects,
+and paid abilities are excluded; targeted chains and separate pellets are not
+splash. These are coarse capabilities, not guaranteed defensive counters.
+Each flag is known for 180 of 182 card/form identities. Mirror is unknown in
+both; Clone's swarm count and Minion Giant's splash flag remain unknown.
 
 Synthetic mechanics are accepted only with synthetic preparation fixtures;
 real snapshot adapters and controlled fits reject them. Response missingness
