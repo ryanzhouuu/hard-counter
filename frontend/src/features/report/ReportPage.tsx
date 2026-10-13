@@ -26,6 +26,9 @@ function ReportPage(props: ReportPageProps) {
         <a className="wordmark" href="./">
           Hard Counter
         </a>
+        <a className="matchup-link" href="?view=matchup">
+          Matchup
+        </a>
         <TagForm key={tag} initialTag={tag} onLookUp={props.onLookUp} />
       </header>
       {error && <ErrorNotice error={error} onRetry={props.onRetry} />}

@@ -1,4 +1,5 @@
 import { Landing } from "../features/landing/Landing";
+import { MatchupPage } from "../features/matchup/MatchupPage";
 import { ReportPage } from "../features/report/ReportPage";
 import { useReport } from "../features/report/useReport";
 import "./tokens.css";
@@ -6,9 +7,19 @@ import "./tokens.css";
 const DISCLAIMER = "Unofficial fan project. Not affiliated with or endorsed by Supercell.";
 
 function App() {
-  const view = useReport();
+  const matchup = new URLSearchParams(window.location.search).get("view") === "matchup";
   return (
     <div className="app">
+      {matchup ? <MatchupPage /> : <PlayerView />}
+      <footer className="disclaimer">{DISCLAIMER}</footer>
+    </div>
+  );
+}
+
+function PlayerView() {
+  const view = useReport();
+  return (
+    <>
       {view.query === null ? (
         <Landing onLookUp={view.lookUp} />
       ) : (
@@ -23,8 +34,7 @@ function App() {
           onRetry={view.retry}
         />
       )}
-      <footer className="disclaimer">{DISCLAIMER}</footer>
-    </div>
+    </>
   );
 }
 

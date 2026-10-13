@@ -86,6 +86,15 @@ input {
   font-variant-numeric: tabular-nums;
 }
 
+.matchup-link {
+  color: var(--blue);
+  font-size: 13px;
+  text-underline-offset: 4px;
+}
+.landing-matchup {
+  margin-top: 32px;
+}
+
 .tone-positive {
   color: var(--green);
 }

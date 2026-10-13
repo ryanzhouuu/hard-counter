@@ -8,6 +8,9 @@ function Landing({ onLookUp }: { onLookUp: (tag: string) => void }) {
       <p className="landing-tagline">How tough were your recent matches?</p>
       <TagForm size="large" onLookUp={onLookUp} />
       <p className="landing-hint">Your tag is on your Clash Royale profile, under your name.</p>
+      <a className="matchup-link landing-matchup" href="?view=matchup">
+        Predict a deck matchup →
+      </a>
     </main>
   );
 }

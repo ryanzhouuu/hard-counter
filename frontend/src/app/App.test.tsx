@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { jsonResponse, makeAnalysis, makeSchedule } from "../test/fixtures";
+import { matchupOptions } from "../test/matchupFixtures";
 import { App } from "./App";
 
 const DISCLAIMER = "Unofficial fan project. Not affiliated with or endorsed by Supercell.";
@@ -16,6 +17,20 @@ afterEach(() => {
 });
 
 describe("App", () => {
+  it("opens matchup mode without fetching player history", async () => {
+    window.history.replaceState(null, "", "/?view=matchup&tag=ABC123");
+    const fetch = vi.fn().mockResolvedValue(jsonResponse(matchupOptions));
+    vi.stubGlobal("fetch", fetch);
+    render(<App />);
+    expect(screen.getByRole("heading", { name: "Deck matchup" })).toBeInTheDocument();
+    expect(
+      await screen.findByRole("searchbox", { name: "Deck A search cards" }),
+    ).toBeInTheDocument();
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(fetch.mock.calls[0][0]).toBe("/api/matchup-options");
+    expect(screen.getByRole("link", { name: "Player analysis" })).toHaveAttribute("href", "./");
+  });
+
   it("looks up a tag from the landing screen", async () => {
     vi.stubGlobal(
       "fetch",
@@ -25,6 +40,10 @@ describe("App", () => {
     render(<App />);
 
     expect(screen.getByText(DISCLAIMER)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Predict a deck matchup/ })).toHaveAttribute(
+      "href",
+      "?view=matchup",
+    );
     await user.type(screen.getByRole("textbox", { name: "Player tag" }), "#abc123");
     await user.click(screen.getByRole("button", { name: "Look up" }));
 
