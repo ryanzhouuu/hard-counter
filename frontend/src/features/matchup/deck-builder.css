@@ -114,10 +114,11 @@
   }
   .deck-slots {
     gap: 5px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
   .deck-slots button,
   .empty-slot {
-    min-height: 94px;
+    min-height: 72px;
     padding: 7px;
     font-size: 11px;
   }

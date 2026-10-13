@@ -46,8 +46,10 @@ describe("DeckBuilder", () => {
     }
     expect(screen.getByText("8 / 8")).toBeInTheDocument();
     expect(screen.getByRole("searchbox")).toBeDisabled();
+    expect(screen.queryByRole("group", { name: "Deck A card choices" })).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Remove Knight from Deck A" }));
     expect(screen.getByRole("searchbox")).toBeEnabled();
+    expect(screen.getByRole("group", { name: "Deck A card choices" })).toBeVisible();
   });
 
   it("keeps towers explicit and offers an empty search state", async () => {

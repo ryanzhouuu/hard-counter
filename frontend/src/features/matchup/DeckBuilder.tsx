@@ -64,12 +64,17 @@ function DeckBuilder({ label, cards, towers, deck, onChange }: DeckBuilderProps)
         id={`${id}-search`}
         type="search"
         aria-label={`${label} search cards`}
-        placeholder="Card name or form…"
+        placeholder={deck.cards.length === 8 ? "Deck complete" : "Card name or form…"}
         value={search}
         disabled={deck.cards.length === 8}
         onChange={(event) => setSearch(event.target.value)}
       />
-      <div className="card-choices" role="group" aria-label={`${label} card choices`}>
+      <div
+        className="card-choices"
+        role="group"
+        aria-label={`${label} card choices`}
+        hidden={deck.cards.length === 8}
+      >
         {matches.map((card) => (
           <button
             key={card.identity}
