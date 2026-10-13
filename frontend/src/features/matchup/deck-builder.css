@@ -1,0 +1,124 @@
+.deck-builder {
+  min-width: 0;
+  margin: 0;
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+}
+.deck-builder legend {
+  padding: 0 8px;
+  font-size: 20px;
+  font-weight: 650;
+}
+.deck-count {
+  margin-left: 12px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 400;
+}
+.deck-slots {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0 0 20px;
+  padding: 0;
+  list-style: none;
+}
+.deck-slots button,
+.empty-slot {
+  display: flex;
+  width: 100%;
+  min-height: 86px;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--surface-hover);
+  font-size: 12px;
+  text-align: left;
+}
+.deck-slots strong {
+  overflow-wrap: anywhere;
+}
+.empty-slot {
+  color: var(--faint);
+  border-style: dashed;
+  font-variant-numeric: tabular-nums;
+}
+.deck-slots small {
+  display: flex;
+  justify-content: space-between;
+  color: var(--muted);
+}
+.deck-builder label {
+  display: block;
+  margin: 16px 0 8px;
+  font-size: 13px;
+  font-weight: 600;
+}
+.deck-builder input,
+.deck-builder select {
+  width: 100%;
+  padding: 11px 12px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--bg);
+  color: var(--ink);
+  font: inherit;
+}
+.card-choices {
+  max-height: 210px;
+  margin-top: 8px;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+}
+.card-choices button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  min-height: 40px;
+  padding: 8px 10px;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  background: transparent;
+  text-align: left;
+  font-size: 13px;
+}
+.card-choices small {
+  color: var(--muted);
+  font-size: 11px;
+}
+.card-choices p {
+  padding: 12px;
+  color: var(--muted);
+  font-size: 13px;
+}
+.deck-builder button {
+  cursor: pointer;
+}
+.deck-builder button:hover:enabled {
+  background: var(--track);
+}
+.deck-builder :disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+@media (max-width: 420px) {
+  .deck-builder {
+    padding: 14px;
+  }
+  .deck-slots {
+    gap: 5px;
+  }
+  .deck-slots button,
+  .empty-slot {
+    min-height: 94px;
+    padding: 7px;
+    font-size: 11px;
+  }
+}
