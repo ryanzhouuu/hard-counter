@@ -14,6 +14,8 @@ relative to expectation.
 - Look up a player on demand through the backend's `/api/player-analysis` route.
   The web app shows the resulting report, including each battle's decks and
   estimated win chance.
+- Build two eight-card decks in the web app's Matchup page and compare their
+  predicted win chances, including tower troops when required by the selected model.
 
 Model outputs estimate matchups under an equal-skill assumption.
 The attention model was trained on June 2026 ranked level-16 battles and assumes

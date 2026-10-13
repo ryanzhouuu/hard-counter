@@ -66,6 +66,34 @@ to switch the model artifact without changing code. It defaults to
 that ignored artifact must exist locally. The attention model needs the optional
 `ml` dependencies shown above.
 
+The web app's **Matchup** page accepts two decks with explicit card forms and,
+for tower-aware models, a tower troop on each side. It requires the selected
+model artifact and its runtime, but no Clash Royale API token. Choices come
+from the artifact's frozen catalog. Results assume equal player skill and
+the model's training levels and balance era.
+
+`GET /api/matchup-options` returns `model`, `cards` (identity, name, form), and
+`towers` (identity, name). `POST /api/matchup-prediction` accepts:
+
+```json
+{
+  "side_a": {
+    "cards": ["knight:base", "archers:base", "goblins:base", "giant:base", "pekka:base", "minions:base", "balloon:base", "witch:base"],
+    "tower": "tower-princess:tower"
+  },
+  "side_b": {
+    "cards": ["barbarians:base", "golem:base", "skeletons:base", "valkyrie:base", "skeleton-army:base", "bomber:base", "musketeer:base", "baby-dragon:base"],
+    "tower": "cannoneer:tower"
+  }
+}
+```
+
+Omit `tower` for deck-only artifacts. Each deck requires eight distinct root
+cards; a base card and its evolution cannot occupy separate slots. Successful
+responses contain `side_a_win_probability`, `side_b_win_probability`, and
+model provenance. Invalid or unsupported inputs return 422; an unavailable
+artifact or missing ML runtime returns 503. Manual predictions are not saved.
+
 The backend and collector use `https://api.clashroyale.com/v1/` by default. For
 a changing outbound IP, [RoyaleAPI's proxy](https://docs.royaleapi.com/proxy)
 can use a key that allows `45.79.218.79`. Set
