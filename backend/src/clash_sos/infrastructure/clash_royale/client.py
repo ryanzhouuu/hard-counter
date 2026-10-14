@@ -1,4 +1,4 @@
-"""Server-side access to the official player and recent-battle endpoints."""
+"""Server-side access to the official player, recent-battle, and card-list endpoints."""
 
 from typing import cast
 from urllib.parse import quote
@@ -39,6 +39,13 @@ class RoyaleClient:
         if any(not isinstance(row, dict) for row in rows):
             raise RoyaleAPIError("invalid_response")
         return cast(list[dict[str, object]], rows)
+
+    async def cards(self) -> dict[str, object]:
+        """Return the official card list with icon URLs and elixir costs."""
+        payload = await self._get("cards")
+        if not isinstance(payload, dict):
+            raise RoyaleAPIError("invalid_response")
+        return cast(dict[str, object], payload)
 
     async def _get(self, path: str) -> object:
         try:

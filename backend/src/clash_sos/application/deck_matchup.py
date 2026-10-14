@@ -12,6 +12,7 @@ from clash_sos.application.live_model import LiveModelError, score_live_decks
 from clash_sos.domain.attention_schema import AttentionCardSchema
 from clash_sos.domain.card_catalog import CardCatalog
 from clash_sos.domain.model_artifact import ModelArtifactManifest
+from clash_sos.infrastructure.clash_royale.card_media import EMPTY_MEDIA, CardMedia
 
 CardIdentity = Annotated[
     str,
@@ -50,11 +51,14 @@ class CardChoice(BaseModel):
     identity: str
     name: str
     form: str
+    icon_url: str | None = None
+    elixir: int | None = None
 
 
 class TowerChoice(BaseModel):
     identity: str
     name: str
+    icon_url: str | None = None
 
 
 class MatchupOptions(BaseModel):
@@ -73,7 +77,7 @@ class MatchupInputError(ValueError):
     """A validly shaped deck falls outside the selected model's input contract."""
 
 
-def matchup_options(artifact: Path) -> MatchupOptions:
+def matchup_options(artifact: Path, media: CardMedia = EMPTY_MEDIA) -> MatchupOptions:
     """Offer only frozen card forms and towers after verifying the serving artifact."""
     info, _ = score_live_decks(artifact, [])
     try:
@@ -86,7 +90,11 @@ def matchup_options(artifact: Path) -> MatchupOptions:
             catalog = CardCatalog.from_payload(schema.catalog_snapshot)
             if schema.tower_catalog is not None:
                 towers = tuple(
-                    TowerChoice(identity=entry.identity, name=entry.name)
+                    TowerChoice(
+                        identity=entry.identity,
+                        name=entry.name,
+                        icon_url=media.icon(entry.identity),
+                    )
                     for entry in schema.tower_catalog.entries
                 )
         else:
@@ -104,6 +112,8 @@ def matchup_options(artifact: Path) -> MatchupOptions:
                         identity=entry.card.identity_key,
                         name=entry.source_name.title(),
                         form=entry.card.form.value,
+                        icon_url=media.icon(entry.card.identity_key),
+                        elixir=media.elixir.get(entry.card.card_id.value),
                     )
                     for entry in catalog.entries
                 ),

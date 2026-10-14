@@ -12,6 +12,8 @@ from test_tower_attention import tower_schema
 from clash_sos.domain.attention_model import AttentionMatchupModel
 from clash_sos.domain.attention_schema import AttentionCardSchema
 from clash_sos.domain.model_artifact import ModelArtifactManifest, ModelOutputFile
+from clash_sos.infrastructure.clash_royale import client as client_module
+from clash_sos.infrastructure.clash_royale.card_api_catalog import CURRENT_CARD_API_CATALOG
 from clash_sos.infrastructure.kaggle_v6.catalog import KAGGLE_V6_CARDS
 from clash_sos.infrastructure.ml import attention_artifact_io
 from clash_sos.infrastructure.settings import Settings
@@ -56,10 +58,12 @@ def artifact(tmp_path: Path) -> Path:
     return tmp_path
 
 
-def request(artifact: Path, body: dict[str, object] | None = None) -> Response:
+def request(
+    artifact: Path, body: dict[str, object] | None = None, *, token: str | None = None
+) -> Response:
     async def run() -> Response:
         settings = Settings.model_validate(
-            {"active_model_path": artifact, "CLASH_ROYALE_API_TOKEN": None}
+            {"active_model_path": artifact, "CLASH_ROYALE_API_TOKEN": token}
         )
         async with AsyncClient(
             transport=ASGITransport(app=create_app(settings)), base_url="http://test"
@@ -86,6 +90,35 @@ def test_options_offer_frozen_forms_without_towers_for_legacy_models(artifact: P
         entry.card.identity_key for entry in KAGGLE_V6_CARDS.entries
     }
     assert {card["form"] for card in body["cards"]} >= {"base", "evolution", "hero", "champion"}
+
+
+def test_options_omit_media_without_a_token(artifact: Path) -> None:
+    cards = request(artifact).json()["cards"]
+    assert all(card["icon_url"] is None and card["elixir"] is None for card in cards)
+
+
+def test_options_include_official_media(artifact: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    async def cards(_self: object) -> dict[str, object]:
+        return {
+            "items": [
+                {
+                    "id": CURRENT_CARD_API_CATALOG["knight"].api_id,
+                    "elixirCost": 3,
+                    "iconUrls": {"medium": "https://api-assets.clashroyale.com/cards/300/k.png"},
+                }
+            ]
+        }
+
+    monkeypatch.setattr(client_module.RoyaleClient, "cards", cards, raising=False)
+    response = request(artifact, token="test-token")
+    knight = next(card for card in response.json()["cards"] if card["identity"] == "knight:base")
+    assert knight == {
+        "identity": "knight:base",
+        "name": "Knight",
+        "form": "base",
+        "icon_url": "https://api-assets.clashroyale.com/cards/300/k.png",
+        "elixir": 3,
+    }
 
 
 def test_prediction_preserves_orientation_and_model_provenance(artifact: Path) -> None:

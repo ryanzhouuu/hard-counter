@@ -1,12 +1,14 @@
 """Map the official card list onto catalog identities for images and elixir costs."""
 
-from collections.abc import Mapping
+import time
+from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass, field
 from typing import cast
 
 from clash_sos.infrastructure.clash_royale.adapter import ICON_HOST
 from clash_sos.infrastructure.clash_royale.card_api_catalog import CURRENT_CARD_API_CATALOG
 from clash_sos.infrastructure.clash_royale.catalog import CURRENT_TOWER_CATALOG
+from clash_sos.infrastructure.clash_royale.client import RoyaleAPIError
 
 FORM_ICON_KEYS = {"evolution": "evolutionMedium", "hero": "heroMedium"}
 
@@ -75,3 +77,34 @@ def parse_card_media(payload: object) -> CardMedia:
     if not icons and not elixir and not towers:
         return EMPTY_MEDIA
     return CardMedia(icons=icons, elixir=elixir, tower_icons=towers)
+
+
+class CardMediaCache:
+    """Serve the last good card list for a day; retry failed fetches after five minutes."""
+
+    def __init__(
+        self,
+        fetch: Callable[[], Awaitable[object]],
+        *,
+        clock: Callable[[], float] = time.monotonic,
+        ttl: float = 86_400,
+        retry_after: float = 300,
+    ) -> None:
+        self._fetch = fetch
+        self._clock = clock
+        self._ttl = ttl
+        self._retry_after = retry_after
+        self._media = EMPTY_MEDIA
+        self._expires = float("-inf")
+
+    async def get(self) -> CardMedia:
+        now = self._clock()
+        if now < self._expires:
+            return self._media
+        try:
+            media = parse_card_media(await self._fetch())
+        except RoyaleAPIError:
+            self._expires = now + self._retry_after
+            return self._media
+        self._media, self._expires = media, now + self._ttl
+        return media

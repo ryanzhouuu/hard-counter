@@ -1,7 +1,14 @@
 """Official card lists map onto catalog identities without trusting foreign hosts."""
 
+import asyncio
+
 from clash_sos.infrastructure.clash_royale.card_api_catalog import CURRENT_CARD_API_CATALOG
-from clash_sos.infrastructure.clash_royale.card_media import EMPTY_MEDIA, parse_card_media
+from clash_sos.infrastructure.clash_royale.card_media import (
+    EMPTY_MEDIA,
+    CardMediaCache,
+    parse_card_media,
+)
+from clash_sos.infrastructure.clash_royale.client import RoyaleAPIError
 
 ASSETS = "https://api-assets.clashroyale.com"
 IDS = {root: entry.api_id for root, entry in CURRENT_CARD_API_CATALOG.items()}
@@ -47,3 +54,33 @@ def test_unexpected_shapes_yield_empty_media() -> None:
     payloads: list[object] = [[], {"items": "x", "supportItems": None}, None]
     for payload in payloads:
         assert parse_card_media(payload) == EMPTY_MEDIA
+
+
+def test_cache_serves_for_a_day_and_retries_failures_after_five_minutes() -> None:
+    now = [0.0]
+    replies: list[object] = [
+        RoyaleAPIError("upstream_unavailable"),
+        PAYLOAD,
+        RoyaleAPIError("rate_limited"),
+    ]
+    calls: list[int] = []
+
+    async def fetch() -> object:
+        calls.append(1)
+        reply = replies.pop(0)
+        if isinstance(reply, RoyaleAPIError):
+            raise reply
+        return reply
+
+    cache = CardMediaCache(fetch, clock=lambda: now[0])
+
+    async def run() -> list[str | None]:
+        seen: list[str | None] = []
+        for moment in (0, 299, 300, 300 + 86_400):
+            now[0] = moment
+            seen.append((await cache.get()).icon("knight:base"))
+        return seen
+
+    knight = f"{ASSETS}/cards/300/knight.png"
+    assert asyncio.run(run()) == [None, None, knight, knight]
+    assert len(calls) == 3
