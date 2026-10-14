@@ -2,6 +2,8 @@
 
 import asyncio
 
+import pytest
+
 from clash_sos.infrastructure.clash_royale.card_api_catalog import CURRENT_CARD_API_CATALOG
 from clash_sos.infrastructure.clash_royale.card_media import (
     EMPTY_MEDIA,
@@ -85,6 +87,37 @@ def test_cache_serves_for_a_day_and_retries_failures_after_five_minutes() -> Non
     knight = f"{ASSETS}/cards/300/knight.png"
     assert asyncio.run(run()) == [None, None, knight, knight]
     assert len(calls) == 3
+
+
+@pytest.mark.parametrize("warm", [False, True])
+@pytest.mark.parametrize("empty", [{"items": []}, {"items": "invalid"}, None])
+def test_empty_refresh_preserves_media_and_retries_after_five_minutes(
+    warm: bool, empty: object
+) -> None:
+    now = [0.0]
+    replies = ([PAYLOAD] if warm else []) + [empty, PAYLOAD]
+    calls: list[int] = []
+
+    async def fetch() -> object:
+        calls.append(1)
+        return replies.pop(0)
+
+    cache = CardMediaCache(fetch, clock=lambda: now[0])
+
+    async def run() -> None:
+        expected = parse_card_media(PAYLOAD) if warm else EMPTY_MEDIA
+        if warm:
+            assert await cache.get() == expected
+            now[0] = 86_400
+        assert await cache.get() == expected
+        now[0] += 299
+        assert await cache.get() == expected
+        assert len(calls) == (2 if warm else 1)
+        now[0] += 1
+        assert await cache.get() == parse_card_media(PAYLOAD)
+        assert len(calls) == (3 if warm else 2)
+
+    asyncio.run(run())
 
 
 def test_concurrent_refreshes_share_one_fetch() -> None:

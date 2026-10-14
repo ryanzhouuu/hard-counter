@@ -81,7 +81,7 @@ def parse_card_media(payload: object) -> CardMedia:
 
 
 class CardMediaCache:
-    """Serve the last good card list for a day; retry failed fetches after five minutes.
+    """Serve the last good card list for a day; retry failed or empty fetches after five minutes.
 
     Callers share one refresh and wait at most ``wait`` seconds; a slow one finishes later.
     """
@@ -117,8 +117,12 @@ class CardMediaCache:
     async def _load(self) -> CardMedia:
         started = self._clock()
         try:
-            self._media = parse_card_media(await self._fetch())
-            self._expires = started + self._ttl
+            media = parse_card_media(await self._fetch())
+            if media == EMPTY_MEDIA:
+                self._expires = started + self._retry_after
+            else:
+                self._media = media
+                self._expires = started + self._ttl
         except RoyaleAPIError:
             self._expires = started + self._retry_after
         finally:
