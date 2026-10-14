@@ -29,9 +29,7 @@ describe("slotLayout", () => {
 describe("blockReason", () => {
   it("explains why a card cannot be added", () => {
     expect(blockReason(["a:base"], "a:evolution")).toBe("Already in deck");
-    expect(blockReason(["x:evolution", "y:evolution"], "z:evolution")).toBe(
-      "Evolution slots full",
-    );
+    expect(blockReason(["x:evolution", "y:evolution"], "z:evolution")).toBe("Evolution slots full");
     expect(blockReason(["h:hero", "q:champion"], "r:hero")).toBe("Hero slots full");
     expect(blockReason(["x:evolution", "y:evolution", "h:hero"], "q:champion")).toBe(
       "No special slots left",

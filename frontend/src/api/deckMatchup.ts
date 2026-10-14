@@ -7,8 +7,14 @@ type MatchupModel = {
   training_era_id: string;
   input_scope: "deck_only" | "deck_and_tower";
 };
-type CardChoice = { identity: string; name: string; form: string };
-type TowerChoice = { identity: string; name: string };
+type CardChoice = {
+  identity: string;
+  name: string;
+  form: string;
+  icon_url: string | null;
+  elixir: number | null;
+};
+type TowerChoice = { identity: string; name: string; icon_url: string | null };
 type MatchupOptions = { model: MatchupModel; cards: CardChoice[]; towers: TowerChoice[] };
 type MatchupDeck = { cards: string[]; tower: string | null };
 type MatchupRequest = { side_a: MatchupDeck; side_b: MatchupDeck };

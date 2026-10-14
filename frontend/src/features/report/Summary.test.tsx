@@ -75,7 +75,9 @@ describe("Summary", () => {
   });
 
   it("omits missing trophies", () => {
-    renderSummary(makeAnalysis({ player: { tag: "#ABC123", name: "Ryan", trophies: null } }));
+    renderSummary(
+      makeAnalysis({ player: { tag: "#ABC123", name: "Ryan", trophies: null, ranked: null } }),
+    );
 
     expect(screen.getByText("#ABC123")).toBeInTheDocument();
   });
@@ -112,5 +114,21 @@ describe("Summary", () => {
     await user.click(screen.getByRole("button", { name: "Copy link" }));
     expect(await navigator.clipboard.readText()).toBe(window.location.href);
     expect(screen.getByRole("button", { name: "Copied" })).toBeInTheDocument();
+  });
+
+  it("shows ranked status when the player has a season result", () => {
+    renderSummary(
+      makeAnalysis({
+        player: {
+          tag: "#ABC123",
+          name: "Ryan",
+          trophies: 7412,
+          ranked: { league: 4, trophies: 2100, rank: 1234 },
+        },
+      }),
+    );
+    expect(
+      screen.getByText("#ABC123 · 7,412 trophies · Ranked League 4 · #1,234"),
+    ).toBeInTheDocument();
   });
 });

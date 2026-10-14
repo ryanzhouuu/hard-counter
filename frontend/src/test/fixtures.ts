@@ -24,6 +24,7 @@ const OPPONENT_DECK = [
 function cards(names: string[]): Card[] {
   return names.map((name) => ({
     name,
+    identity: `${name.toLowerCase().replaceAll(" ", "-").replaceAll(".", "")}:base`,
     icon_url: `https://api-assets.clashroyale.com/cards/300/${encodeURIComponent(name)}.png`,
   }));
 }
@@ -61,7 +62,7 @@ function makeSchedule(overrides: Partial<Schedule> = {}): Schedule {
 
 function makeAnalysis(overrides: Partial<PlayerAnalysis> = {}): PlayerAnalysis {
   return {
-    player: { tag: "#ABC123", name: "Ryan", trophies: 7412 },
+    player: { tag: "#ABC123", name: "Ryan", trophies: 7412, ranked: null },
     model: {
       model_version: "attention",
       dataset_version: "data",

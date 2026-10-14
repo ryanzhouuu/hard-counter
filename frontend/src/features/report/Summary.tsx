@@ -17,8 +17,15 @@ type SummaryProps = {
   onSelectWindow: (windowSize: WindowSize) => void;
 };
 
-function playerMeta({ tag, trophies }: PlayerAnalysis["player"]): string {
-  return trophies === null ? tag : `${tag} · ${trophies.toLocaleString("en-US")} trophies`;
+function playerMeta({ tag, trophies, ranked }: PlayerAnalysis["player"]): string {
+  return [
+    tag,
+    trophies !== null && `${trophies.toLocaleString("en-US")} trophies`,
+    ranked && `Ranked League ${ranked.league}`,
+    ranked?.rank != null && `#${ranked.rank.toLocaleString("en-US")}`,
+  ]
+    .filter(Boolean)
+    .join(" · ");
 }
 
 function shortfallNote(report: PlayerAnalysis): string {

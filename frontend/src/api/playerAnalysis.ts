@@ -1,14 +1,16 @@
 type Card = {
   name: string;
+  identity: string | null;
   icon_url: string | null;
 };
 
 type Outcome = "win" | "loss" | "draw" | "unknown";
 
 type Tower = Card & {
-  identity: string | null;
   level: number | null;
 };
+
+type Ranked = { league: number; trophies: number | null; rank: number | null };
 
 type Battle = {
   timestamp: string | null;
@@ -36,7 +38,7 @@ type Schedule = {
 };
 
 type PlayerAnalysis = {
-  player: { tag: string; name: string; trophies: number | null };
+  player: { tag: string; name: string; trophies: number | null; ranked: Ranked | null };
   model: {
     model_version: string;
     dataset_version: string;
@@ -92,4 +94,4 @@ async function fetchPlayerAnalysis(
 }
 
 export { AnalysisError, FALLBACK_MESSAGE, fetchPlayerAnalysis, isRetryable };
-export type { Battle, Card, Outcome, PlayerAnalysis, Schedule, Tower };
+export type { Battle, Card, Outcome, PlayerAnalysis, Ranked, Schedule, Tower };

@@ -2,7 +2,7 @@ import { useState } from "react";
 
 import type { Card } from "../../api/playerAnalysis";
 
-type CardImageProps = { card: Card; decorative?: boolean };
+type CardImageProps = { card: Pick<Card, "name" | "icon_url">; decorative?: boolean };
 
 function CardImage({ card, decorative = false }: CardImageProps) {
   const [failed, setFailed] = useState(false);
