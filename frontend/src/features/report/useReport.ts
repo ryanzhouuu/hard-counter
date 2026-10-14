@@ -6,6 +6,7 @@ import {
   fetchPlayerAnalysis,
   type PlayerAnalysis,
 } from "../../api/playerAnalysis";
+import { recentFromReport, saveRecentPlayer } from "../../lib/recentPlayers";
 import {
   DEFAULT_WINDOW,
   queryKey,
@@ -65,7 +66,11 @@ function useReport(): ReportView {
     const settle = (outcome: Outcome) =>
       setOutcomes((current) => new Map(current).set(key, outcome));
     fetchPlayerAnalysis(query.tag, query.windowSize, controller.signal).then(
-      (report) => settle({ report }),
+      (report) => {
+        const entry = recentFromReport(query, report, false);
+        if (entry) saveRecentPlayer(entry);
+        settle({ report });
+      },
       (error: unknown) => {
         if (!controller.signal.aborted) settle({ error: asAnalysisError(error) });
       },

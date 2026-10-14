@@ -26,5 +26,5 @@ function queryKey(query: ReportQuery): string {
   return `${query.tag}:${query.windowSize}`;
 }
 
-export { DEFAULT_WINDOW, WINDOW_SIZES, queryKey, queryString, readQuery };
+export { DEFAULT_WINDOW, WINDOW_SIZES, isWindowSize, queryKey, queryString, readQuery };
 export type { ReportQuery, WindowSize };

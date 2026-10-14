@@ -1,6 +1,7 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { readRecentPlayers } from "../../lib/recentPlayers";
 import { jsonResponse, makeAnalysis } from "../../test/fixtures";
 import { useReport } from "./useReport";
 
@@ -19,6 +20,15 @@ afterEach(() => {
 });
 
 describe("useReport", () => {
+  it("remembers a player once their report loads", async () => {
+    window.history.replaceState(null, "", "/?tag=ABC123&window=25");
+    stubReports();
+    const { result } = renderHook(() => useReport());
+    expect(readRecentPlayers()).toEqual([]);
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(readRecentPlayers()).toEqual([{ tag: "ABC123", name: "Ryan", window: 25 }]);
+  });
+
   it("loads the tag in the URL with the default window", async () => {
     window.history.replaceState(null, "", "/?tag=abc123");
     const fetchMock = stubReports();

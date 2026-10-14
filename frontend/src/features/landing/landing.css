@@ -104,3 +104,33 @@
   right: 0;
   white-space: nowrap;
 }
+
+.landing-recent {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px 12px;
+  margin-top: 24px;
+  font-size: 13px;
+}
+
+.landing-recent-label {
+  color: var(--muted);
+}
+
+.landing-recent a {
+  color: var(--ink);
+  text-underline-offset: 3px;
+}
+
+.landing-recent a span {
+  color: var(--muted);
+}
+
+.landing-recent button {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+}
