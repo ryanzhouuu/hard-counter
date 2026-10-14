@@ -1,6 +1,7 @@
 import { percent } from "../../lib/format";
+import { TopBar } from "../nav/TopBar";
 import { ErrorNotice } from "../report/ErrorNotice";
-import "../report/report.css";
+import { DEFAULT_WINDOW, queryString } from "../report/query";
 import { DeckBuilder } from "./DeckBuilder";
 import { useMatchup } from "./useMatchup";
 import "./matchup.css";
@@ -11,14 +12,10 @@ function MatchupPage() {
   const model = result?.model ?? options?.model;
   return (
     <div className="matchup-page">
-      <header className="topbar">
-        <a className="wordmark" href="./">
-          Hard Counter
-        </a>
-        <a className="matchup-link" href="./">
-          Player analysis
-        </a>
-      </header>
+      <TopBar
+        page="matchup"
+        onLookUp={(tag) => window.location.assign(queryString({ tag, windowSize: DEFAULT_WINDOW }))}
+      />
       <main className="matchup-main">
         <div className="matchup-intro">
           <p className="matchup-eyebrow">Head to head</p>

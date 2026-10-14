@@ -1,5 +1,5 @@
 import type { AnalysisError, PlayerAnalysis } from "../../api/playerAnalysis";
-import { TagForm } from "../landing/TagForm";
+import { TopBar } from "../nav/TopBar";
 import { BattleList } from "./BattleList";
 import { ErrorNotice } from "./ErrorNotice";
 import type { WindowSize } from "./query";
@@ -24,15 +24,7 @@ function ReportPage(props: ReportPageProps) {
   const { tag, windowSize, report, loading, error } = props;
   return (
     <div className="report-page">
-      <header className="topbar">
-        <a className="wordmark" href="./">
-          Hard Counter
-        </a>
-        <a className="matchup-link" href="?view=matchup">
-          Matchup
-        </a>
-        <TagForm key={tag} initialTag={tag} onLookUp={props.onLookUp} />
-      </header>
+      <TopBar page="players" tag={tag} onLookUp={props.onLookUp} />
       {error && <ErrorNotice error={error} onRetry={props.onRetry} />}
       {report ? (
         <main className="report" aria-busy={loading} data-updating={loading || undefined}>

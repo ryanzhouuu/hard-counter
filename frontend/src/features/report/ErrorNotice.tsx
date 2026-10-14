@@ -1,4 +1,5 @@
 import { type AnalysisError, isRetryable } from "../../api/playerAnalysis";
+import "./error-notice.css";
 
 function ErrorNotice({ error, onRetry }: { error: AnalysisError; onRetry: () => void }) {
   return (

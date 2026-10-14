@@ -28,7 +28,8 @@ describe("App", () => {
     ).toBeInTheDocument();
     expect(fetch).toHaveBeenCalledTimes(1);
     expect(fetch.mock.calls[0][0]).toBe("/api/matchup-options");
-    expect(screen.getByRole("link", { name: "Player analysis" })).toHaveAttribute("href", "./");
+    expect(screen.getByRole("link", { name: "Matchup" })).toHaveAttribute("aria-current", "page");
+    expect(screen.getByRole("link", { name: "Players" })).toHaveAttribute("href", "./");
   });
 
   it("looks up a tag from the landing screen", async () => {
@@ -40,10 +41,8 @@ describe("App", () => {
     render(<App />);
 
     expect(screen.getByText(DISCLAIMER)).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /Predict a deck matchup/ })).toHaveAttribute(
-      "href",
-      "?view=matchup",
-    );
+    expect(screen.getByRole("link", { name: "Matchup" })).toHaveAttribute("href", "?view=matchup");
+    expect(screen.queryByRole("link", { name: /Predict a deck matchup/ })).not.toBeInTheDocument();
     await user.type(screen.getByRole("textbox", { name: "Player tag" }), "#abc123");
     await user.click(screen.getByRole("button", { name: "Look up" }));
 
