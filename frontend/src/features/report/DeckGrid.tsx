@@ -11,25 +11,44 @@ function MiniDeck({ cards, className }: { cards: Card[]; className?: string }) {
   );
 }
 
-type DeckGridProps = { label: string; cards: Card[]; tower?: Tower | null; isPlayer?: boolean };
+type DeckGridProps = {
+  label: string;
+  cards: Card[];
+  tower?: Tower | null;
+  isPlayer?: boolean;
+  mirrored?: boolean;
+};
 
-function DeckGrid({ label, cards, tower = null, isPlayer = false }: DeckGridProps) {
+function TowerTile({ tower }: { tower: Tower }) {
   return (
-    <section className="deck" aria-label={`${label} deck`}>
+    <figure className="tower-tile">
+      <CardImage card={tower} decorative />
+      <figcaption>
+        {tower.name}
+        {tower.level !== null && <span className="num"> · Lv {tower.level}</span>}
+      </figcaption>
+    </figure>
+  );
+}
+
+function DeckGrid({
+  label,
+  cards,
+  tower = null,
+  isPlayer = false,
+  mirrored = false,
+}: DeckGridProps) {
+  return (
+    <section className={mirrored ? "deck deck-mirrored" : "deck"} aria-label={`${label} deck`}>
       <h3 className={isPlayer ? "deck-label deck-label-player" : "deck-label"}>{label}</h3>
-      <div className="deck-grid">
-        {cards.map((card, index) => (
-          <CardImage key={`${card.name}-${index}`} card={card} />
-        ))}
+      <div className="deck-side">
+        {tower && <TowerTile tower={tower} />}
+        <div className="deck-grid">
+          {cards.map((card, index) => (
+            <CardImage key={`${card.name}-${index}`} card={card} />
+          ))}
+        </div>
       </div>
-      {tower && (
-        <p className="deck-tower">
-          <span className="deck-tower-icon">
-            <CardImage card={tower} decorative />
-          </span>
-          {tower.name}
-        </p>
-      )}
     </section>
   );
 }

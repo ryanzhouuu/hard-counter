@@ -27,15 +27,33 @@ function WinChance({ probability, upset }: { probability: number; upset: Upset |
 }
 
 function detailMeta(battle: Battle, upset: Upset | null): string {
-  const ago = relativeTime(battle.timestamp);
-  const chance =
-    battle.win_probability === null
-      ? skipLabel(battle.skip_reason)
-      : `your win chance ${percent(battle.win_probability)}`;
-  const when = ago === "now" ? "just now" : ago && `${ago} ago`;
-  return [modeLabel(battle.mode), when, chance, upset && `upset ${upset}`]
+  return [modeLabel(battle.mode), fullTime(battle.timestamp), upset && `upset ${upset}`]
     .filter(Boolean)
     .join(" · ");
+}
+
+function ChanceBar({ probability, opponent }: { probability: number; opponent: string }) {
+  const you = percent(probability);
+  return (
+    <div className="chance-bar">
+      <div className="chance-bar-labels num">
+        <span>You {you}</span>
+        <span>
+          {percent(1 - probability)} {opponent}
+        </span>
+      </div>
+      <div
+        className="chance-bar-track"
+        role="meter"
+        aria-label="Your win chance"
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={Math.round(probability * 100)}
+      >
+        <span style={{ width: you }} />
+      </div>
+    </div>
+  );
 }
 
 type BattleRowProps = { battle: Battle };
@@ -46,7 +64,7 @@ function BattleRow({ battle }: BattleRowProps) {
   const outcome = OUTCOMES[battle.outcome];
   const upset = upsetOf(battle);
   return (
-    <li className="battle">
+    <li className={open ? "battle battle-open" : "battle"}>
       <button
         type="button"
         className="battle-row"
@@ -81,7 +99,7 @@ function BattleRow({ battle }: BattleRowProps) {
       <div id={detailId} className="battle-detail" hidden={!open}>
         {open && (
           <>
-            <div className="decks">
+            <div className="duel">
               <DeckGrid
                 label="You"
                 cards={battle.player_cards}
@@ -92,8 +110,14 @@ function BattleRow({ battle }: BattleRowProps) {
                 label={battle.opponent_name}
                 cards={battle.opponent_cards}
                 tower={battle.opponent_tower}
+                mirrored
               />
             </div>
+            {battle.win_probability === null ? (
+              <p className="battle-skip-note">{skipLabel(battle.skip_reason)}</p>
+            ) : (
+              <ChanceBar probability={battle.win_probability} opponent={battle.opponent_name} />
+            )}
             <p className="battle-meta">{detailMeta(battle, upset)}</p>
           </>
         )}

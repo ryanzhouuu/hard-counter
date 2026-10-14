@@ -41,7 +41,7 @@
 
 .deck-grid {
   display: grid;
-  grid-template-columns: repeat(4, 58px);
+  grid-template-columns: repeat(4, 64px);
   gap: 4px;
 }
 
@@ -218,29 +218,94 @@
   transform: rotate(225deg);
 }
 
-.battle-detail {
-  padding: 6px 16px 18px;
-  border-top: 1px dashed var(--line);
+.battle-open {
   background: var(--surface-hover);
 }
 
-.decks {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 36px;
+.battle-open .battle-row:hover {
+  background: transparent;
 }
 
-.deck-tower {
+.battle-open .battle-row .mini-deck,
+.battle-open .battle-row .battle-vs,
+.battle-open .battle-row .win-chance {
+  visibility: hidden;
+}
+
+.battle-detail {
+  padding: 0 16px 18px;
+  animation: detail-in 160ms ease-out;
+}
+
+.duel {
   display: flex;
-  align-items: center;
-  gap: 8px;
-  margin: 8px 0 0;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 16px 24px;
+}
+
+.deck-side {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.deck-mirrored .deck-label {
+  text-align: right;
+}
+
+.deck-mirrored .deck-side {
+  flex-direction: row-reverse;
+}
+
+.tower-tile {
+  width: 64px;
+  margin: 0;
+}
+
+.tower-tile figcaption {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.2;
+}
+
+.chance-bar {
+  margin-top: 16px;
+}
+
+.chance-bar-labels {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 6px;
   color: var(--muted);
   font-size: 12px;
 }
 
-.deck-tower-icon {
-  width: 22px;
+.chance-bar-track {
+  height: 8px;
+  overflow: hidden;
+  border-radius: 4px;
+  background: var(--track);
+}
+
+.chance-bar-track span {
+  display: block;
+  height: 100%;
+  background: var(--blue);
+}
+
+.battle-skip-note {
+  margin: 16px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+@keyframes detail-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
 }
 
 .battle-meta {
@@ -253,19 +318,26 @@
   .battle-chevron {
     transition: none;
   }
+
+  .battle-detail {
+    animation: none;
+  }
 }
 
 @media (max-width: 959px) {
-  .decks {
-    gap: 4px 24px;
+  .duel {
+    flex-direction: column;
   }
 
-  .deck {
-    flex: 1 1 240px;
-    max-width: 320px;
+  .deck-mirrored .deck-label {
+    text-align: left;
+  }
+
+  .deck-mirrored .deck-side {
+    flex-direction: row;
   }
 
   .deck-grid {
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(4, minmax(0, 64px));
   }
 }
