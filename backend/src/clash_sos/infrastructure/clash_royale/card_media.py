@@ -1,5 +1,6 @@
 """Map the official card list onto catalog identities for images and elixir costs."""
 
+import asyncio
 import time
 from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass, field
@@ -80,7 +81,10 @@ def parse_card_media(payload: object) -> CardMedia:
 
 
 class CardMediaCache:
-    """Serve the last good card list for a day; retry failed fetches after five minutes."""
+    """Serve the last good card list for a day; retry failed fetches after five minutes.
+
+    Callers share one refresh and wait at most ``wait`` seconds; a slow one finishes later.
+    """
 
     def __init__(
         self,
@@ -89,22 +93,34 @@ class CardMediaCache:
         clock: Callable[[], float] = time.monotonic,
         ttl: float = 86_400,
         retry_after: float = 300,
+        wait: float = 3,
     ) -> None:
         self._fetch = fetch
         self._clock = clock
         self._ttl = ttl
         self._retry_after = retry_after
+        self._wait = wait
         self._media = EMPTY_MEDIA
         self._expires = float("-inf")
+        self._refresh: asyncio.Task[CardMedia] | None = None
 
     async def get(self) -> CardMedia:
-        now = self._clock()
-        if now < self._expires:
+        if self._clock() < self._expires:
             return self._media
+        if self._refresh is None:
+            self._refresh = asyncio.create_task(self._load())
         try:
-            media = parse_card_media(await self._fetch())
-        except RoyaleAPIError:
-            self._expires = now + self._retry_after
+            return await asyncio.wait_for(asyncio.shield(self._refresh), self._wait)
+        except TimeoutError:
             return self._media
-        self._media, self._expires = media, now + self._ttl
-        return media
+
+    async def _load(self) -> CardMedia:
+        started = self._clock()
+        try:
+            self._media = parse_card_media(await self._fetch())
+            self._expires = started + self._ttl
+        except RoyaleAPIError:
+            self._expires = started + self._retry_after
+        finally:
+            self._refresh = None
+        return self._media

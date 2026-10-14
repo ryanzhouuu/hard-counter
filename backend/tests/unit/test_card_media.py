@@ -5,6 +5,7 @@ import asyncio
 from clash_sos.infrastructure.clash_royale.card_api_catalog import CURRENT_CARD_API_CATALOG
 from clash_sos.infrastructure.clash_royale.card_media import (
     EMPTY_MEDIA,
+    CardMedia,
     CardMediaCache,
     parse_card_media,
 )
@@ -84,3 +85,43 @@ def test_cache_serves_for_a_day_and_retries_failures_after_five_minutes() -> Non
     knight = f"{ASSETS}/cards/300/knight.png"
     assert asyncio.run(run()) == [None, None, knight, knight]
     assert len(calls) == 3
+
+
+def test_concurrent_refreshes_share_one_fetch() -> None:
+    calls: list[int] = []
+
+    async def run() -> list[str | None]:
+        release = asyncio.Event()
+
+        async def fetch() -> object:
+            calls.append(1)
+            await release.wait()
+            return PAYLOAD
+
+        cache = CardMediaCache(fetch, clock=lambda: 0.0)
+        waiting = [asyncio.create_task(cache.get()) for _ in range(3)]
+        await asyncio.sleep(0)
+        release.set()
+        return [media.icon("knight:base") for media in await asyncio.gather(*waiting)]
+
+    assert asyncio.run(run()) == [f"{ASSETS}/cards/300/knight.png"] * 3
+    assert len(calls) == 1
+
+
+def test_slow_refresh_serves_current_media_and_finishes_in_background() -> None:
+    async def run() -> tuple[CardMedia, CardMedia]:
+        release = asyncio.Event()
+
+        async def fetch() -> object:
+            await release.wait()
+            return PAYLOAD
+
+        cache = CardMediaCache(fetch, clock=lambda: 0.0, wait=0.01)
+        first = await cache.get()
+        release.set()
+        await asyncio.sleep(0.01)
+        return first, await cache.get()
+
+    first, later = asyncio.run(run())
+    assert first == EMPTY_MEDIA
+    assert later.icon("knight:base") == f"{ASSETS}/cards/300/knight.png"
