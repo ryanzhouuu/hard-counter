@@ -50,12 +50,21 @@ function useMatchup() {
         (options.model.input_scope === "deck_only" || deck.tower !== null),
     );
 
-  function changeDeck(side: keyof MatchupRequest, deck: MatchupDeck) {
+  function clearResult() {
     pending.current?.abort();
-    setDecks((current) => ({ ...current, [side]: deck }));
     setResult(null);
     setError(null);
     setPredicting(false);
+  }
+
+  function changeDeck(side: keyof MatchupRequest, deck: MatchupDeck) {
+    clearResult();
+    setDecks((current) => ({ ...current, [side]: deck }));
+  }
+
+  function swap() {
+    clearResult();
+    setDecks((current) => ({ side_a: current.side_b, side_b: current.side_a }));
   }
 
   async function predict() {
@@ -89,6 +98,7 @@ function useMatchup() {
     result,
     error,
     changeDeck,
+    swap,
     predict,
     retryOptions,
   };

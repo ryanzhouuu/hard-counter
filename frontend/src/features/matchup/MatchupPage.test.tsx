@@ -2,7 +2,8 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { jsonResponse } from "../../test/fixtures";
+import { saveRecentPlayer } from "../../lib/recentPlayers";
+import { cards, jsonResponse, makeAnalysis, makeBattle } from "../../test/fixtures";
 import { matchupOptions, matchupResult } from "../../test/matchupFixtures";
 import { MatchupPage } from "./MatchupPage";
 
@@ -85,5 +86,46 @@ describe("MatchupPage", () => {
     unmount();
     const calls = vi.mocked(globalThis.fetch).mock.calls;
     expect(calls[0][1]?.signal?.aborted).toBe(true);
+  });
+
+  it("loads the latest ranked deck for the most recent player", async () => {
+    saveRecentPlayer({ tag: "ABC123", name: "Ryan", window: 10 });
+    const names = [
+      "Knight",
+      "Archers",
+      "Goblins",
+      "Giant",
+      "Minions",
+      "Balloon",
+      "Witch",
+      "Bomber",
+    ];
+    const tower = { name: "Cannoneer", icon_url: null, identity: "cannoneer:tower", level: 11 };
+    const fetch = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse(matchupOptions))
+      .mockResolvedValueOnce(
+        jsonResponse(
+          makeAnalysis({
+            battles: [makeBattle({ player_cards: cards(names), player_tower: tower })],
+          }),
+        ),
+      );
+    vi.stubGlobal("fetch", fetch);
+    const user = userEvent.setup();
+    render(<MatchupPage />);
+    const [useLatest] = await screen.findAllByRole("button", { name: "Use my latest" });
+    await user.click(useLatest);
+    expect(await screen.findByText(/^8 \/ 8/)).toBeInTheDocument();
+    expect(fetch.mock.calls[1][0]).toBe("/api/player-analysis?tag=ABC123&window=5");
+    await user.click(screen.getByRole("button", { name: "Swap decks" }));
+    expect(screen.getAllByText(/^0 \/ 8/)).toHaveLength(1);
+  });
+
+  it("hides Use my latest without recent players", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonResponse(matchupOptions)));
+    render(<MatchupPage />);
+    await screen.findByRole("searchbox", { name: "Deck A search cards" });
+    expect(screen.queryByRole("button", { name: "Use my latest" })).not.toBeInTheDocument();
   });
 });

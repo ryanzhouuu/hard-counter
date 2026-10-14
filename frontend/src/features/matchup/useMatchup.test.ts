@@ -14,6 +14,20 @@ const complete: MatchupDeck = {
 afterEach(() => vi.unstubAllGlobals());
 
 describe("useMatchup", () => {
+  it("swaps the two decks and drops the old result", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonResponse(matchupOptions)));
+    const { result } = renderHook(useMatchup);
+    await waitFor(() => expect(result.current.options).not.toBeNull());
+    const other: MatchupDeck = { cards: complete.cards.slice(0, 3), tower: null };
+    act(() => {
+      result.current.changeDeck("side_a", complete);
+      result.current.changeDeck("side_b", other);
+    });
+    act(() => result.current.swap());
+    expect(result.current.decks).toEqual({ side_a: other, side_b: complete });
+    expect(result.current.result).toBeNull();
+  });
+
   it("requires complete decks and towers before posting a prediction", async () => {
     const fetch = vi
       .fn()

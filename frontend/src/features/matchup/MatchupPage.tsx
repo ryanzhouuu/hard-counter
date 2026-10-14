@@ -1,15 +1,37 @@
+import { useState } from "react";
+
+import { AnalysisError, FALLBACK_MESSAGE, fetchPlayerAnalysis } from "../../api/playerAnalysis";
 import { percent } from "../../lib/format";
+import { readRecentPlayers } from "../../lib/recentPlayers";
 import { TopBar } from "../nav/TopBar";
 import { ErrorNotice } from "../report/ErrorNotice";
 import { DEFAULT_WINDOW, queryString } from "../report/query";
 import { DeckBuilder } from "./DeckBuilder";
+import { latestRankedDeck } from "./latestDeck";
 import { useMatchup } from "./useMatchup";
 import "./matchup.css";
+
+type Side = "side_a" | "side_b";
 
 function MatchupPage() {
   const view = useMatchup();
   const { options, result } = view;
   const model = result?.model ?? options?.model;
+  const [latest] = useState(() => readRecentPlayers()[0] ?? null);
+  const [notes, setNotes] = useState<Partial<Record<Side, string>>>({});
+
+  async function loadLatest(side: Side) {
+    if (latest === null || options === null) return;
+    setNotes((current) => ({ ...current, [side]: undefined }));
+    try {
+      const outcome = latestRankedDeck(await fetchPlayerAnalysis(latest.tag, 5), options);
+      if ("deck" in outcome) view.changeDeck(side, outcome.deck);
+      else setNotes((current) => ({ ...current, [side]: outcome.message }));
+    } catch (failure) {
+      const message = failure instanceof AnalysisError ? failure.message : FALLBACK_MESSAGE;
+      setNotes((current) => ({ ...current, [side]: message }));
+    }
+  }
   return (
     <div className="matchup-page">
       <TopBar
@@ -40,13 +62,25 @@ function MatchupPage() {
                 towers={options.towers}
                 deck={view.decks.side_a}
                 onChange={(deck) => view.changeDeck("side_a", deck)}
+                onUseLatest={latest ? () => void loadLatest("side_a") : undefined}
+                note={notes.side_a}
               />
+              <button
+                type="button"
+                className="swap-button"
+                aria-label="Swap decks"
+                onClick={view.swap}
+              >
+                ⇄ Swap
+              </button>
               <DeckBuilder
                 label="Deck B"
                 cards={options.cards}
                 towers={options.towers}
                 deck={view.decks.side_b}
                 onChange={(deck) => view.changeDeck("side_b", deck)}
+                onUseLatest={latest ? () => void loadLatest("side_b") : undefined}
+                note={notes.side_b}
               />
             </div>
             <div className="matchup-actions">
