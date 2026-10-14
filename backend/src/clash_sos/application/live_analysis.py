@@ -3,6 +3,7 @@
 from dataclasses import replace
 from datetime import datetime
 from pathlib import Path
+from typing import cast
 
 from pydantic import BaseModel, Field
 
@@ -14,14 +15,22 @@ from clash_sos.infrastructure.clash_royale.adapter import LiveBattle, LiveCard, 
 from clash_sos.infrastructure.clash_royale.tower_adapter import LiveTower
 
 
+class LiveRanked(BaseModel):
+    league: int
+    trophies: int | None
+    rank: int | None
+
+
 class LivePlayer(BaseModel):
     tag: str
     name: str
     trophies: int | None
+    ranked: LiveRanked | None = None
 
 
 class LiveCardReport(BaseModel):
     name: str
+    identity: str | None
     icon_url: str | None
 
 
@@ -72,6 +81,25 @@ class LiveAnalysisResponse(BaseModel):
     battles: tuple[LiveBattleReport, ...]
 
 
+def _int_or_none(value: object) -> int | None:
+    return value if type(value) is int else None
+
+
+def _ranked(profile: dict[str, object]) -> LiveRanked | None:
+    season = profile.get("currentPathOfLegendSeasonResult")
+    if not isinstance(season, dict):
+        return None
+    values = cast(dict[str, object], season)
+    league = _int_or_none(values.get("leagueNumber"))
+    if league is None:
+        return None
+    return LiveRanked(
+        league=league,
+        trophies=_int_or_none(values.get("trophies")),
+        rank=_int_or_none(values.get("rank")),
+    )
+
+
 def _player(profile: dict[str, object], tag: str) -> LivePlayer:
     """Use only the requested profile and public display fields."""
     if profile.get("tag") != tag:
@@ -81,12 +109,16 @@ def _player(profile: dict[str, object], tag: str) -> LivePlayer:
     return LivePlayer(
         tag=tag,
         name=name if isinstance(name, str) and name else tag,
-        trophies=trophies if type(trophies) is int else None,
+        trophies=_int_or_none(trophies),
+        ranked=_ranked(profile),
     )
 
 
 def _card_reports(cards: tuple[LiveCard, ...]) -> tuple[LiveCardReport, ...]:
-    return tuple(LiveCardReport(name=card.name, icon_url=card.icon_url) for card in cards)
+    return tuple(
+        LiveCardReport(name=card.name, identity=card.identity, icon_url=card.icon_url)
+        for card in cards
+    )
 
 
 def _tower_report(tower: LiveTower | None) -> LiveTowerReport | None:

@@ -233,3 +233,53 @@ def test_live_report_excludes_model_coverage_without_losing_other_battles(
         assert result.battles[1].win_probability == 0.5
         assert result.battles[1].in_window
         assert result.schedule.expected_wins == 0.5
+
+
+def test_live_player_reports_current_ranked_season() -> None:
+    profile: dict[str, object] = {
+        "tag": "#ABC",
+        "name": "Player",
+        "currentPathOfLegendSeasonResult": {"leagueNumber": 4, "trophies": 2100, "rank": 1234},
+    }
+    assert live_analysis._player(profile, "#ABC").ranked == live_analysis.LiveRanked(  # pyright: ignore[reportPrivateUsage]
+        league=4, trophies=2100, rank=1234
+    )
+
+
+@pytest.mark.parametrize(
+    "season", [None, {}, {"leagueNumber": "4"}, {"leagueNumber": True}, "ranked"]
+)
+def test_live_player_ignores_missing_or_malformed_ranked_data(season: object) -> None:
+    profile: dict[str, object] = {
+        "tag": "#ABC",
+        "name": "Player",
+        "currentPathOfLegendSeasonResult": season,
+    }
+    assert live_analysis._player(profile, "#ABC").ranked is None  # pyright: ignore[reportPrivateUsage]
+
+
+def test_live_report_exposes_resolved_card_identities(monkeypatch: pytest.MonkeyPatch) -> None:
+    info = LiveModelInfo("attention", "data", "catalog", "2026-06")
+
+    def score(
+        artifact: Path, pairs: Sequence[DeckPair], *, tower_pairs: Sequence[TowerPair] | None = None
+    ) -> tuple[LiveModelInfo, tuple[MatchupPrediction, ...]]:
+        return info, tuple(
+            MatchupPrediction(
+                state=PredictionState.AVAILABLE,
+                side_a_win_probability=0.5,
+                provenance=info.provenance,
+            )
+            for _ in pairs
+        )
+
+    monkeypatch.setattr(live_analysis, "score_live_decks", score)
+    result = live_analysis.analyze_live_player(
+        {"tag": "#ABC", "name": "Player"},
+        [_battle("20260925T120000Z"), _battle("20260925T110000Z", unknown=True)],
+        tag="#ABC",
+        artifact=Path("model"),
+        window_size=1,
+    )
+    assert result.battles[0].player_cards[0].identity == "knight:base"
+    assert result.battles[1].player_cards[0].identity is None

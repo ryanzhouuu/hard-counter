@@ -95,13 +95,13 @@ def test_lookup_returns_scored_recent_battle(monkeypatch: pytest.MonkeyPatch) ->
 
     assert response.status_code == 200
     body = response.json()
-    assert body["player"] == {"tag": "#ABC", "name": "Player", "trophies": 1234}
+    assert body["player"] == {"tag": "#ABC", "name": "Player", "trophies": 1234, "ranked": None}
     assert body["model"]["training_era_id"] == "2026-06"
     assert body["schedule"]["strength_of_schedule"] == pytest.approx(0.3)
     assert body["battles"][0]["win_probability"] == 0.7
     assert body["battles"][0]["player_cards"][:2] == [
-        {"name": "Knight", "icon_url": KNIGHT_ICON},
-        {"name": "Archers", "icon_url": None},
+        {"name": "Knight", "identity": "knight:base", "icon_url": KNIGHT_ICON},
+        {"name": "Archers", "identity": "archers:base", "icon_url": None},
     ]
     assert "test-secret" not in response.text
 
