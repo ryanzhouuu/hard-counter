@@ -9,11 +9,15 @@
 }
 .deck-actions {
   position: absolute;
-  top: 18px;
-  right: 20px;
+  top: -9px;
+  right: 16px;
+  z-index: 1;
   display: flex;
   gap: 12px;
+  padding: 0 6px;
+  background: var(--surface);
   font-size: 12px;
+  line-height: 18px;
 }
 .deck-actions button {
   padding: 0;
