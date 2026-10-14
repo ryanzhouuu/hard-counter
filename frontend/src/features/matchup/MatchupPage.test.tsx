@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -10,6 +10,29 @@ import { MatchupPage } from "./MatchupPage";
 afterEach(() => vi.unstubAllGlobals());
 
 describe("MatchupPage", () => {
+  it("supports older options responses without images or elixir", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        jsonResponse({
+          ...matchupOptions,
+          cards: matchupOptions.cards.map(({ identity, name, form }) => ({ identity, name, form })),
+        }),
+      ),
+    );
+    const user = userEvent.setup();
+    render(<MatchupPage />);
+    await user.click(await screen.findByRole("button", { name: "Add Knight to Deck A" }));
+
+    const selected = within(screen.getByRole("list", { name: "Deck A selected cards" }));
+    expect(screen.getByText(/^1 \/ 8/)).toHaveTextContent("1 / 8");
+    expect(screen.queryByText(/elixir/)).not.toBeInTheDocument();
+    expect(selected.getByText("Knight")).toBeInTheDocument();
+    expect(
+      selected.getByRole("button", { name: "Remove Knight from Deck A" }).querySelector("img"),
+    ).toBeNull();
+  });
+
   it("builds two decks, predicts explicit forms and towers, and clears results on edit", async () => {
     const fetch = vi
       .fn()

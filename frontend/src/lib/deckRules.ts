@@ -45,7 +45,7 @@ function blockReason(cards: string[], identity: string): string | null {
 }
 
 function averageElixir(cards: CardChoice[]): number | null {
-  const costs = cards.flatMap((card) => (card.elixir === null ? [] : [card.elixir]));
+  const costs = cards.flatMap((card) => (card.elixir == null ? [] : [card.elixir]));
   return costs.length === 0 ? null : costs.reduce((sum, cost) => sum + cost, 0) / costs.length;
 }
 
