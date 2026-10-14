@@ -96,7 +96,7 @@ describe("App", () => {
     expect(await screen.findByText("Won 2 of 5")).toBeInTheDocument();
     expect(screen.getByText("−0.8")).toHaveClass("tone-negative");
 
-    await user.click(screen.getByRole("button", { name: /^Win/ }));
+    await user.click(screen.getByRole("button", { name: /^Win/, expanded: false }));
     expect(screen.getByRole("region", { name: "You deck" })).toBeVisible();
   });
 });
