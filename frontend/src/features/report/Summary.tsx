@@ -1,10 +1,14 @@
 import type { Battle, PlayerAnalysis, Schedule } from "../../api/playerAnalysis";
 import { percent, signedValue } from "../../lib/format";
+import { winSpread } from "../../lib/stats";
 import { UPSET_DEFINITION, upsetOf } from "../../lib/upset";
 import { ExpectationBar } from "./ExpectationBar";
+import { FacedMost } from "./FacedMost";
 import type { WindowSize } from "./query";
 import { WindowPicker } from "./WindowPicker";
 import "./summary.css";
+
+const SPREAD_DEFINITION = "Typical spread given these matchups";
 
 type SummaryProps = {
   report: PlayerAnalysis;
@@ -50,8 +54,11 @@ function Headline({ schedule, battles }: { schedule: Schedule; battles: Battle[]
         Won {actual_wins} of {schedule.requested_window}
       </p>
       <p className="subline num">
-        Expected {expected_wins.toFixed(1)} ·{" "}
-        <span className={`tone-${delta.tone}`}>{delta.text}</span>
+        Expected {expected_wins.toFixed(1)}{" "}
+        <span className="spread" title={SPREAD_DEFINITION}>
+          ± {winSpread(battles).toFixed(1)}
+        </span>{" "}
+        · <span className={`tone-${delta.tone}`}>{delta.text}</span>
       </p>
       <ExpectationBar
         actual={actual_wins}
@@ -88,6 +95,7 @@ function Summary({ report, windowSize, onSelectWindow }: SummaryProps) {
         explainLimit={available}
         onSelect={onSelectWindow}
       />
+      {available && <FacedMost battles={battles} total={schedule.requested_window} />}
     </aside>
   );
 }

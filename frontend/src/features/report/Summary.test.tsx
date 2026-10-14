@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import { makeAnalysis, makeBattle, makeSchedule } from "../../test/fixtures";
@@ -24,7 +24,8 @@ describe("Summary", () => {
     expect(screen.getByRole("heading", { name: "Ryan" })).toBeInTheDocument();
     expect(screen.getByText("#ABC123 · 7,412 trophies")).toBeInTheDocument();
     expect(screen.getByText("Won 7 of 10")).toBeInTheDocument();
-    expect(screen.getByText(/^Expected 5\.4/)).toHaveTextContent("Expected 5.4 · +1.6");
+    expect(screen.getByText(/^Expected 5\.4/)).toHaveTextContent("Expected 5.4 ± 0.5 · +1.6");
+    expect(screen.getByTitle("Typical spread given these matchups")).toHaveTextContent("± 0.5");
     expect(screen.getByText("+1.6")).toHaveClass("tone-positive");
     expect(screen.getByText("Avg win chance").parentElement).toHaveTextContent(
       "Avg win chance 54%",
@@ -89,5 +90,18 @@ describe("Summary", () => {
     renderSummary(makeAnalysis({ schedule: { ...insufficient, eligible_count: 0 }, battles: [] }));
 
     expect(screen.getByText("No recent battles.")).toBeInTheDocument();
+  });
+
+  it("lists the opponent cards faced most in the window", () => {
+    renderSummary(makeAnalysis({ battles: [makeBattle(), makeBattle({ win_probability: 0.4 })] }));
+    const table = screen.getByRole("table", { name: "Faced most" });
+    const rows = within(table).getAllByRole("row").slice(1);
+    expect(rows).toHaveLength(5);
+    expect(rows[0]).toHaveTextContent("Baby Dragon2/1051%");
+  });
+
+  it("omits the faced table until the window is filled", () => {
+    renderSummary(makeAnalysis({ schedule: insufficient }));
+    expect(screen.queryByRole("table")).not.toBeInTheDocument();
   });
 });

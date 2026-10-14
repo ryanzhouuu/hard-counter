@@ -163,3 +163,48 @@
     flex: 1;
   }
 }
+
+.subline .spread {
+  font-weight: 400;
+}
+
+.faced-most {
+  width: 100%;
+  margin-top: 28px;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.faced-most caption {
+  margin-bottom: 8px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+  text-align: left;
+}
+
+.faced-most th,
+.faced-most td {
+  padding: 5px 0;
+  border-top: 1px solid var(--line);
+  font-weight: 400;
+  text-align: right;
+}
+
+.faced-most thead th {
+  border-top: 0;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.faced-most tbody th {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  text-align: left;
+}
+
+.faced-icon {
+  width: 18px;
+  flex: none;
+}
