@@ -76,4 +76,31 @@ describe("BattleList", () => {
     await user.click(screen.getByRole("button", { name: "Losses" }));
     expect(screen.getByText("No battles match.")).toBeInTheDocument();
   });
+
+  it("counts only matching older battles and hides the toggle when none match", async () => {
+    const user = userEvent.setup();
+    render(
+      <BattleList
+        windowFilled
+        battles={[
+          makeBattle(),
+          makeBattle({ in_window: false, outcome: "win", opponent_name: "Ana" }),
+          makeBattle({
+            in_window: false,
+            outcome: "loss",
+            win_probability: 0.4,
+            opponent_name: "Bo",
+          }),
+        ]}
+      />,
+    );
+    expect(screen.getByRole("button", { name: "Show 2 older battles" })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Wins" }));
+    await user.click(screen.getByRole("button", { name: "Show 1 older battle" }));
+    expect(screen.getByText("Ana")).toBeInTheDocument();
+    expect(screen.queryByText("Bo")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Hide 1 older battle" }));
+    await user.click(screen.getByRole("button", { name: "Upsets" }));
+    expect(screen.queryByRole("button", { name: /older battle/ })).not.toBeInTheDocument();
+  });
 });

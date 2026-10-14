@@ -85,15 +85,15 @@ function BattleList({ battles, windowFilled }: BattleListProps) {
       <Rows items={primary} />
       {showOlder && <Rows items={older} />}
       {showSkipped && <Rows items={skipped} />}
-      {(olderAll.length > 0 || skipped.length > 0) && (
+      {(older.length > 0 || skipped.length > 0) && (
         <div className="battle-more">
-          {olderAll.length > 0 && (
+          {older.length > 0 && (
             <button
               type="button"
               aria-expanded={showOlder}
               onClick={() => setShowOlder((value) => !value)}
             >
-              {showOlder ? "Hide" : "Show"} {plural(olderAll.length, "older battle")}
+              {showOlder ? "Hide" : "Show"} {plural(older.length, "older battle")}
             </button>
           )}
           {skipped.length > 0 && (
