@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
+import type { MatchupDeck } from "../../api/deckMatchup";
 import { AnalysisError, FALLBACK_MESSAGE, fetchPlayerAnalysis } from "../../api/playerAnalysis";
 import { percent } from "../../lib/format";
 import { readRecentPlayers } from "../../lib/recentPlayers";
@@ -19,17 +20,58 @@ function MatchupPage() {
   const model = result?.model ?? options?.model;
   const [latest] = useState(() => readRecentPlayers()[0] ?? null);
   const [notes, setNotes] = useState<Partial<Record<Side, string>>>({});
+  const [loadingLatest, setLoadingLatest] = useState<Partial<Record<Side, boolean>>>({});
+  const latestRequests = useRef<Partial<Record<Side, AbortController>>>({});
+
+  useEffect(() => {
+    const requests = latestRequests.current;
+    return () => {
+      for (const side of ["side_a", "side_b"] as const) {
+        requests[side]?.abort();
+        delete requests[side];
+      }
+    };
+  }, []);
+
+  function cancelLatest(side: Side) {
+    latestRequests.current[side]?.abort();
+    delete latestRequests.current[side];
+    setLoadingLatest((current) => ({ ...current, [side]: false }));
+    setNotes((current) => ({ ...current, [side]: undefined }));
+  }
+
+  function changeDeck(side: Side, deck: MatchupDeck) {
+    cancelLatest(side);
+    view.changeDeck(side, deck);
+  }
+
+  function swapDecks() {
+    cancelLatest("side_a");
+    cancelLatest("side_b");
+    view.swap();
+  }
 
   async function loadLatest(side: Side) {
-    if (latest === null || options === null) return;
+    if (latest === null || options === null || latestRequests.current[side]) return;
+    const controller = new AbortController();
+    latestRequests.current[side] = controller;
+    setLoadingLatest((current) => ({ ...current, [side]: true }));
     setNotes((current) => ({ ...current, [side]: undefined }));
     try {
-      const outcome = latestRankedDeck(await fetchPlayerAnalysis(latest.tag, 5), options);
+      const report = await fetchPlayerAnalysis(latest.tag, 5, controller.signal);
+      if (controller.signal.aborted) return;
+      const outcome = latestRankedDeck(report, options);
       if ("deck" in outcome) view.changeDeck(side, outcome.deck);
       else setNotes((current) => ({ ...current, [side]: outcome.message }));
     } catch (failure) {
+      if (controller.signal.aborted) return;
       const message = failure instanceof AnalysisError ? failure.message : FALLBACK_MESSAGE;
       setNotes((current) => ({ ...current, [side]: message }));
+    } finally {
+      if (latestRequests.current[side] === controller) {
+        delete latestRequests.current[side];
+        setLoadingLatest((current) => ({ ...current, [side]: false }));
+      }
     }
   }
   return (
@@ -61,15 +103,16 @@ function MatchupPage() {
                 cards={options.cards}
                 towers={options.towers}
                 deck={view.decks.side_a}
-                onChange={(deck) => view.changeDeck("side_a", deck)}
+                onChange={(deck) => changeDeck("side_a", deck)}
                 onUseLatest={latest ? () => void loadLatest("side_a") : undefined}
+                loadingLatest={loadingLatest.side_a}
                 note={notes.side_a}
               />
               <button
                 type="button"
                 className="swap-button"
                 aria-label="Swap decks"
-                onClick={view.swap}
+                onClick={swapDecks}
               >
                 ⇄ Swap
               </button>
@@ -78,8 +121,9 @@ function MatchupPage() {
                 cards={options.cards}
                 towers={options.towers}
                 deck={view.decks.side_b}
-                onChange={(deck) => view.changeDeck("side_b", deck)}
+                onChange={(deck) => changeDeck("side_b", deck)}
                 onUseLatest={latest ? () => void loadLatest("side_b") : undefined}
+                loadingLatest={loadingLatest.side_b}
                 note={notes.side_b}
               />
             </div>

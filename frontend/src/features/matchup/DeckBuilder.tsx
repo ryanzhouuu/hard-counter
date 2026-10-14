@@ -12,6 +12,7 @@ type DeckBuilderProps = {
   deck: MatchupDeck;
   onChange: (deck: MatchupDeck) => void;
   onUseLatest?: () => void;
+  loadingLatest?: boolean;
   note?: string | null;
 };
 
@@ -29,6 +30,7 @@ function DeckBuilder({
   deck,
   onChange,
   onUseLatest,
+  loadingLatest = false,
   note,
 }: DeckBuilderProps) {
   const id = useId();
@@ -50,8 +52,8 @@ function DeckBuilder({
       </legend>
       <div className="deck-actions">
         {onUseLatest && (
-          <button type="button" onClick={onUseLatest}>
-            Use my latest
+          <button type="button" onClick={onUseLatest} disabled={loadingLatest}>
+            {loadingLatest ? "Loading latest…" : "Use my latest"}
           </button>
         )}
         <button
