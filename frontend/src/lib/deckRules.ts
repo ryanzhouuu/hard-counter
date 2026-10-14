@@ -1,3 +1,5 @@
+import type { CardChoice } from "../api/deckMatchup";
+
 type Special = "evolution" | "hero" | null;
 
 const SLOT_LABELS = ["EVO", "HERO", "WILD", null, null, null, null, null] as const;
@@ -42,4 +44,9 @@ function blockReason(cards: string[], identity: string): string | null {
   return null;
 }
 
-export { SLOT_LABELS, blockReason, rootOf, slotLayout };
+function averageElixir(cards: CardChoice[]): number | null {
+  const costs = cards.flatMap((card) => (card.elixir === null ? [] : [card.elixir]));
+  return costs.length === 0 ? null : costs.reduce((sum, cost) => sum + cost, 0) / costs.length;
+}
+
+export { SLOT_LABELS, averageElixir, blockReason, rootOf, slotLayout };
