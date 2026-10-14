@@ -1,14 +1,17 @@
 """Manual predictions use frozen model inputs without a Royale API token."""
 
 import asyncio
+import threading
 from hashlib import sha256
 from pathlib import Path
 from types import SimpleNamespace
+from typing import Any
 
 import pytest
 from httpx import ASGITransport, AsyncClient, Response
 from test_tower_attention import tower_schema
 
+from clash_sos.application.deck_matchup import matchup_options
 from clash_sos.domain.attention_model import AttentionMatchupModel
 from clash_sos.domain.attention_schema import AttentionCardSchema
 from clash_sos.domain.model_artifact import ModelArtifactManifest, ModelOutputFile
@@ -119,6 +122,20 @@ def test_options_include_official_media(artifact: Path, monkeypatch: pytest.Monk
         "icon_url": "https://api-assets.clashroyale.com/cards/300/k.png",
         "elixir": 3,
     }
+
+
+def test_options_load_the_model_off_the_event_loop(
+    artifact: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    threads: list[threading.Thread] = []
+
+    def record(*args: Any) -> Any:
+        threads.append(threading.current_thread())
+        return matchup_options(*args)
+
+    monkeypatch.setattr("clash_sos.interfaces.api.deck_matchup.matchup_options", record)
+    assert request(artifact).status_code == 200
+    assert threads and threads[0] is not threading.main_thread()
 
 
 def test_prediction_preserves_orientation_and_model_provenance(artifact: Path) -> None:

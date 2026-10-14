@@ -2,6 +2,7 @@
 
 import httpx
 from fastapi import APIRouter, HTTPException
+from fastapi.concurrency import run_in_threadpool
 
 from clash_sos.application.deck_matchup import (
     MatchupInputError,
@@ -32,7 +33,9 @@ def matchup_router(settings: Settings) -> APIRouter:
 
     async def options() -> MatchupOptions:
         try:
-            return matchup_options(settings.active_model_path, await media.get())
+            return await run_in_threadpool(
+                matchup_options, settings.active_model_path, await media.get()
+            )
         except LiveModelError as error:
             status, detail = ERRORS.get(error.args[0], ERRORS["model_unavailable"])
             raise HTTPException(status_code=status, detail=detail) from error
