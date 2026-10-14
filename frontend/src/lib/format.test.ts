@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { modeLabel, percent, relativeTime, signedValue, skipLabel } from "./format";
+import { fullTime, modeLabel, percent, relativeTime, signedValue, skipLabel } from "./format";
 
 describe("signedValue", () => {
   it.each([
@@ -52,5 +52,12 @@ describe("labels", () => {
     expect(modeLabel("Ranked1v1_NewArena2")).toBe("Ranked");
     expect(modeLabel("Ladder")).toBe("Ladder");
     expect(modeLabel("Friendly")).toBeNull();
+  });
+});
+
+describe("fullTime", () => {
+  it("formats a full local date and time", () => {
+    expect(fullTime("2026-09-25T12:00:00Z")).toMatch(/^Sep 2[45], 2026, \d{1,2}:00\s[AP]M$/u);
+    expect(fullTime(null)).toBe("");
   });
 });

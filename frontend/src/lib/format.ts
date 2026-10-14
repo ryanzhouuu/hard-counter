@@ -34,6 +34,11 @@ function relativeTime(timestamp: string | null, now: Date = new Date()): string 
   return hours < 24 ? `${hours}h` : `${Math.floor(hours / 24)}d`;
 }
 
+function fullTime(timestamp: string | null): string {
+  if (timestamp === null) return "";
+  return new Date(timestamp).toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" });
+}
+
 function skipLabel(reason: string | null): string {
   return (reason !== null && SKIP_LABELS[reason]) || "Not scored";
 }
@@ -43,5 +48,5 @@ function modeLabel(mode: string): string | null {
   return mode === "Ladder" ? "Ladder" : null;
 }
 
-export { modeLabel, percent, relativeTime, signedValue, skipLabel };
+export { fullTime, modeLabel, percent, relativeTime, signedValue, skipLabel };
 export type { Tone };

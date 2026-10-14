@@ -2,6 +2,7 @@ import type { Battle, PlayerAnalysis, Schedule } from "../../api/playerAnalysis"
 import { percent, signedValue } from "../../lib/format";
 import { winSpread } from "../../lib/stats";
 import { UPSET_DEFINITION, upsetOf } from "../../lib/upset";
+import { CopyLink } from "./CopyLink";
 import { ExpectationBar } from "./ExpectationBar";
 import { FacedMost } from "./FacedMost";
 import type { WindowSize } from "./query";
@@ -83,7 +84,10 @@ function Summary({ report, windowSize, onSelectWindow }: SummaryProps) {
   return (
     <aside className="summary" aria-label="Summary">
       <h1 className="player-name">{player.name}</h1>
-      <p className="player-meta num">{playerMeta(player)}</p>
+      <div className="player-meta-row">
+        <p className="player-meta num">{playerMeta(player)}</p>
+        <CopyLink />
+      </div>
       {available ? (
         <Headline schedule={schedule} battles={battles} />
       ) : (

@@ -1,7 +1,7 @@
 import { useId, useState } from "react";
 
 import type { Battle, Outcome } from "../../api/playerAnalysis";
-import { modeLabel, percent, relativeTime, skipLabel } from "../../lib/format";
+import { fullTime, modeLabel, percent, relativeTime, skipLabel } from "../../lib/format";
 import { type Upset, upsetOf } from "../../lib/upset";
 import { DeckGrid, MiniDeck } from "./DeckGrid";
 import "./battles.css";
@@ -38,9 +38,9 @@ function detailMeta(battle: Battle, upset: Upset | null): string {
     .join(" · ");
 }
 
-type BattleRowProps = { battle: Battle; repeatsDeck?: boolean };
+type BattleRowProps = { battle: Battle };
 
-function BattleRow({ battle, repeatsDeck = false }: BattleRowProps) {
+function BattleRow({ battle }: BattleRowProps) {
   const [open, setOpen] = useState(false);
   const detailId = useId();
   const outcome = OUTCOMES[battle.outcome];
@@ -59,10 +59,7 @@ function BattleRow({ battle, repeatsDeck = false }: BattleRowProps) {
           <span className="visually-hidden">{outcome.label}</span>
         </span>
         <span className="battle-opponent">{battle.opponent_name}</span>
-        <MiniDeck
-          cards={battle.player_cards}
-          className={repeatsDeck ? "mini-deck-player mini-deck-repeat" : "mini-deck-player"}
-        />
+        <MiniDeck cards={battle.player_cards} className="mini-deck-player" />
         <span className="battle-vs" aria-hidden="true">
           vs
         </span>
@@ -72,7 +69,11 @@ function BattleRow({ battle, repeatsDeck = false }: BattleRowProps) {
         ) : (
           <WinChance probability={battle.win_probability} upset={upset} />
         )}
-        <time className="battle-ago" dateTime={battle.timestamp ?? undefined}>
+        <time
+          className="battle-ago"
+          dateTime={battle.timestamp ?? undefined}
+          title={fullTime(battle.timestamp) || undefined}
+        >
           {relativeTime(battle.timestamp)}
         </time>
         <span className="battle-chevron" aria-hidden="true" />

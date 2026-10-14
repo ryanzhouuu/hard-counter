@@ -71,14 +71,12 @@ describe("BattleRow", () => {
     ).toBeNull();
   });
 
-  it("fades a deck repeated from the previous row", () => {
+  it("shows the full battle time on hover", () => {
     const { container } = render(
       <ul>
-        <BattleRow battle={makeBattle()} repeatsDeck />
+        <BattleRow battle={makeBattle()} />
       </ul>,
     );
-
-    expect(container.querySelector(".mini-deck-player")).toHaveClass("mini-deck-repeat");
-    expect(container.querySelector(".mini-deck-opponent")).not.toHaveClass("mini-deck-repeat");
+    expect(container.querySelector("time")).toHaveAttribute("title", expect.stringMatching(/2026/));
   });
 });

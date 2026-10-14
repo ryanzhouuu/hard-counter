@@ -1,4 +1,5 @@
 import { render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 
 import { makeAnalysis, makeBattle, makeSchedule } from "../../test/fixtures";
@@ -103,5 +104,13 @@ describe("Summary", () => {
   it("omits the faced table until the window is filled", () => {
     renderSummary(makeAnalysis({ schedule: insufficient }));
     expect(screen.queryByRole("table")).not.toBeInTheDocument();
+  });
+
+  it("copies the report link", async () => {
+    const user = userEvent.setup();
+    renderSummary();
+    await user.click(screen.getByRole("button", { name: "Copy link" }));
+    expect(await navigator.clipboard.readText()).toBe(window.location.href);
+    expect(screen.getByRole("button", { name: "Copied" })).toBeInTheDocument();
   });
 });

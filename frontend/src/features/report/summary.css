@@ -5,10 +5,27 @@
   letter-spacing: -0.02em;
 }
 
-.player-meta {
+.player-meta-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 12px;
   margin: 4px 0 28px;
+}
+
+.player-meta {
+  margin: 0;
   color: var(--muted);
   font-size: 14px;
+}
+
+.copy-link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--blue);
+  font-size: 13px;
+  cursor: pointer;
 }
 
 .headline {
