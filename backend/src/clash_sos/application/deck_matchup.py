@@ -26,6 +26,8 @@ TowerIdentity = Annotated[
     str, Field(strict=True, max_length=96, pattern=r"^[a-z0-9]+(?:-[a-z0-9]+)*:tower$")
 ]
 
+SLOT_KINDS = {"evolution": "evolution", "hero": "hero", "champion": "hero"}
+
 
 class MatchupDeck(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -37,6 +39,16 @@ class MatchupDeck(BaseModel):
     def unique_cards(self) -> Self:
         if len({identity.rsplit(":", 1)[0] for identity in self.cards}) != 8:
             raise ValueError("Select eight different cards; forms of the same card share a slot.")
+        return self
+
+    @model_validator(mode="after")
+    def legal_slots(self) -> Self:
+        kinds = [SLOT_KINDS.get(identity.rsplit(":", 1)[1]) for identity in self.cards]
+        evolutions, heroes = kinds.count("evolution"), kinds.count("hero")
+        if evolutions > 2 or heroes > 2 or evolutions + heroes > 3:
+            raise ValueError(
+                "Use at most 2 Evolutions, 2 Heroes or Champions, and 3 special cards."
+            )
         return self
 
 
