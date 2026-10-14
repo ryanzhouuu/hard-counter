@@ -4,7 +4,7 @@ import type { ComponentProps } from "react";
 import { describe, expect, it, vi } from "vitest";
 
 import { AnalysisError } from "../../api/playerAnalysis";
-import { makeAnalysis } from "../../test/fixtures";
+import { makeAnalysis, makeBattle } from "../../test/fixtures";
 import { ReportPage } from "./ReportPage";
 
 function renderPage(props: Partial<ComponentProps<typeof ReportPage>> = {}) {
@@ -55,5 +55,32 @@ describe("ReportPage", () => {
 
     expect(screen.getByRole("alert")).toHaveTextContent("Player tag not found.");
     expect(screen.queryByRole("button", { name: "Retry" })).not.toBeInTheDocument();
+  });
+
+  it("navigates rows and the tag box from the keyboard", async () => {
+    const user = userEvent.setup();
+    renderPage({
+      report: makeAnalysis({
+        battles: [makeBattle({ opponent_name: "Sora" }), makeBattle({ opponent_name: "Tariq" })],
+      }),
+    });
+    const tagBox = screen.getByRole("textbox", { name: "Player tag" });
+    await user.keyboard("/");
+    expect(tagBox).toHaveFocus();
+    expect(tagBox).toHaveValue("ABC123");
+    await user.keyboard("j");
+    expect(tagBox).toHaveValue("ABC123j");
+    tagBox.blur();
+    const rows = [...document.querySelectorAll<HTMLButtonElement>(".battle-row")];
+    await user.keyboard("j");
+    expect(rows[0]).toHaveFocus();
+    await user.keyboard("j");
+    expect(rows[1]).toHaveFocus();
+    await user.keyboard("k");
+    expect(rows[0]).toHaveFocus();
+    await user.keyboard("{Enter}");
+    expect(rows[0]).toHaveAttribute("aria-expanded", "true");
+    await user.keyboard("{Escape}");
+    expect(rows[0]).toHaveAttribute("aria-expanded", "false");
   });
 });

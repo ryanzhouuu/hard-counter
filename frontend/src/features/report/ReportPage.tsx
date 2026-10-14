@@ -5,6 +5,7 @@ import { ErrorNotice } from "./ErrorNotice";
 import type { WindowSize } from "./query";
 import { ReportSkeleton } from "./ReportSkeleton";
 import { Summary } from "./Summary";
+import { useShortcuts } from "./useShortcuts";
 import "./report.css";
 
 type ReportPageProps = {
@@ -19,6 +20,7 @@ type ReportPageProps = {
 };
 
 function ReportPage(props: ReportPageProps) {
+  useShortcuts();
   const { tag, windowSize, report, loading, error } = props;
   return (
     <div className="report-page">
