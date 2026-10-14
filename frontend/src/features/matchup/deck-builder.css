@@ -1,5 +1,4 @@
 .deck-builder {
-  position: relative;
   min-width: 0;
   margin: 0;
   padding: 20px;
@@ -8,16 +7,11 @@
   background: var(--surface);
 }
 .deck-actions {
-  position: absolute;
-  top: -9px;
-  right: 16px;
-  z-index: 1;
   display: flex;
+  justify-content: flex-end;
   gap: 12px;
-  padding: 0 6px;
-  background: var(--surface);
+  margin: -6px 0 10px;
   font-size: 12px;
-  line-height: 18px;
 }
 .deck-actions button {
   padding: 0;
