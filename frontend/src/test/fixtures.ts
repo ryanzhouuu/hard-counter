@@ -82,4 +82,4 @@ function jsonResponse(body: unknown, status = 200): Response {
   });
 }
 
-export { jsonResponse, makeAnalysis, makeBattle, makeSchedule };
+export { cards, jsonResponse, makeAnalysis, makeBattle, makeSchedule };
