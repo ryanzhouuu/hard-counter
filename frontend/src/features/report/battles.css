@@ -239,23 +239,14 @@
 
 .duel {
   display: flex;
-  flex-wrap: wrap;
-  justify-content: space-between;
-  gap: 16px 24px;
+  flex-direction: column;
+  gap: 16px;
 }
 
 .deck-side {
   display: flex;
   align-items: flex-start;
   gap: 10px;
-}
-
-.deck-mirrored .deck-label {
-  text-align: right;
-}
-
-.deck-mirrored .deck-side {
-  flex-direction: row-reverse;
 }
 
 .tower-tile {
@@ -325,19 +316,23 @@
 }
 
 @media (max-width: 959px) {
+  .deck-grid {
+    grid-template-columns: repeat(4, minmax(0, 64px));
+  }
+}
+
+@container battles (min-width: 720px) {
   .duel {
-    flex-direction: column;
+    flex-direction: row;
+    justify-content: space-between;
+    gap: 24px;
   }
 
   .deck-mirrored .deck-label {
-    text-align: left;
+    text-align: right;
   }
 
   .deck-mirrored .deck-side {
-    flex-direction: row;
-  }
-
-  .deck-grid {
-    grid-template-columns: repeat(4, minmax(0, 64px));
+    flex-direction: row-reverse;
   }
 }
