@@ -2,6 +2,9 @@
   "name": "hard-counter",
   "private": true,
   "packageManager": "pnpm@11.20.0",
+  "engines": {
+    "node": "24.x"
+  },
   "scripts": {
     "dev": "bash scripts/dev.sh",
     "web:build": "pnpm --dir frontend build",
@@ -9,6 +12,7 @@
     "web:format:check": "pnpm --dir frontend format:check",
     "web:lint": "pnpm --dir frontend lint",
     "web:test": "pnpm --dir frontend test",
-    "web:typecheck": "pnpm --dir frontend typecheck"
+    "web:typecheck": "pnpm --dir frontend typecheck",
+    "vercel:stage": "uv run --no-sync python -m scripts.vercel stage-model"
   }
 }

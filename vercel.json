@@ -1,0 +1,18 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": "fastapi",
+  "fluid": true,
+  "installCommand": "pnpm install --frozen-lockfile && uv sync --locked --no-dev --extra ml",
+  "buildCommand": "pnpm web:build && python -m scripts.vercel build",
+  "functions": {
+    "app.py": {
+      "maxDuration": 60,
+      "excludeFiles": "{backend/tests/**,frontend/**,scripts/**,docs/**,experiments/**,notebooks/**,data/**,models/**,.env,.env.*,**/__pycache__/**}"
+    }
+  },
+  "env": {
+    "CLASH_SOS_ACTIVE_MODEL_PATH": "infra/vercel/model",
+    "OMP_NUM_THREADS": "1"
+  },
+  "rewrites": [{ "source": "/", "destination": "/index.html" }]
+}

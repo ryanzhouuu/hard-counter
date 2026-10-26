@@ -82,7 +82,7 @@ target-version = "py312"
 select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
 
 [tool.pyright]
-include = ["backend/src", "backend/tests", "experiments"]
+include = ["backend/src", "backend/tests", "experiments", "scripts/vercel.py", "app.py"]
 pythonVersion = "3.12"
 typeCheckingMode = "strict"
 extraPaths = ["backend/tests/unit"]

@@ -20,10 +20,14 @@ frontend/dist/
 frontend/coverage/
 frontend/playwright-report/
 frontend/test-results/
+.vercel/
+/public/
 
 # Local data and artifacts
 data/
 models/
+infra/vercel/model/
+infra/vercel/.model-*/
 *.duckdb
 *.duckdb.tmp/
 
