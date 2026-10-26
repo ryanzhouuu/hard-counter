@@ -66,6 +66,11 @@ to switch the model artifact without changing code. It defaults to
 that ignored artifact must exist locally. The attention model needs the optional
 `ml` dependencies shown above.
 
+Live attention inference caches one verified artifact per process. Repeated
+requests reuse its CPU model; changing the selected directory or manifest reloads
+it. Treat published artifact members as immutable and restart the API after
+replacing files without changing the manifest.
+
 The web app's **Matchup** page accepts two decks with explicit card forms and,
 for tower-aware models, a tower troop on each side. It requires the selected
 model artifact and its runtime, but no Clash Royale API token for predictions.

@@ -4,6 +4,7 @@ import re
 
 import httpx
 from fastapi import APIRouter, HTTPException, Query
+from fastapi.concurrency import run_in_threadpool
 
 from clash_sos.application.live_analysis import LiveAnalysisResponse, analyze_live_player
 from clash_sos.application.live_model import LiveModelError
@@ -52,7 +53,8 @@ def player_router(settings: Settings) -> APIRouter:
                 royale = RoyaleClient(client, token.get_secret_value())
                 profile = await royale.player(normalized)
                 battles = await royale.battles(normalized)
-            return analyze_live_player(
+            return await run_in_threadpool(
+                analyze_live_player,
                 profile,
                 battles,
                 tag=normalized,

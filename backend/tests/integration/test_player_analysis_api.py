@@ -1,6 +1,7 @@
 """The HTTP route keeps the key server-side and returns live analysis."""
 
 import asyncio
+import threading
 from collections.abc import Sequence
 from pathlib import Path
 
@@ -29,6 +30,8 @@ async def _request(path: str, settings: Settings) -> Response:
 
 
 def test_lookup_returns_scored_recent_battle(monkeypatch: pytest.MonkeyPatch) -> None:
+    inference_threads: list[threading.Thread] = []
+
     async def player(_self: RoyaleClient, tag: str) -> dict[str, object]:
         assert tag == "#ABC"
         return {"tag": tag, "name": "Player", "trophies": 1234}
@@ -80,6 +83,7 @@ def test_lookup_returns_scored_recent_battle(monkeypatch: pytest.MonkeyPatch) ->
         *,
         tower_pairs: Sequence[TowerPair] | None = None,
     ) -> tuple[LiveModelInfo, tuple[MatchupPrediction, ...]]:
+        inference_threads.append(threading.current_thread())
         return info, (
             MatchupPrediction(
                 state=PredictionState.AVAILABLE,
@@ -104,6 +108,7 @@ def test_lookup_returns_scored_recent_battle(monkeypatch: pytest.MonkeyPatch) ->
         {"name": "Archers", "identity": "archers:base", "icon_url": None},
     ]
     assert "test-secret" not in response.text
+    assert inference_threads and inference_threads[0] is not threading.main_thread()
 
 
 def test_lookup_rejects_bad_tag() -> None:

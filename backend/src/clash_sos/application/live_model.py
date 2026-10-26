@@ -1,11 +1,15 @@
 """Score a recent battle batch with one configured immutable matchup artifact."""
 
+from __future__ import annotations
+
 from collections.abc import Sequence
 from dataclasses import dataclass
+from functools import lru_cache
 from hashlib import sha256
 from json import loads
 from pathlib import Path
-from typing import cast
+from threading import Lock
+from typing import TYPE_CHECKING, cast
 
 from pydantic import ValidationError
 
@@ -15,8 +19,14 @@ from clash_sos.domain.canonical import RecordIssue
 from clash_sos.domain.card_catalog import CardCatalog
 from clash_sos.domain.model_artifact import ModelArtifactManifest
 
+if TYPE_CHECKING:
+    from clash_sos.domain.attention_artifact import AttentionArtifactManifest
+    from clash_sos.domain.attention_model import AttentionMatchupModel
+    from clash_sos.domain.attention_schema import AttentionCardSchema
+
 DeckPair = tuple[tuple[str, ...], tuple[str, ...]]
 TowerPair = tuple[str | None, str | None]
+_MODEL_LOAD_LOCK = Lock()
 
 
 class LiveModelError(ValueError):
@@ -47,10 +57,11 @@ def _unavailable_prediction() -> MatchupPrediction:
     )
 
 
-def _manifest_kind(artifact: Path) -> str:
+def _manifest(artifact: Path) -> tuple[str, bytes]:
     """Reject missing or non-object manifests before selecting a loader."""
     try:
-        raw: object = loads((artifact / "manifest.json").read_text(encoding="utf-8"))
+        content = (artifact / "manifest.json").read_bytes()
+        raw: object = loads(content)
     except (OSError, ValueError) as error:
         raise LiveModelError("model_unavailable") from error
     if not isinstance(raw, dict):
@@ -59,7 +70,17 @@ def _manifest_kind(artifact: Path) -> str:
     kind = body.get("manifest_type")
     if not isinstance(kind, str):
         raise LiveModelError("model_unavailable")
-    return kind
+    return kind, content
+
+
+@lru_cache(maxsize=1)
+def _load_live_attention(
+    artifact: Path, manifest_bytes: bytes
+) -> tuple[AttentionArtifactManifest, AttentionCardSchema, AttentionMatchupModel]:
+    """Reuse one immutable artifact until its resolved path or manifest bytes change."""
+    from clash_sos.infrastructure.ml.attention_artifact_io import load_attention_artifact
+
+    return load_attention_artifact(artifact)
 
 
 def score_live_decks(
@@ -71,16 +92,13 @@ def score_live_decks(
     """Retain training provenance and exclude pairs outside the frozen vocabulary."""
     if tower_pairs is not None and len(tower_pairs) != len(pairs):
         raise ValueError("tower pairs must align with deck pairs")
-    kind = _manifest_kind(artifact)
+    kind, manifest_bytes = _manifest(artifact)
     if kind == "matchup_attention":
         try:
             import torch
 
-            from clash_sos.infrastructure.ml.attention_artifact_io import load_attention_artifact
-        except ImportError as error:
-            raise LiveModelError("missing_ml_runtime") from error
-        try:
-            manifest, schema, model = load_attention_artifact(artifact)
+            with _MODEL_LOAD_LOCK:
+                manifest, schema, model = _load_live_attention(artifact.resolve(), manifest_bytes)
             vocabulary = set(schema.identity_vocab)
             with_towers = schema.tower_catalog is not None
             tower_vocabulary: set[str] = (
@@ -111,6 +129,8 @@ def score_live_decks(
                         supported, torch.sigmoid(logits.to(dtype=torch.float64)), strict=True
                     ):
                         probabilities[index] = float(value.item())
+        except ImportError as error:
+            raise LiveModelError("missing_ml_runtime") from error
         except (OSError, ValueError, RuntimeError) as error:
             raise LiveModelError("model_unavailable") from error
         info = LiveModelInfo(
