@@ -21,9 +21,11 @@
 !/scripts
 /scripts/*
 !/scripts/vercel.py
+!/scripts/vercel_model.py
 !/infra
 /infra/*
 !/infra/vercel
 /infra/vercel/*
 !/infra/vercel/model
+!/infra/vercel/model-release.json
 **/__pycache__

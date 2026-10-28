@@ -1,16 +1,42 @@
-# Vercel preview deployment
+# Vercel deployment
 
 The repository deploys as one FastAPI project. Vercel serves the built React app
 from its CDN and routes API requests to a Python function on the same domain.
 Use the repository root as the project's Root Directory; `vercel.json` selects
 the FastAPI framework and supplies the install and build commands.
 
-This initial workflow uses a CLI deployment from a machine with the selected
-model artifact. The artifact stays ignored by Git. A Git-only deployment does
-not contain that artifact and fails the build until a separate model-provisioning
-step is added.
+Git pushes and CLI deployments use the model release pinned in
+`infra/vercel/model-release.json`. The descriptor contains an immutable private
+Vercel Blob URL and the archive's SHA-256 digest. Model bytes stay outside Git.
+Each build downloads that release, checks its digest, rejects unsafe archive
+members, and validates every file against the model manifest before packaging.
+It replaces any stale staged model from a previous build.
 
-## Prepare the selected model
+## Configure private model storage
+
+The `hard-counter-models` private Blob store is connected to Preview and
+Production. Its archive contains the complete
+`official-ranked16-june-finetuned-pair-20261013-v1` artifact.
+
+For a new Vercel project, create and connect a private store:
+
+```bash
+pnpm dlx vercel blob create-store hard-counter-models --access private --yes \
+  --environment preview --environment production
+```
+
+Set `BLOB_STORE_ID` to the returned store ID for both environments. Vercel supplies
+`VERCEL_OIDC_TOKEN` to builds; the download uses this short-lived token first and
+falls back to `BLOB_READ_WRITE_TOKEN` when no OIDC token is available. These
+credentials belong in Vercel environment settings, never in Git or frontend code.
+See [private Blob authentication](https://vercel.com/docs/vercel-blob/private-storage#accessing-without-the-sdk).
+
+The archive is downloaded at build time and bundled in the Python function.
+Live predictions do not fetch the model from Blob. Downloads and expanded
+archives are limited to 64 MiB; authentication failures, checksum mismatches, and
+invalid model files stop the build before frontend assets are published.
+
+## Publish a different model
 
 Install dependencies as described in [SETUP.md](SETUP.md), including the `ml`
 extra. Set `CLASH_SOS_ACTIVE_MODEL_PATH` in your local `.env` to the model you
@@ -27,10 +53,32 @@ pnpm vercel:stage models/YOUR_MODEL_VERSION
 ```
 
 Staging copies and validates the complete artifact before replacing the previous
-copy in ignored `infra/vercel/model/`. The CLI upload allowlist includes this
-directory, the application source, and build inputs. It excludes `.env`, local
-datasets, other models, and local working material. Model files are packaged in
-the function, outside the public frontend assets.
+copy in ignored `infra/vercel/model/`. Package it and compute the release digest:
+
+```bash
+COPYFILE_DISABLE=1 tar -czf /tmp/model.tar.gz -C infra/vercel/model .
+shasum -a256 /tmp/model.tar.gz
+```
+
+For local Blob operations, export the connected store's `BLOB_READ_WRITE_TOKEN`.
+Local OIDC tokens use the Development environment, which this workflow does not
+connect. Clear OIDC variables for the local upload:
+
+```bash
+VERCEL_OIDC_TOKEN= BLOB_STORE_ID= pnpm dlx vercel blob put /tmp/model.tar.gz \
+  --access private --no-multipart --pathname models/YOUR_MODEL_VERSION/SHA256.tar.gz
+```
+
+Use the actual model version and digest in the pathname. Update the descriptor
+with the returned URL and digest, then commit it with any corresponding code.
+Publish each new archive to a new pathname; retain previous releases for
+rollback. Changing only the locally staged model does not change a pinned build.
+
+The CLI upload allowlist includes the release descriptor, provisioning scripts,
+application source, build inputs, and optional staged model. It excludes `.env`,
+local datasets, other models, and local working material. Model files are
+packaged in the function, outside the public frontend assets. Without a release
+descriptor, CLI builds can still use a locally staged artifact.
 
 ## Link a Vercel project
 
@@ -72,14 +120,16 @@ backend package instead of an editable import path pointing at the build machine
 
 ## Deploy and verify a preview
 
-After staging the intended model and configuring Preview variables:
+After publishing the pinned model and configuring Preview variables, push a
+branch to the connected Git repository or deploy using the CLI:
 
 ```bash
 pnpm dlx vercel
 ```
 
 The command creates a preview deployment. Its build compiles the frontend,
-verifies the uploaded model, and copies `frontend/dist/` into ignored `public/`.
+downloads and verifies the pinned model, and copies `frontend/dist/` into ignored
+`public/`.
 Vercel serves those public files from its CDN. API routes retain their `/api`
 prefix; the root URL serves `index.html`, including report and matchup query
 parameters.
@@ -99,16 +149,17 @@ Check the resulting preview:
 4. Compare the first request with subsequent requests and inspect function memory
    and duration in Vercel before promoting the preview.
 
-After the preview checks pass, publish the same staged source using Production
-variables with `pnpm dlx vercel --prod`. Verify the resulting production URL with
-the same checks before sharing it.
+After the preview checks pass, merge to `main` to trigger the Git production
+deployment, or publish using Production variables with `pnpm dlx vercel --prod`.
+Verify the resulting production URL with the same checks before sharing it.
 
 Live attention inference reuses one verified CPU model per warm function
 instance. A new instance still pays import and model-loading costs; published
 artifact members must remain immutable. A changed directory or manifest reloads
 the cached model.
 
-To exercise the build preparation locally after staging:
+To exercise the pinned build locally, export `BLOB_READ_WRITE_TOKEN` from the
+connected store and leave `VERCEL_OIDC_TOKEN` unset:
 
 ```bash
 pnpm web:build

@@ -29,8 +29,8 @@ Live battle history is not saved locally.
 See [SETUP.md](docs/SETUP.md) for installation, local commands, data
 preparation, model training, and quality checks.
 
-See [DEPLOYMENT.md](docs/DEPLOYMENT.md) for staging a selected model and deploying
-the frontend and API together as a Vercel preview.
+See [DEPLOYMENT.md](docs/DEPLOYMENT.md) for publishing a pinned model and deploying
+the frontend and API together on Vercel.
 
 See [MODEL_INPUTS.md](docs/MODEL_INPUTS.md) for selected card catalogs and
 attributes, attention cache rebuilding, and live model coverage.
