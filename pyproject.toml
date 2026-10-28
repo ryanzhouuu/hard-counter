@@ -60,6 +60,9 @@ clash-sos-worker = "clash_sos.interfaces.workers.main:app"
 [tool.hatch.build.targets.wheel]
 packages = ["backend/src/clash_sos"]
 
+[tool.vercel.fastapi.static]
+exclude = true
+
 [tool.pytest.ini_options]
 addopts = "--strict-config --strict-markers"
 pythonpath = [".", "backend/src", "backend/tests/unit"]

@@ -83,6 +83,11 @@ Vercel serves those public files from its CDN. API routes retain their `/api`
 prefix; the root URL serves `index.html`, including report and matchup query
 parameters.
 
+The Vercel entrypoint mounts `public/` after the API routes so Vercel's FastAPI
+collector discovers the built frontend. `[tool.vercel.fastapi.static]` excludes
+collected assets from the function bundle while retaining the directory stubs
+needed for startup and fallback routing.
+
 Check the resulting preview:
 
 1. Open `/health` to confirm the function starts. This does not verify the model
