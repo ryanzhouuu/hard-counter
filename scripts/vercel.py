@@ -1,14 +1,17 @@
-"""Stage an ignored model for CLI uploads and publish Vite output to Vercel's CDN."""
+"""Provision the deployment model and publish Vite output to Vercel's CDN."""
 
 import argparse
 import shutil
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
+from scripts.vercel_model import downloaded_model
+
 from clash_sos.application.live_model import score_live_decks
 from clash_sos.infrastructure.settings import Settings
 
 MODEL_DIRECTORY = Path("infra/vercel/model")
+MODEL_RELEASE = Path("infra/vercel/model-release.json")
 
 
 def stage_model(source: Path, destination: Path = MODEL_DIRECTORY) -> Path:
@@ -31,8 +34,12 @@ def prepare_public(
     frontend: Path = Path("frontend/dist"),
     model: Path = MODEL_DIRECTORY,
     destination: Path = Path("public"),
+    release: Path | None = None,
 ) -> None:
-    """Fail before publishing assets when the CLI-uploaded model is missing or invalid."""
+    """Validate the pinned release or staged model before publishing frontend assets."""
+    if release is not None:
+        with downloaded_model(release) as source:
+            stage_model(source, model)
     if not (model / "manifest.json").is_file():
         raise FileNotFoundError(
             "Model missing: run pnpm vercel:stage before deploying with the CLI."
@@ -56,7 +63,7 @@ def main() -> None:
         source = arguments.source or Settings().active_model_path
         print(f"Staged model at {stage_model(source)}")
     else:
-        prepare_public()
+        prepare_public(release=MODEL_RELEASE if MODEL_RELEASE.is_file() else None)
 
 
 if __name__ == "__main__":
