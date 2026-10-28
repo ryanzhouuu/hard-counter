@@ -42,7 +42,8 @@ pnpm dlx vercel link
 Choose the intended account and project, with the repository root as its source.
 The resulting `.vercel/` directory stays ignored by Git.
 
-In the project's **Preview** environment, configure:
+Configure these project variables for **Preview** and **Production** before
+deploying to each environment:
 
 | Variable                         | Value                                                                 |
 | -------------------------------- | --------------------------------------------------------------------- |
@@ -97,6 +98,10 @@ Check the resulting preview:
 3. Look up a known player to verify the proxy, key, and battle analysis together.
 4. Compare the first request with subsequent requests and inspect function memory
    and duration in Vercel before promoting the preview.
+
+After the preview checks pass, publish the same staged source using Production
+variables with `pnpm dlx vercel --prod`. Verify the resulting production URL with
+the same checks before sharing it.
 
 Live attention inference reuses one verified CPU model per warm function
 instance. A new instance still pays import and model-loading costs; published
