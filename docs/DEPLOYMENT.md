@@ -66,6 +66,9 @@ OpenMP to one thread. It installs locked dependencies with the `ml` extra and
 without the development group. Local settings and development commands continue
 to use their existing model selection.
 
+The deployment install uses `--no-editable` so the function contains the installed
+backend package instead of an editable import path pointing at the build machine.
+
 ## Deploy and verify a preview
 
 After staging the intended model and configuring Preview variables:
