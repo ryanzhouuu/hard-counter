@@ -1,6 +1,7 @@
 """Deployment staging preserves verified model bytes and separates them from public assets."""
 
 import json
+import shutil
 import sys
 import tarfile
 from hashlib import sha256
@@ -215,6 +216,17 @@ def test_build_command_downloads_without_a_staged_model(
     (frontend / "index.html").write_text("frontend")
     monkeypatch.chdir(tmp_path)
     monkeypatch.setattr(sys, "argv", ["vercel", "build"])
+
+    main()
+
+    assert snapshot(tmp_path / "infra/vercel/model") == snapshot(model)
+    assert snapshot(tmp_path / "public") == snapshot(frontend)
+
+    def offline_client(*, timeout: float) -> httpx.Client:
+        raise httpx.ConnectError("Model storage unavailable")
+
+    shutil.rmtree(tmp_path / "infra/vercel/model")
+    monkeypatch.setattr(httpx, "Client", offline_client)
 
     main()
 

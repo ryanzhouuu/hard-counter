@@ -8,9 +8,21 @@ the FastAPI framework and supplies the install and build commands.
 Git pushes and CLI deployments use the model release pinned in
 `infra/vercel/model-release.json`. The descriptor contains an immutable private
 Vercel Blob URL and the archive's SHA-256 digest. Model bytes stay outside Git.
-Each build downloads that release, checks its digest, rejects unsafe archive
+Each build obtains that release, checks its digest, rejects unsafe archive
 members, and validates every file against the model manifest before packaging.
 It replaces any stale staged model from a previous build.
+
+The build command caches archives by SHA-256 in ignored
+`node_modules/.cache/hard-counter-models/`, covered by Vercel's
+[`node_modules` build cache](https://vercel.com/docs/deployments/troubleshoot-a-build#what-is-cached).
+Every cache hit is copied into a temporary workspace and rehashed before use.
+Missing, corrupt, or oversized entries trigger a fresh download of the exact
+pinned release; a different cached model is never substituted. A downloaded
+archive is cached atomically only after extraction and model validation succeed.
+Failed downloads and checksum mismatches stop the build without caching partial
+bytes. The archive cache is excluded from the deployed Python function and is
+never copied into public assets. Vercel may evict its build cache, so a cache miss
+still requires working Blob access.
 
 ## Configure private model storage
 
@@ -31,7 +43,7 @@ falls back to `BLOB_READ_WRITE_TOKEN` when no OIDC token is available. These
 credentials belong in Vercel environment settings, never in Git or frontend code.
 See [private Blob authentication](https://vercel.com/docs/vercel-blob/private-storage#accessing-without-the-sdk).
 
-The archive is downloaded at build time and bundled in the Python function.
+The model is provisioned at build time and bundled in the Python function.
 Live predictions do not fetch the model from Blob. Downloads and expanded
 archives are limited to 64 MiB; authentication failures, checksum mismatches, and
 invalid model files stop the build before frontend assets are published.

@@ -12,6 +12,7 @@ from clash_sos.infrastructure.settings import Settings
 
 MODEL_DIRECTORY = Path("infra/vercel/model")
 MODEL_RELEASE = Path("infra/vercel/model-release.json")
+MODEL_CACHE = Path("node_modules/.cache/hard-counter-models")
 
 
 def stage_model(source: Path, destination: Path = MODEL_DIRECTORY) -> Path:
@@ -35,10 +36,11 @@ def prepare_public(
     model: Path = MODEL_DIRECTORY,
     destination: Path = Path("public"),
     release: Path | None = None,
+    cache: Path | None = None,
 ) -> None:
     """Validate the pinned release or staged model before publishing frontend assets."""
     if release is not None:
-        with downloaded_model(release) as source:
+        with downloaded_model(release, cache=cache) as source:
             stage_model(source, model)
     if not (model / "manifest.json").is_file():
         raise FileNotFoundError(
@@ -63,7 +65,9 @@ def main() -> None:
         source = arguments.source or Settings().active_model_path
         print(f"Staged model at {stage_model(source)}")
     else:
-        prepare_public(release=MODEL_RELEASE if MODEL_RELEASE.is_file() else None)
+        prepare_public(
+            release=MODEL_RELEASE if MODEL_RELEASE.is_file() else None, cache=MODEL_CACHE
+        )
 
 
 if __name__ == "__main__":
