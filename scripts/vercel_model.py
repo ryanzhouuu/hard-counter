@@ -74,12 +74,35 @@ def _extract(archive: Path, destination: Path) -> None:
         bundle.extractall(destination, members=members, filter="data")
 
 
+def _restore_archive(source: Path, destination: Path, expected_digest: str) -> bool:
+    """Snapshot a bounded cache entry; a missing or mismatched archive is a cache miss."""
+    digest, size = sha256(), 0
+    try:
+        with source.open("rb") as cached, destination.open("wb") as output:
+            while chunk := cached.read(1024 * 1024):
+                size += len(chunk)
+                if size > MAX_MODEL_BYTES:
+                    return False
+                digest.update(chunk)
+                output.write(chunk)
+    except FileNotFoundError:
+        return False
+    return digest.hexdigest() == expected_digest
+
+
 @contextmanager
-def downloaded_model(release_file: Path) -> Generator[Path, None, None]:
-    """Yield extracted bytes only after checksum verification; remove them on exit."""
+def downloaded_model(release_file: Path, cache: Path | None = None) -> Generator[Path, None, None]:
+    """Reverify cached bytes; atomically cache downloads only after caller validation succeeds."""
     release = ModelRelease.model_validate_json(release_file.read_bytes())
-    with TemporaryDirectory(prefix="vercel-model-") as workspace:
+    cached = cache / f"{release.sha256}.tar.gz" if cache is not None else None
+    if cache is not None:
+        cache.mkdir(parents=True, exist_ok=True)
+    with TemporaryDirectory(prefix="vercel-model-", dir=cache) as workspace:
         archive, extracted = Path(workspace) / "model.tar.gz", Path(workspace) / "model"
-        _download(release, archive)
+        cache_hit = cached is not None and _restore_archive(cached, archive, release.sha256)
+        if not cache_hit:
+            _download(release, archive)
         _extract(archive, extracted)
         yield extracted
+        if cached is not None and not cache_hit:
+            archive.replace(cached)
